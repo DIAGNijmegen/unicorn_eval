@@ -5,7 +5,7 @@ import json
 from sklearn.metrics import cohen_kappa_score
 from sksurv.metrics import concordance_index_censored
 
-from unicorn_eval.adaptors import (density_map, knn_probing, linear_probing,
+from unicorn_eval.adaptors import (density_map, knn_probing, linear_probing, logistic_regression,
                                    mlp, segmentation_upsampling,
                                    weighted_knn_probing)
 from unicorn_eval.metrics.dice import compute_dice_score
@@ -52,70 +52,70 @@ METRIC_DICT = {
 
 
 def aggregate_features(
+    *,
     adaptor: str,
     task_type: str,
-    train_feats,
+    train_feats: np.ndarray,
+    train_labels: np.ndarray,
+    test_feats: np.ndarray,
     train_cases,
-    train_labels,
-    test_feats,
     train_coords=None,
     test_coords=None,
     test_cases=None,
     patch_size=224,
     test_image_sizes=None,
-    image_spacing=None,
 ):
     num_train_samples = len(train_feats)
-    num_classes = len(np.unique(train_labels))
     if "-nn" in adaptor:
         k = int(adaptor.split("-nn")[0])
         k = min(k, num_train_samples)
         if "weighted" in adaptor:
             predictions = weighted_knn_probing(
-                train_feats, train_labels, test_feats, task_type=task_type, k=k,
+                train_feats=train_feats, train_labels=train_labels, test_feats=test_feats, task_type=task_type, k=k
             )
         else:
             predictions = knn_probing(
-                train_feats, train_labels, test_feats, task_type=task_type, k=k, num_workers=4
+                train_feats=train_feats, train_labels=train_labels, test_feats=test_feats, task_type=task_type, k=k, num_workers=4
             )
+    elif adaptor == "logistic-regression":
+        predictions = logistic_regression(
+            train_feats=train_feats, train_labels=train_labels, test_feats=test_feats, max_iter=1000, C=1.0, solver="lbfgs"
+        )
     elif adaptor == "linear-probing":
         predictions = linear_probing(
-            train_feats, train_labels, test_feats, max_iter=1000, C=1.0, solver="lbfgs"
+            train_feats=train_feats, train_labels=train_labels, test_feats=test_feats, num_epochs=100, learning_rate=0.001
         )
     elif adaptor == "mlp":
-        input_dim = train_feats.shape[1]
         predictions = mlp(
-            train_feats,
-            train_labels,
-            test_feats,
-            input_dim=input_dim,
-            num_classes=num_classes,
+            train_feats=train_feats,
+            train_labels=train_labels,
+            test_feats=test_feats,
             hidden_dim=256,
             num_epochs=100,
             learning_rate=0.001,
         )
     elif adaptor == "density-map":
         predictions = density_map(
-            train_feats,
-            train_coords,
-            train_cases,
-            train_labels,
-            test_feats,
-            test_coords,
-            test_cases, # try to remove this input
+            train_feats=train_feats,
+            train_coords=train_coords,
+            train_cases=train_cases,
+            train_labels=train_labels,
+            test_feats=test_feats,
+            test_coords=test_coords,
+            test_cases=test_cases,
             patch_size=patch_size[0],
             heatmap_size=16,
         )
     elif adaptor == "segmentation-upsampling":
         predictions = segmentation_upsampling(
-            train_feats,
-            train_coords,
-            train_cases,
-            train_labels,
-            test_feats,
-            test_coords,
-            test_cases, # try to remove this input
-            test_image_sizes,
+            train_feats=train_feats,
+            train_coords=train_coords,
+            train_cases=train_cases,
+            train_labels=train_labels,
+            test_feats=test_feats,
+            test_coords=test_coords,
+            test_cases=test_cases,
+            test_image_sizes=test_image_sizes,
             patch_size=patch_size[0],
         )
     else:

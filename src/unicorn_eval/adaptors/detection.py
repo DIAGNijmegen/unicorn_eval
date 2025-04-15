@@ -246,6 +246,7 @@ def construct_detection_labels(
 
 
 def density_map(
+    *,
     train_feats,
     train_coords,
     train_cases,

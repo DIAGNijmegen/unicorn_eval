@@ -40,6 +40,7 @@ def preprocess_features(
 
 
 def knn_probing(
+    *,
     train_feats: np.ndarray,
     train_labels: np.ndarray,
     test_feats: np.ndarray,
@@ -48,7 +49,6 @@ def knn_probing(
     num_workers: int = 8,
     center_feats: bool = False,
     normalize_feats: bool = False,
-    event: Optional[np.ndarray] = None,  # only needed for survival
 ) -> np.ndarray:
     """
     Perform KNN probing for classification, regression, or survival analysis.
@@ -62,10 +62,9 @@ def knn_probing(
         num_workers: Number of parallel jobs (for sklearn models)
         center_feats: Subtract mean from features
         normalize_feats: L2 normalize features
-        event: Event indicators (1 = event occurred, 0 = censored). Required for survival.
 
     Returns:
-        np.ndarray: Predictions for classification/regression or list of survival functions
+        np.ndarray: Predictions for classification/regression
     """
     train_feats, test_feats = preprocess_features(
         train_feats, test_feats,
@@ -88,6 +87,7 @@ def knn_probing(
 
 
 def weighted_knn_probing(
+    *,
     train_feats: np.ndarray,
     train_labels: np.ndarray,
     test_feats: np.ndarray,
@@ -169,49 +169,11 @@ def weighted_knn_probing(
     return predictions
 
 
-def prototype_classification(
+def logistic_regression(
+    *,
     train_feats: np.ndarray,
     train_labels: np.ndarray,
     test_feats: np.ndarray,
-    center_feats: bool = True,
-    normalize_feats: bool = True,
-) -> torch.Tensor:
-    """
-    Perform prototype-based classification (few-shot learning).
-
-    Args:
-        train_feats (torch.Tensor): Training feature vectors.
-        train_labels (torch.Tensor): Training labels.
-        test_feats (torch.Tensor): Test feature vectors.
-        center_feats (bool): Whether to center features.
-        normalize_feats (bool): Whether to normalize features.
-
-    Returns:
-        torch.Tensor: Predicted labels for test data.
-    """
-    train_feats, test_feats = preprocess_features(
-        train_feats, test_feats, center_feats, normalize_feats
-    )
-
-    unique_labels = torch.unique(train_labels, sorted=True)
-    prototypes = torch.stack(
-        [train_feats[train_labels == lbl].mean(dim=0) for lbl in unique_labels]
-    )
-
-    # Ensure compatibility with device
-    prototypes, unique_labels = prototypes.to(test_feats.device), unique_labels.to(
-        test_feats.device
-    )
-
-    # Compute pairwise distances & get nearest prototype
-    distances = (test_feats[:, None] - prototypes[None, :]).norm(dim=-1, p=2)
-    return unique_labels[distances.argmin(dim=1)]
-
-
-def linear_probing(
-    train_data: np.ndarray,
-    train_labels: np.ndarray,
-    test_data: np.ndarray,
     max_iter: int = 1000,
     C: float = 1.0,
     solver: str = "lbfgs",
@@ -220,9 +182,9 @@ def linear_probing(
     Perform logistic regression classification.
 
     Args:
-        train_data (np.ndarray): Training data.
+        train_feats (np.ndarray): Training features.
         train_labels (np.ndarray): Training labels.
-        test_data (np.ndarray): Test data.
+        test_feats (np.ndarray): Test features.
         max_iter (int): Maximum iterations.
         C (float): Regularization strength.
         solver (str): Optimization solver.
@@ -231,9 +193,85 @@ def linear_probing(
         np.ndarray: Predicted labels for test data.
     """
     model = LogisticRegression(C=C, max_iter=max_iter, solver=solver, random_state=0)
-    model.fit(train_data, train_labels)
+    model.fit(train_feats, train_labels)
 
-    return model.predict(test_data)
+    return model.predict(test_feats)
+
+
+class LPClassifier(nn.Module):
+    """
+    A simple linear classifier.
+    """
+
+    def __init__(self, input_dim: int, output_dim: int):
+        super().__init__()
+        self.fc = nn.Linear(input_dim, output_dim)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.fc(x)
+
+
+def linear_probing(
+    *,
+    train_feats: np.ndarray,
+    train_labels: np.ndarray,
+    test_feats: np.ndarray,
+    num_epochs: int = 100,
+    learning_rate: float = 0.001,
+) -> np.ndarray:
+    """
+    Train a linear classifier using torch.
+
+    Args:
+        train_feats (np.ndarray): Training features.
+        train_labels (np.ndarray: Training labels.
+        test_feats (np.ndarray): Test features.
+        num_epochs (int): Number of training epochs.
+        learning_rate (float): Learning rate.
+
+    Returns:
+        np.ndarray: Predicted labels for test data.
+    """
+    input_dim = train_feats.shape[1]
+    num_classes = len(np.unique(train_labels))
+
+    # check if GPU is available
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    # convert arrays to tensors
+    train_feats = torch.tensor(train_feats, dtype=torch.float32)
+    train_labels = torch.tensor(train_labels, dtype=torch.long)
+    test_feats = torch.tensor(test_feats, dtype=torch.float32)
+
+    # move data to device
+    train_feats, train_labels = train_feats.to(device), train_labels.to(device)
+    test_feats = test_feats.to(device)
+
+    # initialize linear model
+    model = LPClassifier(input_dim, num_classes).to(device)
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+
+    # training loop
+    for epoch in range(num_epochs):
+        model.train()
+        optimizer.zero_grad()
+
+        outputs = model(train_feats)
+        loss = criterion(outputs, train_labels)
+        loss.backward()
+        optimizer.step()
+
+        if (epoch + 1) % 10 == 0:
+            print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.4f}")
+
+    # inference
+    model.eval()
+    with torch.no_grad():
+        test_outputs = model(test_feats)
+        _, test_preds = torch.max(test_outputs, 1)
+
+    return test_preds.cpu().numpy()
 
 
 class MLPClassifier(nn.Module):
@@ -253,43 +291,43 @@ class MLPClassifier(nn.Module):
 
 
 def mlp(
-    train_data: np.ndarray,
+    *,
+    train_feats: np.ndarray,
     train_labels: np.ndarray,
-    test_data: np.ndarray,
-    input_dim: int,
-    num_classes: int,
+    test_feats: np.ndarray,
     hidden_dim: int = 64,
     num_epochs: int = 100,
     learning_rate: float = 0.001,
-) -> torch.Tensor:
+) -> np.ndarray:
     """
     Train an MLP classifier.
 
     Args:
-        train_data (torch.Tensor): Training feature vectors.
-        train_labels (torch.Tensor): Training labels.
-        test_data (torch.Tensor): Test feature vectors.
-        test_labels (torch.Tensor): Test labels.
-        input_dim (int): Input feature dimension.
-        num_classes (int): Number of output classes.
+        train_feats (np.ndarray): Training features.
+        train_labels (np.ndarray): Training labels.
+        test_feats (np.ndarray): Test features.
+        test_labels (np.ndarray): Test labels.
         hidden_dim (int): Hidden layer size.
         num_epochs (int): Number of training epochs.
-        batch_size (int): Batch size.
         learning_rate (float): Learning rate.
 
     Returns:
-        torch.Tensor: Predicted labels for test data.
+        np.ndarray: Predicted labels for test data.
     """
+    input_dim = train_feats.shape[1]
+    num_classes = len(np.unique(train_labels))
+
+    # check if GPU is available
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    # Convert data to PyTorch tensors
-    train_data = torch.tensor(train_data, dtype=torch.float32)
+    # convert arrays to tensors
+    train_feats = torch.tensor(train_feats, dtype=torch.float32)
     train_labels = torch.tensor(train_labels, dtype=torch.long)
-    test_data = torch.tensor(test_data, dtype=torch.float32)
+    test_feats = torch.tensor(test_feats, dtype=torch.float32)
 
     # Move data to device
-    train_data, train_labels = train_data.to(device), train_labels.to(device)
-    test_data = test_data.to(device)
+    train_feats, train_labels = train_feats.to(device), train_labels.to(device)
+    test_feats = test_feats.to(device)
 
     # Initialize model
     model = MLPClassifier(input_dim, hidden_dim, num_classes).to(device)
@@ -301,7 +339,7 @@ def mlp(
         model.train()
         optimizer.zero_grad()
 
-        outputs = model(train_data)
+        outputs = model(train_feats)
         loss = criterion(outputs, train_labels)
         loss.backward()
         optimizer.step()
@@ -312,7 +350,7 @@ def mlp(
     # Evaluation
     model.eval()
     with torch.no_grad():
-        test_outputs = model(test_data)
+        test_outputs = model(test_feats)
         _, test_preds = torch.max(test_outputs, 1)
 
-    return test_preds
+    return test_preds.cpu().numpy()
