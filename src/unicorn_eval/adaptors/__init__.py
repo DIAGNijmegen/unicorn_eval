@@ -14,18 +14,20 @@
 
 from unicorn_eval.adaptors.classification import (
     knn_probing,
+    weighted_knn_probing,
+    logistic_regression,
     linear_probing,
     mlp,
-    weighted_knn_probing,
 )
 from unicorn_eval.adaptors.detection import density_map
 from unicorn_eval.adaptors.segmentation import segmentation_upsampling
 
 __all__ = [
     "knn_probing",
+    "logistic_regression",
+    "weighted_knn_probing",
     "linear_probing",
     "mlp",
-    "weighted_knn_probing",
     "density_map",
     "segmentation_upsampling",
 ]
