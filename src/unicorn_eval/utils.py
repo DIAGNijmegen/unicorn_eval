@@ -1,0 +1,315 @@
+from functools import partial
+
+import numpy as np
+import json
+from sklearn.metrics import cohen_kappa_score
+from sksurv.metrics import concordance_index_censored
+
+from unicorn_eval.adaptors import (density_map, knn_probing, linear_probing,
+                                   mlp, segmentation_upsampling,
+                                   weighted_knn_probing)
+from unicorn_eval.metrics.dice import compute_dice_score
+from unicorn_eval.metrics.f1_score import compute_f1
+from unicorn_eval.metrics.vision_language import compute_average_language_metric
+
+METRIC_DICT = {
+    "Task01_classifying_he_prostate_biopsies_into_isup_scores": {
+        "name": "cohen-kappa-quadratic",
+        "fn": partial(cohen_kappa_score, weights="quadratic"),
+        "range": (-1, 1),
+    },
+    "Task03_predicting_the_time_to_biochemical_recurrence_in_he_prostatectomies": {
+        "name": "c-index",
+        "fn": concordance_index_censored,
+        "range": (0, 1),
+    },
+    "Task04_predicting_slide_level_tumor_proportion_score_in_ihc_stained_wsi": {
+        "name": "cohen-kappa-quadratic",
+        "fn": partial(cohen_kappa_score, weights="quadratic"),
+        "range": (-1, 1),
+    },
+    "Task05_detecting_signet_ring_cells_in_he_stained_wsi_of_gastric_cancer": {
+        "name": "froc",
+        "fn": compute_f1,
+        "range": (0, 1),
+    },
+    "Task08_detecting_mitotic_figures_in_breast_cancer_wsis": {
+        "name": "froc",
+        "fn": compute_f1,
+        "range": (0, 1),
+    },
+    "Task09_segmenting_rois_in_breast_cancer_wsis": {
+        "name": "dice",
+        "fn": compute_dice_score,
+        "range": (0, 1),
+    },
+    "Task20_generating_caption_from_wsi": {
+        "name": "average_language_metric",
+        "fn": compute_average_language_metric,
+        "range": (0, 1),
+    },
+}
+
+
+def aggregate_features(
+    adaptor: str,
+    task_type: str,
+    train_feats,
+    train_cases,
+    train_labels,
+    test_feats,
+    train_coords=None,
+    test_coords=None,
+    test_cases=None,
+    patch_size=224,
+    test_image_sizes=None,
+    image_spacing=None,
+):
+    num_train_samples = len(train_feats)
+    num_classes = len(np.unique(train_labels))
+    if "-nn" in adaptor:
+        k = int(adaptor.split("-nn")[0])
+        k = min(k, num_train_samples)
+        if "weighted" in adaptor:
+            predictions = weighted_knn_probing(
+                train_feats, train_labels, test_feats, task_type=task_type, k=k,
+            )
+        else:
+            predictions = knn_probing(
+                train_feats, train_labels, test_feats, task_type=task_type, k=k, num_workers=4
+            )
+    elif adaptor == "linear-probing":
+        predictions = linear_probing(
+            train_feats, train_labels, test_feats, max_iter=1000, C=1.0, solver="lbfgs"
+        )
+    elif adaptor == "mlp":
+        input_dim = train_feats.shape[1]
+        predictions = mlp(
+            train_feats,
+            train_labels,
+            test_feats,
+            input_dim=input_dim,
+            num_classes=num_classes,
+            hidden_dim=256,
+            num_epochs=100,
+            learning_rate=0.001,
+        )
+    elif adaptor == "density-map":
+        predictions = density_map(
+            train_feats,
+            train_coords,
+            train_cases,
+            train_labels,
+            test_feats,
+            test_coords,
+            test_cases, # try to remove this input
+            patch_size=patch_size[0],
+            heatmap_size=16,
+        )
+    elif adaptor == "segmentation-upsampling":
+        predictions = segmentation_upsampling(
+            train_feats,
+            train_coords,
+            train_cases,
+            train_labels,
+            test_feats,
+            test_coords,
+            test_cases, # try to remove this input
+            test_image_sizes,
+            patch_size=patch_size[0],
+        )
+    else:
+        raise ValueError(f"Unknown adaptor: {adaptor}")
+    return predictions
+
+
+def convert_numpy_types(obj):
+    """Recursively converts numpy types to native Python types."""
+    if isinstance(obj, np.int64):
+        return int(obj)
+    elif isinstance(obj, np.float64):
+        return float(obj)
+    else:
+        return obj
+
+
+def evaluate_predictions(task_name, case_ids, test_predictions, test_labels, test_extra_labels=None):
+
+    metrics = {
+        "predictions": [],  # list to store individual case results
+        "metrics": {}, # dictionary to store main metric
+        "additional_metrics": {},  # dictionary to store additional metrics
+    }
+
+    for case_id, prediction, ground_truth in zip(case_ids, test_predictions, test_labels):
+        ground_truth = convert_numpy_types(ground_truth)
+        prediction = convert_numpy_types(prediction)
+
+        metrics["predictions"].append(
+            {
+                "case_id": case_id,
+                "ground_truth": ground_truth,
+                "prediction": prediction,
+            }
+        )
+
+    # handle metric computation based on task_name
+    metric_name = METRIC_DICT[task_name]["name"]
+    metric_fn = METRIC_DICT[task_name]["fn"]
+    metric_dict = {}
+    additional_metric_dict = {}
+    if task_name == "Task01_classifying_he_prostate_biopsies_into_isup_scores":
+        metric_value = metric_fn(test_labels, test_predictions)
+        metric_dict[metric_name] = metric_value
+    elif task_name == "Task03_predicting_the_time_to_biochemical_recurrence_in_he_prostatectomies":
+        events = test_extra_labels["event"].astype(bool)
+        metric_value = metric_fn(events, test_labels, -test_predictions)[0]
+        metric_dict[metric_name] = metric_value
+    elif task_name == "Task04_predicting_slide_level_tumor_proportion_score_in_ihc_stained_wsi":
+        metric_value = metric_fn(test_labels, test_predictions)
+        metric_dict[metric_name] = metric_value
+    elif task_name == "Task05_detecting_signet_ring_cells_in_he_stained_wsi_of_gastric_cancer":
+        metric_value = metric_fn(test_labels, test_predictions, 8)
+        metric_dict[metric_name] = metric_value
+    elif task_name == "Task08_detecting_mitotic_figures_in_breast_cancer_wsis":
+        metric_value = metric_fn(test_labels, test_predictions, 16)
+        metric_dict[metric_name] = metric_value
+    elif task_name == "Task09_segmenting_rois_in_breast_cancer_wsis":
+        metric_value = metric_fn(test_labels, test_predictions)
+        metric_dict[metric_name] = metric_value
+    elif task_name == "Task20_generating_caption_from_wsi":
+        language_metric_dict = metric_fn(test_labels, test_predictions) # a dictionnary
+        metric_dict[metric_name] = language_metric_dict.pop(metric_name)
+        additional_metric_dict.update(language_metric_dict)
+    else:
+        raise ValueError(f"Unsupported task: {task_name}")
+
+    metrics["metrics"] = metric_dict
+    metrics["additional_metrics"] = additional_metric_dict
+
+    return metrics
+
+
+def process_image_representation(data):
+    # stack embeddings
+    data["shot_embeddings"] = np.vstack(data["shot_embeddings"])
+    data["case_embeddings"] = np.vstack(data["case_embeddings"])
+    # convert labels to numpy arrays
+    data["shot_labels"] = np.array(data["shot_labels"])
+    data["case_labels"] = np.array(data["case_labels"])
+    if data["case_extra_labels"] and data["case_extra_labels"][0] is not None:
+        data["case_extra_labels"] = np.concatenate(data["case_extra_labels"], axis=0)
+    else:
+        data["case_extra_labels"] = None
+    return data
+
+
+def process_detection(data):
+    def extract_points(labels):
+        return [np.array([(p["point"][0], p["point"][1]) for p in gt["points"]]).tolist() for gt in labels]
+    # add comment
+    data["shot_labels"] = extract_points(data["shot_labels"])
+    data["case_labels"] = extract_points(data["case_labels"])
+    if data["case_extra_labels"] and data["case_extra_labels"][0] is not None:
+        data["case_extra_labels"] = np.concatenate(data["case_extra_labels"], axis=0)
+    else:
+        data["case_extra_labels"] = None
+    return data
+
+
+def extract_embeddings_and_labels(processed_results):
+    tasks = {}
+
+    for result in processed_results:
+        task_name = result["task_name"]
+
+        if task_name not in tasks:
+            tasks[task_name] = {
+                "task_type": result["task_type"],
+                "modality": result["modality"],
+                "spacing": result["spacing"],
+                "patch_size": result["patch_size"],
+                "prediction": [],
+                "shot_embeddings": [],
+                "shot_coordinates": [],
+                "shot_labels": [],
+                "shot_ids": [],
+                "case_embeddings": [],
+                "cases_coordinates": [],
+                "case_labels": [],
+                "case_ids": [],
+                "case_extra_labels": [],
+                "cases_image_sizes": {},
+                "cases_image_spacings": {},
+            }
+
+        if result["split"] == "shot":
+            tasks[task_name]["shot_embeddings"].append(result["embeddings"])
+            tasks[task_name]["shot_labels"].append(result["label"])
+            tasks[task_name]["shot_ids"].append(result["case_id"])
+            tasks[task_name]["shot_coordinates"].append(result["coordinates"])
+        elif result["split"] == "case":
+            tasks[task_name]["case_embeddings"].append(result["embeddings"])
+            tasks[task_name]["case_labels"].append(result["label"])
+            tasks[task_name]["prediction"].append(result["prediction"])
+            tasks[task_name]["case_ids"].append(result["case_id"])
+            tasks[task_name]["case_extra_labels"].append(result["extra_labels"])
+            tasks[task_name]["cases_coordinates"].append(result["coordinates"])
+            case_id = result["case_id"]
+            image_size = result["image_size"]
+            tasks[task_name]["cases_image_spacings"][case_id] = result["image_spacing"]
+            tasks[task_name]["cases_image_sizes"][case_id] = image_size
+
+    for task_name, task_data in tasks.items():
+        task_type = task_data["task_type"]
+        if task_type in ["classification", "regression"]:
+            tasks[task_name] = process_image_representation(task_data)
+        elif task_type == "detection":
+            tasks[task_name] = process_detection(task_data)
+
+    return tasks
+
+
+def extract_data(patch_neural_representation):
+    # Extract metadata
+    spacing = patch_neural_representation["meta"]["patch-spacing"]
+    patch_size = patch_neural_representation["meta"]["patch-size"]
+    image_size = patch_neural_representation["meta"]["image-size"]
+    image_spacing = patch_neural_representation["meta"]["image-spacing"]
+
+    # Extract patches
+    patches = patch_neural_representation["patches"]
+
+    # Extract features and coordinates
+    features = np.array([p["features"] for p in patches]).astype(np.float32)
+    coordinates = np.array([p["coordinates"] for p in patches])
+
+    return features, coordinates, spacing, patch_size, image_size, image_spacing
+
+
+def normalize_metric(task_name, metric_value):
+    min_value, max_value = METRIC_DICT[task_name]["range"]
+    normalized_value = (metric_value - min_value) / (max_value - min_value)
+    return normalized_value
+
+
+def sanitize_json_content(obj):
+    if isinstance(obj, dict):
+        return {k: sanitize_json_content(v) for k, v in obj.items()}
+    elif isinstance(obj, (list, tuple, np.ndarray)):
+        return [sanitize_json_content(v) for v in obj]
+    elif isinstance(obj, (str, int, bool, float)):
+        return obj
+    elif isinstance(obj, (np.float16, np.float32, np.float64)):
+        return float(obj)
+    elif isinstance(obj, (np.uint8, np.uint16, np.uint32, np.uint64, np.int8, np.int16, np.int32, np.int64)):
+        return int(obj)
+    else:
+        return obj.__repr__()
+
+
+def write_json_file(*, location, content):
+    # Writes a json file with the sanitized content
+    content = sanitize_json_content(content)
+    with open(location, "w") as f:
+        f.write(json.dumps(content, indent=4))
