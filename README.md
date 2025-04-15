@@ -1,6 +1,6 @@
 # 🧪 UNICORN Evaluation Toolkit
 
-Welcome to the official evaluation repository for the [UNICORN Challenge]([url](https://unicorn.grand-challenge.org/)) — a benchmark for foundation models in pathology, radiology and medical language processing. This repository provides the code used to evaluate submissions using frozen foundation model features. It ships with a set of feature adaptors that convert features into predictions and expects to community to contribute with custom & more fancy adaptors.
+Welcome to the official evaluation repository for the [UNICORN Challenge](https://unicorn.grand-challenge.org/) — a benchmark for foundation models in pathology, radiology and medical language processing. This repository provides the code used to evaluate submissions using frozen foundation model features. It ships with a set of feature adaptors that convert features into predictions and expects to community to contribute with custom & more fancy adaptors.
 
 ## 🚀 Goal
 
