@@ -356,9 +356,9 @@ def main():
         case_ids = results["case_ids"]
         task_type = results["task_type"]
 
-        adaptor = adaptors[task_name]
-
         if modality == "vision":
+
+            adaptor = adaptors[task_name]
 
             shot_embeddings = results["shot_embeddings"]
             shot_labels = results["shot_labels"]
