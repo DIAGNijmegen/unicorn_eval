@@ -10,6 +10,7 @@ from torch.utils.data._utils.collate import default_collate
 
 class DetectionDecoder(nn.Module):
     """MLP that maps vision encoder features to a density map."""
+
     def __init__(self, input_dim, hidden_dim=512, heatmap_size=16):
         super().__init__()
         self.heatmap_size = heatmap_size  # Store heatmap size
@@ -19,7 +20,7 @@ class DetectionDecoder(nn.Module):
             nn.Linear(input_dim, hidden_dim),
             nn.ReLU(),
             nn.Linear(hidden_dim, output_size),
-            nn.Sigmoid()
+            nn.Sigmoid(),
         )
 
     def forward(self, x):
@@ -56,9 +57,9 @@ def custom_collate(batch):
 
     return (
         default_collate(patch_embs),  # Stack patch embeddings
-        heatmaps,                    # Heatmaps will be None or stacked
-        patch_coords,                # Keep as a list
-        cases                        # Keep as a list
+        heatmaps,  # Heatmaps will be None or stacked
+        patch_coords,  # Keep as a list
+        cases,  # Keep as a list
     )
 
 
@@ -79,15 +80,15 @@ def heatmap_to_cells_using_maxima(heatmap, neighborhood_size=5, threshold=0.01):
     if heatmap.ndim != 2:
         raise ValueError(f"Expected 2D heatmap, got {heatmap.shape}")
     # Apply threshold to heatmap to create a binary map of potential cells
-    maxima = (heatmap > threshold)
+    maxima = heatmap > threshold
 
     # Use maximum filter to detect local maxima (peaks in heatmap)
     data_max = filters.maximum_filter(heatmap, neighborhood_size)
-    maxima = (heatmap == data_max)  # Only keep true maxima
+    maxima = heatmap == data_max  # Only keep true maxima
 
     # Apply minimum filter to identify significant local differences
     data_min = filters.minimum_filter(heatmap, neighborhood_size)
-    diff = ((data_max - data_min) > threshold)
+    diff = (data_max - data_min) > threshold
     maxima[diff == 0] = 0  # Keep only significant maxima
 
     # Label connected regions (objects) in the binary map
@@ -133,14 +134,14 @@ def train_decoder(decoder, dataloader, heatmap_size=16, num_epochs=200, lr=1e-5)
 
 
 def inference(decoder, dataloader, heatmap_size=16, patch_size=224):
-    """"Run inference on the test set."""
+    """ "Run inference on the test set."""
     decoder.eval()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     with torch.no_grad():
         patch_predictions = []  # List to store the predictions from each patch
         patch_coordinates = []  # List to store the top-left coordinates of each patch
-        roi_identifiers = []    # List to store ROI identifiers for each patch
+        roi_identifiers = []  # List to store ROI identifiers for each patch
 
         for patch_emb, _, patch_coordinates_batch, case in dataloader:
             patch_emb = patch_emb.to(device)
@@ -149,15 +150,23 @@ def inference(decoder, dataloader, heatmap_size=16, patch_size=224):
             pred_heatmap = decoder(patch_emb)
 
             # Store the predictions, coordinates, and ROI identifiers
-            patch_predictions.append(pred_heatmap.cpu().squeeze(0))  # Store predicted heatmap
-            patch_coordinates.extend(patch_coordinates_batch)  # Store coordinates of the patch
-            roi_identifiers.extend([case]* len(patch_coordinates_batch))
+            patch_predictions.append(
+                pred_heatmap.cpu().squeeze(0)
+            )  # Store predicted heatmap
+            patch_coordinates.extend(
+                patch_coordinates_batch
+            )  # Store coordinates of the patch
+            roi_identifiers.extend([case] * len(patch_coordinates_batch))
 
     case_ids = []  # List to store case identifiers
     test_predictions = []  # List to store points for each case
 
-    for i, (patch_pred, patch_coord, case) in enumerate(zip(patch_predictions, patch_coordinates, roi_identifiers)):
-        x_local, y_local = heatmap_to_cells_using_maxima(patch_pred, neighborhood_size=5)
+    for i, (patch_pred, patch_coord, case) in enumerate(
+        zip(patch_predictions, patch_coordinates, roi_identifiers)
+    ):
+        x_local, y_local = heatmap_to_cells_using_maxima(
+            patch_pred, neighborhood_size=5
+        )
         patch_top_left = patch_coord
 
         if case not in case_ids:
@@ -167,14 +176,18 @@ def inference(decoder, dataloader, heatmap_size=16, patch_size=224):
         case_index = case_ids.index(case)
         case_points = []
         for x, y in zip(x_local, y_local):
-            global_x = patch_top_left[0] + x * (patch_size / heatmap_size)  # Scaling factor: (ROI size / patch size)
+            global_x = patch_top_left[0] + x * (
+                patch_size / heatmap_size
+            )  # Scaling factor: (ROI size / patch size)
             global_y = patch_top_left[1] + y * (patch_size / heatmap_size)
 
             case_points.append([global_x, global_y])
 
         test_predictions[case_index] = np.array(case_points)
 
-    test_predictions = [np.array(case_points).tolist() for case_points in test_predictions]
+    test_predictions = [
+        np.array(case_points).tolist() for case_points in test_predictions
+    ]
     return test_predictions
 
 
@@ -184,7 +197,10 @@ def assign_cells_to_patches(cell_data, patch_coordinates, patch_size):
 
     for x, y in cell_data:
         for i, (x_patch, y_patch) in enumerate(patch_coordinates):
-            if x_patch <= x < x_patch + patch_size and y_patch <= y < y_patch + patch_size:
+            if (
+                x_patch <= x < x_patch + patch_size
+                and y_patch <= y < y_patch + patch_size
+            ):
                 x_local, y_local = x - x_patch, y - y_patch
                 patch_cell_map[i].append((x_local, y_local))
 
@@ -215,7 +231,7 @@ def construct_detection_labels(
     patch_size=224,
     heatmap_size=16,
     sigma=1.0,
-    is_train=True
+    is_train=True,
 ):
 
     processed_data = []
@@ -226,7 +242,9 @@ def construct_detection_labels(
 
         if is_train and labels is not None:
             cell_coordinates = labels[case_idx]
-            patch_cell_map = assign_cells_to_patches(cell_coordinates, patch_coordinates, patch_size)
+            patch_cell_map = assign_cells_to_patches(
+                cell_coordinates, patch_coordinates, patch_size
+            )
 
         for i, (x_patch, y_patch) in enumerate(patch_coordinates):
             patch_emb = case_embeddings[i]
@@ -234,7 +252,10 @@ def construct_detection_labels(
             if is_train and labels is not None:
                 cell_coordinates = patch_cell_map.get(i, [])
                 heatmap = coordinates_to_heatmap(
-                    cell_coordinates, patch_size=patch_size, heatmap_size=heatmap_size, sigma=sigma
+                    cell_coordinates,
+                    patch_size=patch_size,
+                    heatmap_size=heatmap_size,
+                    sigma=sigma,
                 )
             else:
                 cell_coordinates = None
@@ -259,22 +280,42 @@ def density_map(
 ):
     input_dim = train_feats[0].shape[1]
     train_data = construct_detection_labels(
-        train_coords, train_feats, train_cases, train_labels, patch_size=patch_size, heatmap_size=heatmap_size
+        train_coords,
+        train_feats,
+        train_cases,
+        train_labels,
+        patch_size=patch_size,
+        heatmap_size=heatmap_size,
     )
 
     dataset = DetectionDataset(preprocessed_data=train_data)
-    dataloader = DataLoader(dataset, batch_size=32, shuffle=True, collate_fn=custom_collate)
+    dataloader = DataLoader(
+        dataset, batch_size=32, shuffle=True, collate_fn=custom_collate
+    )
 
-    decoder = DetectionDecoder(input_dim=input_dim, heatmap_size=heatmap_size).to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
+    decoder = DetectionDecoder(input_dim=input_dim, heatmap_size=heatmap_size).to(
+        torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    )
 
-    decoder = train_decoder(decoder, dataloader, heatmap_size=heatmap_size, num_epochs=200, lr=1e-5)
+    decoder = train_decoder(
+        decoder, dataloader, heatmap_size=heatmap_size, num_epochs=200, lr=1e-5
+    )
 
     test_data = construct_detection_labels(
-        test_coords, test_feats, cases=test_cases, patch_size=patch_size, heatmap_size=heatmap_size, is_train=False
+        test_coords,
+        test_feats,
+        cases=test_cases,
+        patch_size=patch_size,
+        heatmap_size=heatmap_size,
+        is_train=False,
     )
     test_dataset = DetectionDataset(preprocessed_data=test_data)
-    test_dataloader = DataLoader(test_dataset, batch_size=1, shuffle=False, collate_fn=custom_collate)
+    test_dataloader = DataLoader(
+        test_dataset, batch_size=1, shuffle=False, collate_fn=custom_collate
+    )
 
-    predicted_points = inference(decoder, test_dataloader, heatmap_size=heatmap_size, patch_size=patch_size)
+    predicted_points = inference(
+        decoder, test_dataloader, heatmap_size=heatmap_size, patch_size=patch_size
+    )
 
     return predicted_points

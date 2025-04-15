@@ -12,7 +12,7 @@ from transformers import logging
 logging.set_verbosity_error()
 
 
-def compute_cider_score(references,predictions):
+def compute_cider_score(references, predictions):
     """
     Compute CIDEr score for generated captions.
 
@@ -26,7 +26,10 @@ def compute_cider_score(references,predictions):
 
     scorer = Cider()
 
-    gts = {i: ([refs] if isinstance(refs, str) else refs) for i, refs in enumerate(references)}
+    gts = {
+        i: ([refs] if isinstance(refs, str) else refs)
+        for i, refs in enumerate(references)
+    }
     res = {i: [pred] for i, pred in enumerate(predictions)}
 
     score, _ = scorer.compute_score(gts, res)
@@ -34,75 +37,84 @@ def compute_cider_score(references,predictions):
 
 
 def compute_bleu_score(reports_true, reports_pred):
-        """
-        Calculate average machine translation metrics (BLEU-1, BLEU-2, BLEU-3, BLEU-4, ROUGE-L, METEOR).
+    """
+    Calculate average machine translation metrics (BLEU-1, BLEU-2, BLEU-3, BLEU-4, ROUGE-L, METEOR).
 
-        Args:
-            reports_true (list of str): List of reference texts.
-            reports_pred (list of str): List of hypothesis texts.
+    Args:
+        reports_true (list of str): List of reference texts.
+        reports_pred (list of str): List of hypothesis texts.
 
-        Returns:
-            dict: Dictionary containing averaged scores for BLEU, ROUGE-L, and METEOR.
-        """
-        # Initialize scorers
-        scorer_b = Bleu(4)
+    Returns:
+        dict: Dictionary containing averaged scores for BLEU, ROUGE-L, and METEOR.
+    """
+    # Initialize scorers
+    scorer_b = Bleu(4)
 
-        # Prepare data in the required format
-        gts = {i: [refs] if isinstance(refs, str) else refs for i, refs in enumerate(reports_true)}
-        res = {i: [pred] for i, pred in enumerate(reports_pred)}
+    # Prepare data in the required format
+    gts = {
+        i: [refs] if isinstance(refs, str) else refs
+        for i, refs in enumerate(reports_true)
+    }
+    res = {i: [pred] for i, pred in enumerate(reports_pred)}
 
-        # Compute BLEU scores
-        bleu_scores, _ = scorer_b.compute_score(gts, res)
+    # Compute BLEU scores
+    bleu_scores, _ = scorer_b.compute_score(gts, res)
 
-        return bleu_scores[3]
+    return bleu_scores[3]
 
 
 def compute_rouge_score(reports_true, reports_pred):
-        """
-        Calculate average machine translation metrics (BLEU-1, BLEU-2, BLEU-3, BLEU-4, ROUGE-L, METEOR).
+    """
+    Calculate average machine translation metrics (BLEU-1, BLEU-2, BLEU-3, BLEU-4, ROUGE-L, METEOR).
 
-        Args:
-            reports_true (list of str): List of reference texts.
-            reports_pred (list of str): List of hypothesis texts.
+    Args:
+        reports_true (list of str): List of reference texts.
+        reports_pred (list of str): List of hypothesis texts.
 
-        Returns:
-            dict: Dictionary containing averaged scores for BLEU, ROUGE-L, and METEOR.
-        """
-        # Initialize scorers
-        scorer_r = Rouge()
+    Returns:
+        dict: Dictionary containing averaged scores for BLEU, ROUGE-L, and METEOR.
+    """
+    # Initialize scorers
+    scorer_r = Rouge()
 
-        # Prepare data in the required format
-        gts = {i: [refs] if isinstance(refs, str) else refs for i, refs in enumerate(reports_true)}
-        res = {i: [pred] for i, pred in enumerate(reports_pred)}
+    # Prepare data in the required format
+    gts = {
+        i: [refs] if isinstance(refs, str) else refs
+        for i, refs in enumerate(reports_true)
+    }
+    res = {i: [pred] for i, pred in enumerate(reports_pred)}
 
-        # Compute ROUGE-L score
-        rouge_score, _ = scorer_r.compute_score(gts, res)
+    # Compute ROUGE-L score
+    rouge_score, _ = scorer_r.compute_score(gts, res)
 
-        return rouge_score
+    return rouge_score
 
 
 def compute_meteor_score(reports_true, reports_pred):
-        """
-        Calculate average machine translation metrics (BLEU-1, BLEU-2, BLEU-3, BLEU-4, ROUGE-L, METEOR).
+    """
+    Calculate average machine translation metrics (BLEU-1, BLEU-2, BLEU-3, BLEU-4, ROUGE-L, METEOR).
 
-        Args:
-            reports_true (list of str): List of reference texts.
-            reports_pred (list of str): List of hypothesis texts.
+    Args:
+        reports_true (list of str): List of reference texts.
+        reports_pred (list of str): List of hypothesis texts.
 
-        Returns:
-            dict: Dictionary containing averaged scores for BLEU, ROUGE-L, and METEOR.
-        """
-        # Initialize scorers
-        scorer_m = Meteor()
+    Returns:
+        dict: Dictionary containing averaged scores for BLEU, ROUGE-L, and METEOR.
+    """
+    # Initialize scorers
+    scorer_m = Meteor()
 
-        # Prepare data in the required format
-        gts = {i: [refs] if isinstance(refs, str) else refs for i, refs in enumerate(reports_true)}
-        res = {i: [pred] for i, pred in enumerate(reports_pred)}
+    # Prepare data in the required format
+    gts = {
+        i: [refs] if isinstance(refs, str) else refs
+        for i, refs in enumerate(reports_true)
+    }
+    res = {i: [pred] for i, pred in enumerate(reports_pred)}
 
-        # Compute METEOR score
-        meteor_score, _ = scorer_m.compute_score(gts, res)
+    # Compute METEOR score
+    meteor_score, _ = scorer_m.compute_score(gts, res)
 
-        return meteor_score
+    return meteor_score
 
 
 def compute_bert_score(reports_true, reports_pred):
@@ -123,12 +135,8 @@ def compute_bert_score(reports_true, reports_pred):
     # Ensure the cache directory exists
     os.makedirs(cache_directory, exist_ok=True)
 
-
     scorer = BERTScorer(
-        model_type=cache_directory,  # local path
-        num_layers=12,
-        lang="nl",
-        device="cpu"
+        model_type=cache_directory, num_layers=12, lang="nl", device="cpu"  # local path
     )
     for text_true, text_pred in tqdm(zip(reports_true, reports_pred)):
         p, r, f1 = scorer.score([text_true], [text_pred])

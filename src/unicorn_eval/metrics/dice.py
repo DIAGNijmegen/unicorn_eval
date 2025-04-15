@@ -7,9 +7,17 @@ def list_not_in(lst1, lst2):
     """Returns values in lst1 not in lst2"""
     return [v for v in lst1 if v not in lst2]
 
+
 class CmScorer:
-    def __init__(self, class_map, incremental=False, ignore_gt_zeros=True,
-                 gt_remap={}, pred_remap={}, remap_inplace=False):
+    def __init__(
+        self,
+        class_map,
+        incremental=False,
+        ignore_gt_zeros=True,
+        gt_remap={},
+        pred_remap={},
+        remap_inplace=False,
+    ):
         """
         class_map: {label: name}
         incremental: accumulate metrics across calls
@@ -60,9 +68,9 @@ class CmScorer:
         cm_arr = confusion_matrix(gt, pred, labels=class_labels)
         matrix = {
             class_names[i]: {
-                class_names[j]: int(cm_arr[i, j])
-                for j in range(len(class_names))
-            } for i in range(len(class_names))
+                class_names[j]: int(cm_arr[i, j]) for j in range(len(class_names))
+            }
+            for i in range(len(class_names))
         }
 
         cm = ConfusionMatrix(matrix=matrix)
@@ -84,12 +92,16 @@ class CmScorer:
 
 class TigerSegmScorer(CmScorer):
     def __init__(self, incremental=True):
-       # gt_remap = {4: 3, 5: 3, 6: 2, 7: 3}
+        # gt_remap = {4: 3, 5: 3, 6: 2, 7: 3}
         pred_remap = {k: 3 for k in range(256)}
         pred_remap.update({1: 1, 2: 2})
         class_map = {1: "Tumor", 2: "Stroma", 3: "Other"}
-        super().__init__(class_map=class_map, incremental=incremental,
-                          pred_remap=pred_remap, ignore_gt_zeros=True)
+        super().__init__(
+            class_map=class_map,
+            incremental=incremental,
+            pred_remap=pred_remap,
+            ignore_gt_zeros=True,
+        )
 
 
 def compute_dice_score(gts, preds):

@@ -12,8 +12,12 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from unicorn_eval.adaptors.classification import (knn_probing, linear_probing,
-                                                  mlp, weighted_knn_probing)
+from unicorn_eval.adaptors.classification import (
+    knn_probing,
+    linear_probing,
+    mlp,
+    weighted_knn_probing,
+)
 from unicorn_eval.adaptors.detection import density_map
 from unicorn_eval.adaptors.segmentation import segmentation_upsampling
 

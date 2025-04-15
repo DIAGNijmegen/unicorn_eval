@@ -67,7 +67,8 @@ def knn_probing(
         np.ndarray: Predictions for classification/regression
     """
     train_feats, test_feats = preprocess_features(
-        train_feats, test_feats,
+        train_feats,
+        test_feats,
         center=center_feats,
         normalize_feats=normalize_feats,
     )
@@ -97,7 +98,9 @@ def weighted_knn_probing(
     normalize_feats: bool = False,
     return_probabilities: bool = False,
     class_values: Optional[np.ndarray] = None,
-    metric: Union[Literal["cosine", "euclidean"], Callable[[np.ndarray, np.ndarray], np.ndarray]] = "cosine",
+    metric: Union[
+        Literal["cosine", "euclidean"], Callable[[np.ndarray, np.ndarray], np.ndarray]
+    ] = "cosine",
 ) -> Union[np.ndarray, tuple[np.ndarray, np.ndarray]]:
     """
     Predict using weighted kNN with configurable similarity/distance metric.
@@ -110,10 +113,13 @@ def weighted_knn_probing(
     Returns:
         predictions or (predictions, probabilities) if classification + return_probabilities
     """
-    assert not (task_type == "regression" and return_probabilities), \
-        "Cannot return probabilities for regression."
+    assert not (
+        task_type == "regression" and return_probabilities
+    ), "Cannot return probabilities for regression."
 
-    train_feats, test_feats = preprocess_features(train_feats, test_feats, center_feats, normalize_feats)
+    train_feats, test_feats = preprocess_features(
+        train_feats, test_feats, center_feats, normalize_feats
+    )
     predictions = []
 
     if task_type in ["classification", "ordinal-classification"]:
@@ -139,7 +145,9 @@ def weighted_knn_probing(
         k_similarities = sim[k_indices]
 
         if task_type == "regression":
-            weighted_avg = np.sum(k_labels * k_similarities) / (np.sum(k_similarities) + 1e-8)
+            weighted_avg = np.sum(k_labels * k_similarities) / (
+                np.sum(k_similarities) + 1e-8
+            )
             if class_values is not None:
                 diffs = np.abs(class_values - weighted_avg)
                 class_label = class_values[np.argmin(diffs)]
@@ -164,7 +172,10 @@ def weighted_knn_probing(
             predictions.append(predicted_class)
 
     predictions = np.array(predictions)
-    if return_probabilities and task_type in ["classification", "ordinal-classification"]:
+    if return_probabilities and task_type in [
+        "classification",
+        "ordinal-classification",
+    ]:
         return predictions, np.vstack(all_probs)
     return predictions
 

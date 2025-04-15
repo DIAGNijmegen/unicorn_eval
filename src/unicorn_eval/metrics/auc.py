@@ -1,5 +1,6 @@
 from sklearn.metrics import roc_auc_score
 
+
 class ModelEvaluator:
     def __init__(self, predictions, ground_truths):
         # predictions: list of tuples (scan_id, predicted_value)
