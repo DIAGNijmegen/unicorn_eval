@@ -6,6 +6,8 @@ import torch.optim as optim
 from torch.utils.data import DataLoader, Dataset
 from torch.utils.data._utils.collate import default_collate
 
+from unicorn_eval.adaptors.base import DenseAdaptor
+
 
 class SegmentationDecoder(nn.Module):
     def __init__(self, input_dim, num_classes):
@@ -248,47 +250,71 @@ def inference(decoder, dataloader, patch_size=224, test_image_sizes=None):
     return [v.T for v in predicted_masks.values()]
 
 
-def segmentation_upsampling(
-    *,
-    train_feats,
-    train_coords,
-    train_cases,
-    train_labels,
-    test_feats,
-    test_coords,
-    test_cases,
-    test_image_sizes,
-    patch_size=224,
-):
+class SegmentationUpsampling(DenseAdaptor):
+    def __init__(
+        self,
+        train_feats,
+        train_labels,
+        test_feats,
+        train_coordinates,
+        test_coordinates,
+        train_cases,
+        test_cases,
+        test_image_sizes,
+        patch_size=224,
+        num_epochs=20,
+        learning_rate=1e-5,
+    ):
+        super().__init__(train_feats, train_labels, test_feats, train_coordinates, test_coordinates)
+        self.train_cases = train_cases
+        self.test_cases = test_cases
+        self.test_image_sizes = test_image_sizes
+        self.patch_size = patch_size
+        self.num_epochs = num_epochs
+        self.learning_rate = learning_rate
+        self.decoder = None
 
-    input_dim = train_feats[0].shape[1]
-    num_classes = len(np.unique(train_labels))
-    train_data = construct_segmentation_labels(
-        train_coords, train_feats, train_cases, train_labels, patch_size=patch_size
-    )
-    dataset = SegmentationDataset(preprocessed_data=train_data)
-    dataloader = DataLoader(
-        dataset, batch_size=32, shuffle=True, collate_fn=custom_collate
-    )
+    def fit(self):
+        input_dim = self.train_feats[0].shape[1]
+        num_classes = len(np.unique(self.train_labels))
 
-    decoder = SegmentationDecoder(input_dim=input_dim, num_classes=num_classes).to(
-        torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    )
-    decoder = train_decoder(decoder, dataloader, num_epochs=20, lr=1e-5)
+        train_data = construct_segmentation_labels(
+            self.train_coordinates,
+            self.train_feats,
+            self.train_cases,
+            self.train_labels,
+            patch_size=self.patch_size,
+        )
+        dataset = SegmentationDataset(preprocessed_data=train_data)
+        dataloader = DataLoader(
+            dataset, batch_size=32, shuffle=True, collate_fn=custom_collate
+        )
 
-    test_data = construct_segmentation_labels(
-        test_coords, test_feats, cases=test_cases, patch_size=patch_size, is_train=False
-    )
-    test_dataset = SegmentationDataset(preprocessed_data=test_data)
-    test_dataloader = DataLoader(
-        test_dataset, batch_size=1, shuffle=False, collate_fn=custom_collate
-    )
+        self.decoder = SegmentationDecoder(input_dim=input_dim, num_classes=num_classes).to(
+            torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        )
+        self.decoder = train_decoder(
+            self.decoder, dataloader, num_epochs=self.num_epochs, lr=self.learning_rate
+        )
 
-    predicted_masks = inference(
-        decoder,
-        test_dataloader,
-        patch_size=patch_size,
-        test_image_sizes=test_image_sizes,
-    )
+    def predict(self) -> list:
+        test_data = construct_segmentation_labels(
+            self.test_coordinates,
+            self.test_feats,
+            cases=self.test_cases,
+            patch_size=self.patch_size,
+            is_train=False,
+        )
+        test_dataset = SegmentationDataset(preprocessed_data=test_data)
+        test_dataloader = DataLoader(
+            test_dataset, batch_size=1, shuffle=False, collate_fn=custom_collate
+        )
 
-    return predicted_masks
+        predicted_masks = inference(
+            self.decoder,
+            test_dataloader,
+            patch_size=self.patch_size,
+            test_image_sizes=self.test_image_sizes,
+        )
+
+        return predicted_masks

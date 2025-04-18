@@ -7,6 +7,8 @@ from scipy.ndimage import filters, gaussian_filter
 from torch.utils.data import DataLoader, Dataset
 from torch.utils.data._utils.collate import default_collate
 
+from unicorn_eval.adaptors.base import DenseAdaptor
+
 
 class DetectionDecoder(nn.Module):
     """MLP that maps vision encoder features to a density map."""
@@ -266,56 +268,78 @@ def construct_detection_labels(
     return processed_data
 
 
-def density_map(
-    *,
-    train_feats,
-    train_coords,
-    train_cases,
-    train_labels,
-    test_feats,
-    test_coords,
-    test_cases,
-    patch_size=224,
-    heatmap_size=16,
-):
-    input_dim = train_feats[0].shape[1]
-    train_data = construct_detection_labels(
-        train_coords,
+class DensityMap(DenseAdaptor):
+    def __init__(
+        self,
         train_feats,
+        train_coordinates,
         train_cases,
         train_labels,
-        patch_size=patch_size,
-        heatmap_size=heatmap_size,
-    )
-
-    dataset = DetectionDataset(preprocessed_data=train_data)
-    dataloader = DataLoader(
-        dataset, batch_size=32, shuffle=True, collate_fn=custom_collate
-    )
-
-    decoder = DetectionDecoder(input_dim=input_dim, heatmap_size=heatmap_size).to(
-        torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    )
-
-    decoder = train_decoder(
-        decoder, dataloader, heatmap_size=heatmap_size, num_epochs=200, lr=1e-5
-    )
-
-    test_data = construct_detection_labels(
-        test_coords,
         test_feats,
-        cases=test_cases,
-        patch_size=patch_size,
-        heatmap_size=heatmap_size,
-        is_train=False,
-    )
-    test_dataset = DetectionDataset(preprocessed_data=test_data)
-    test_dataloader = DataLoader(
-        test_dataset, batch_size=1, shuffle=False, collate_fn=custom_collate
-    )
+        test_coordinates,
+        test_cases,
+        patch_size=224,
+        heatmap_size=16,
+        num_epochs=200,
+        learning_rate=1e-5,
+    ):
+        super().__init__(train_feats, train_labels, test_feats, train_coordinates, test_coordinates)
+        self.train_cases = train_cases
+        self.test_cases = test_cases
+        self.patch_size = patch_size
+        self.heatmap_size = heatmap_size
+        self.num_epochs = num_epochs
+        self.learning_rate = learning_rate
+        self.decoder = None
 
-    predicted_points = inference(
-        decoder, test_dataloader, heatmap_size=heatmap_size, patch_size=patch_size
-    )
+    def fit(self):
+        input_dim = self.train_feats[0].shape[1]
 
-    return predicted_points
+        train_data = construct_detection_labels(
+            self.train_coordinates,
+            self.train_feats,
+            self.train_cases,
+            self.train_labels,
+            patch_size=self.patch_size,
+            heatmap_size=self.heatmap_size,
+        )
+
+        dataset = DetectionDataset(preprocessed_data=train_data)
+        dataloader = DataLoader(
+            dataset, batch_size=32, shuffle=True, collate_fn=custom_collate
+        )
+
+        self.decoder = DetectionDecoder(input_dim=input_dim, heatmap_size=self.heatmap_size).to(
+            torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        )
+
+        self.decoder = train_decoder(
+            self.decoder,
+            dataloader,
+            heatmap_size=self.heatmap_size,
+            num_epochs=self.num_epochs,
+            lr=self.learning_rate,
+        )
+
+    def predict(self) -> list:
+        test_data = construct_detection_labels(
+            self.test_coordinates,
+            self.test_feats,
+            cases=self.test_cases,
+            patch_size=self.patch_size,
+            heatmap_size=self.heatmap_size,
+            is_train=False,
+        )
+        test_dataset = DetectionDataset(preprocessed_data=test_data)
+        test_dataloader = DataLoader(
+            test_dataset, batch_size=1, shuffle=False, collate_fn=custom_collate
+        )
+
+        predicted_points = inference(
+            self.decoder,
+            test_dataloader,
+            heatmap_size=self.heatmap_size,
+            patch_size=self.patch_size,
+        )
+
+        return predicted_points
