@@ -13,21 +13,21 @@
 #  limitations under the License.
 
 from unicorn_eval.adaptors.classification import (
-    knn_probing,
-    weighted_knn_probing,
-    logistic_regression,
-    linear_probing,
-    mlp,
+    KNN,
+    WeightedKNN,
+    LogisticRegression,
+    LinearProbing,
+    MLP,
 )
-from unicorn_eval.adaptors.detection import density_map
-from unicorn_eval.adaptors.segmentation import segmentation_upsampling
+from unicorn_eval.adaptors.detection import DensityMap
+from unicorn_eval.adaptors.segmentation import SegmentationUpsampling
 
 __all__ = [
-    "knn_probing",
-    "logistic_regression",
-    "weighted_knn_probing",
-    "linear_probing",
-    "mlp",
-    "density_map",
-    "segmentation_upsampling",
+    "KNN",
+    "WeightedKNN",
+    "LogisticRegression",
+    "LinearProbing",
+    "MLP",
+    "DensityMap",
+    "SegmentationUpsampling",
 ]

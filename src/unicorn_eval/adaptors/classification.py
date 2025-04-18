@@ -8,6 +8,8 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
 from sklearn.metrics.pairwise import cosine_similarity, euclidean_distances
 
+from unicorn_eval.adaptors.base import BaseAdaptor
+
 
 def preprocess_features(
     train_feats: np.ndarray,
@@ -39,174 +41,200 @@ def preprocess_features(
     return train_feats, test_feats
 
 
-def knn_probing(
-    *,
-    train_feats: np.ndarray,
-    train_labels: np.ndarray,
-    test_feats: np.ndarray,
-    task_type: Literal["classification", "regression"],
-    k: int,
-    num_workers: int = 8,
-    center_feats: bool = False,
-    normalize_feats: bool = False,
-) -> np.ndarray:
+class KNN(BaseAdaptor):
     """
-    Perform KNN probing for classification, regression, or survival analysis.
-
-    Args:
-        train_feats: (N_train, D) training features (np.ndarray)
-        train_labels: Labels for classification/regression, or time for survival (np.ndarray)
-        test_feats: (N_test, D) test features (np.ndarray)
-        task_type: One of "classification", "regression"
-        k: Number of neighbors
-        num_workers: Number of parallel jobs (for sklearn models)
-        center_feats: Subtract mean from features
-        normalize_feats: L2 normalize features
-
-    Returns:
-        np.ndarray: Predictions for classification/regression
+    A class to perform K-Nearest Neighbors (KNN) probing for classification or regression tasks.
+    This class provides functionality to preprocess features and apply KNN models for
+    classification or regression tasks. It supports feature centering and L2 normalization.
+    Attributes:
+        k (int): Number of neighbors to consider for KNN.
+        task_type (Literal["classification", "regression"]): The type of task to perform.
+        num_workers (int): Number of parallel jobs for sklearn models. Default is 8.
+        center_feats (bool): Whether to subtract the mean from features. Default is False.
+        normalize_feats (bool): Whether to L2 normalize features. Default is False.
+    Methods:
+        fit(train_feats: np.ndarray, train_labels: np.ndarray):
+            Fits the KNN model using the provided training features and labels.
+        predict(test_feats: np.ndarray) -> np.ndarray:
+            Predicts the labels or values for the provided test features.
+        preprocess_features(train_feats: np.ndarray, test_feats: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+            Preprocesses the training and test features by centering and/or normalizing them.
     """
-    train_feats, test_feats = preprocess_features(
-        train_feats,
-        test_feats,
-        center=center_feats,
-        normalize_feats=normalize_feats,
-    )
+    def __init__(self, train_feats, train_labels, test_feats, k, task_type, num_workers=8, center_feats=False, normalize_feats=False):
+        super().__init__(train_feats, train_labels, test_feats)
+        self.k = k
+        self.task_type = task_type
+        self.num_workers = num_workers
+        self.center_feats = center_feats
+        self.normalize_feats = normalize_feats
+        self.model = None
 
-    if task_type == "classification":
-        model = KNeighborsClassifier(n_neighbors=k, n_jobs=num_workers)
-        model.fit(train_feats, train_labels)
-        return model.predict(test_feats)
+    def fit(self):
+        train_feats, _ = preprocess_features(
+            self.train_feats, self.test_feats, center=self.center_feats, normalize_feats=self.normalize_feats
+        )
 
-    elif task_type == "regression":
-        model = KNeighborsRegressor(n_neighbors=k, n_jobs=num_workers)
-        model.fit(train_feats, train_labels)
-        return model.predict(test_feats)
+        if self.task_type == "classification":
+            self.model = KNeighborsClassifier(n_neighbors=self.k, n_jobs=self.num_workers)
+        elif self.task_type == "regression":
+            self.model = KNeighborsRegressor(n_neighbors=self.k, n_jobs=self.num_workers)
+        else:
+            raise ValueError(f"Unknown task type: {self.task_type}")
 
-    else:
-        raise ValueError(f"Unknown task: {task_type}")
+        self.model.fit(train_feats, self.train_labels)
+
+    def predict(self) -> np.ndarray:
+        _, test_feats = preprocess_features(
+            self.train_feats, self.test_feats, center=self.center_feats, normalize_feats=self.normalize_feats
+        )
+
+        if self.model is None:
+            raise ValueError("Model has not been fitted yet. Call `fit` before `predict`.")
+
+        return self.model.predict(test_feats)
 
 
-def weighted_knn_probing(
-    *,
-    train_feats: np.ndarray,
-    train_labels: np.ndarray,
-    test_feats: np.ndarray,
-    k: int,
-    task_type: Literal["classification", "ordinal-classification", "regression"],
-    center_feats: bool = False,
-    normalize_feats: bool = False,
-    return_probabilities: bool = False,
-    class_values: Optional[np.ndarray] = None,
-    metric: Union[
-        Literal["cosine", "euclidean"], Callable[[np.ndarray, np.ndarray], np.ndarray]
-    ] = "cosine",
-) -> Union[np.ndarray, tuple[np.ndarray, np.ndarray]]:
+class WeightedKNN(BaseAdaptor):
     """
-    Predict using weighted kNN with configurable similarity/distance metric.
-
-    Args:
-        task_type: "classification", "ordinal-classification" or "regression"
-        return_probabilities: return probabilities (only for classification tasks)
-        class_values: optional list of valid class values (used in ordinal classification or rounding regression)
-        metric: distance/similarity metric ("cosine", "euclidean", or callable)
-    Returns:
-        predictions or (predictions, probabilities) if classification + return_probabilities
+    WeightedKNN is a k-Nearest Neighbors (k-NN) based adaptor that supports weighted similarity
+    for classification, ordinal classification, and regression tasks. It allows customization of
+    distance metrics, feature preprocessing, and output formats.
+    Attributes:
+        train_feats (np.ndarray): Training feature matrix.
+        train_labels (np.ndarray): Labels corresponding to the training features.
+        test_feats (np.ndarray): Test feature matrix.
+        k (int): Number of nearest neighbors to consider.
+        task_type (str): Type of task, one of ["classification", "ordinal-classification", "regression"].
+        metric (str or callable): Similarity metric to use. Options are "cosine", "euclidean", or a callable function.
+        center_feats (bool): Whether to center the features during preprocessing.
+        normalize_feats (bool): Whether to normalize the features during preprocessing.
+        return_probabilities (bool): Whether to return class probabilities for classification tasks.
+        class_values (np.ndarray or None): Array of possible class values for regression tasks.
+    Methods:
+        __init__(train_feats, train_labels, test_feats, k, task_type, metric="cosine", center_feats=False, normalize_feats=False, return_probabilities=False, class_values=None):
+            Initializes the WeightedKNN with the given parameters.
+        fit():
+            Preprocesses the features and sets up the similarity function and class-related attributes
+            based on the task type.
+        predict() -> Union[np.ndarray, tuple[np.ndarray, np.ndarray]]:
+            Predicts the output for the test features based on the k-nearest neighbors. For classification
+            tasks, it can optionally return class probabilities.
     """
-    assert not (
-        task_type == "regression" and return_probabilities
-    ), "Cannot return probabilities for regression."
+    def __init__(self, train_feats, train_labels, test_feats, k, task_type, metric="cosine", center_feats=False, normalize_feats=False, return_probabilities=False, class_values=None):
+        super().__init__(train_feats, train_labels, test_feats)
+        self.k = k
+        self.task_type = task_type
+        self.metric = metric
+        self.center_feats = center_feats
+        self.normalize_feats = normalize_feats
+        self.return_probabilities = return_probabilities
+        self.class_values = class_values
+        self.train_feats = None
+        self.test_feats = None
+        self.similarity_fn = None
+        self.unique_classes = None
+        self.class_to_idx = None
+        self.num_classes = None
 
-    train_feats, test_feats = preprocess_features(
-        train_feats, test_feats, center_feats, normalize_feats
-    )
-    predictions = []
+        assert not (
+            task_type == "regression" and return_probabilities
+        ), "Cannot return probabilities for regression."
 
-    if task_type in ["classification", "ordinal-classification"]:
-        unique_classes = np.unique(train_labels)
-        class_to_idx = {cls: idx for idx, cls in enumerate(unique_classes)}
-        num_classes = len(unique_classes)
+
+    def fit(self):
+        self.train_feats, self.test_feats = preprocess_features(
+            self.train_feats, self.test_feats, center=self.center_feats, normalize_feats=self.normalize_feats
+        )
+
+        # define similarity function
+        if callable(self.metric):
+            self.similarity_fn = self.metric
+        elif self.metric == "cosine":
+            self.similarity_fn = lambda x, y: cosine_similarity(x, y)
+        elif self.metric == "euclidean":
+            self.similarity_fn = lambda x, y: 1.0 / (euclidean_distances(x, y) + 1e-8)
+        else:
+            raise ValueError(f"Unsupported metric: {self.metric}")
+
+        if self.task_type in ["classification", "ordinal-classification"]:
+            self.unique_classes = np.unique(self.train_labels)
+            self.class_to_idx = {cls: idx for idx, cls in enumerate(self.unique_classes)}
+            self.num_classes = len(self.unique_classes)
+
+    def predict(self) -> Union[np.ndarray, tuple[np.ndarray, np.ndarray]]:
+        if self.train_feats is None or self.test_feats is None or self.similarity_fn is None:
+            raise ValueError("Model has not been fitted yet. Call `fit` before `predict`.")
+
+        predictions = []
         all_probs = []
 
-    # similarity function
-    if callable(metric):
-        similarity_fn = metric
-    elif metric == "cosine":
-        similarity_fn = lambda x, y: cosine_similarity(x, y)
-    elif metric == "euclidean":
-        similarity_fn = lambda x, y: 1.0 / (euclidean_distances(x, y) + 1e-8)
-    else:
-        raise ValueError(f"Unsupported metric: {metric}")
+        for test_point in self.test_feats:
+            sim = self.similarity_fn(test_point.reshape(1, -1), self.train_feats).flatten()
+            k_indices = np.argsort(-sim)[:self.k]
+            k_labels = self.train_labels[k_indices]
+            k_similarities = sim[k_indices]
 
-    for test_point in test_feats:
-        sim = similarity_fn(test_point.reshape(1, -1), train_feats).flatten()
-        k_indices = np.argsort(-sim)[:k]
-        k_labels = train_labels[k_indices]
-        k_similarities = sim[k_indices]
+            if self.task_type == "regression":
+                weighted_avg = np.sum(k_labels * k_similarities) / (np.sum(k_similarities) + 1e-8)
+                if self.class_values is not None:
+                    diffs = np.abs(self.class_values - weighted_avg)
+                    class_label = self.class_values[np.argmin(diffs)]
+                    predictions.append(class_label)
+                else:
+                    predictions.append(weighted_avg)
 
-        if task_type == "regression":
-            weighted_avg = np.sum(k_labels * k_similarities) / (
-                np.sum(k_similarities) + 1e-8
-            )
-            if class_values is not None:
-                diffs = np.abs(class_values - weighted_avg)
-                class_label = class_values[np.argmin(diffs)]
-                predictions.append(class_label)
-            else:
-                predictions.append(weighted_avg)
+            elif self.task_type in ["classification", "ordinal-classification"]:
+                class_weights = np.zeros(self.num_classes)
+                for label, sim in zip(k_labels, k_similarities):
+                    class_weights[self.class_to_idx[label]] += sim
 
-        elif task_type in ["classification", "ordinal-classification"]:
-            class_weights = np.zeros(num_classes)
-            for label, sim in zip(k_labels, k_similarities):
-                class_weights[class_to_idx[label]] += sim
+                class_probs = class_weights / (np.sum(class_weights) + 1e-8)
+                all_probs.append(class_probs)
 
-            class_probs = class_weights / (np.sum(class_weights) + 1e-8)
-            all_probs.append(class_probs)
+                if self.task_type == "ordinal-classification":
+                    expected_val = np.dot(class_probs, self.unique_classes)
+                    predicted_class = int(np.round(expected_val))
+                else:
+                    predicted_class = self.unique_classes[np.argmax(class_probs)]
 
-            if task_type == "ordinal-classification":
-                expected_val = np.dot(class_probs, unique_classes)
-                predicted_class = int(np.round(expected_val))
-            else:
-                predicted_class = unique_classes[np.argmax(class_probs)]
+                predictions.append(predicted_class)
 
-            predictions.append(predicted_class)
-
-    predictions = np.array(predictions)
-    if return_probabilities and task_type in [
-        "classification",
-        "ordinal-classification",
-    ]:
-        return predictions, np.vstack(all_probs)
-    return predictions
+        predictions = np.array(predictions)
+        if self.return_probabilities and self.task_type in ["classification", "ordinal-classification"]:
+            return predictions, np.vstack(all_probs)
+        return predictions
 
 
-def logistic_regression(
-    *,
-    train_feats: np.ndarray,
-    train_labels: np.ndarray,
-    test_feats: np.ndarray,
-    max_iter: int = 1000,
-    C: float = 1.0,
-    solver: str = "lbfgs",
-) -> np.ndarray:
+class LogisticRegression(BaseAdaptor):
     """
-    Perform logistic regression classification.
-
-    Args:
-        train_feats (np.ndarray): Training features.
-        train_labels (np.ndarray): Training labels.
-        test_feats (np.ndarray): Test features.
-        max_iter (int): Maximum iterations.
-        C (float): Regularization strength.
-        solver (str): Optimization solver.
-
-    Returns:
-        np.ndarray: Predicted labels for test data.
+    An adaptor for logistic regression that extends the BaseAdaptor class. This class
+    provides functionality to train a logistic regression model and make predictions
+    using the provided training and testing features.
+    Attributes:
+        train_feats (np.ndarray): The feature matrix for training the model.
+        train_labels (np.ndarray): The labels corresponding to the training features.
+        test_feats (np.ndarray): The feature matrix for testing the model.
+        max_iter (int): The maximum number of iterations for the solver to converge. Default is 1000.
+        C (float): Inverse of regularization strength; smaller values specify stronger regularization. Default is 1.0.
+        solver (str): The algorithm to use in the optimization problem. Default is "lbfgs".
+    Methods:
+        fit():
+            Trains the logistic regression model using the training features and labels.
+        predict() -> np.ndarray:
+            Predicts the labels for the test features using the trained model.
     """
-    model = LogisticRegression(C=C, max_iter=max_iter, solver=solver, random_state=0)
-    model.fit(train_feats, train_labels)
+    def __init__(self, train_feats, train_labels, test_feats, max_iter=1000, C=1.0, solver="lbfgs"):
+        super().__init__(train_feats, train_labels, test_feats)
+        self.max_iter = max_iter
+        self.C = C
+        self.solver = solver
 
-    return model.predict(test_feats)
+    def fit(self):
+        self.model = LogisticRegression(C=self.C, max_iter=self.max_iter, solver=self.solver, random_state=0)
+        self.model.fit(self.train_feats, self.train_labels)
+
+    def predict(self) -> np.ndarray:
+        return self.model.predict(self.test_feats)
 
 
 class LPClassifier(nn.Module):
@@ -222,67 +250,63 @@ class LPClassifier(nn.Module):
         return self.fc(x)
 
 
-def linear_probing(
-    *,
-    train_feats: np.ndarray,
-    train_labels: np.ndarray,
-    test_feats: np.ndarray,
-    num_epochs: int = 100,
-    learning_rate: float = 0.001,
-) -> np.ndarray:
+class LinearProbing(BaseAdaptor):
     """
-    Train a linear classifier using torch.
-
-    Args:
-        train_feats (np.ndarray): Training features.
-        train_labels (np.ndarray: Training labels.
-        test_feats (np.ndarray): Test features.
-        num_epochs (int): Number of training epochs.
-        learning_rate (float): Learning rate.
-
-    Returns:
-        np.ndarray: Predicted labels for test data.
+    A class for performing linear probing on features for classification or regression tasks.
+    Linear probing involves training a simple linear model on top of pre-extracted features
+    to evaluate their quality for a specific task.
+    Attributes:
+        train_feats (np.ndarray): The training feature matrix of shape (n_samples, n_features).
+        train_labels (np.ndarray): The training labels corresponding to the training features.
+        test_feats (np.ndarray): The test feature matrix of shape (n_samples, n_features).
+        task_type (str): The type of task, either "classification" or "regression".
+        num_epochs (int): The number of epochs for training the linear model. Default is 100.
+        learning_rate (float): The learning rate for the optimizer. Default is 0.001.
+    Methods:
+        fit():
+            Trains a linear model on the training features and labels using the specified task type.
+        predict() -> np.ndarray:
+            Predicts the labels for the test features using the trained model.
     """
-    input_dim = train_feats.shape[1]
-    num_classes = len(np.unique(train_labels))
+    def __init__(self, train_feats, train_labels, test_feats, task_type, num_epochs=100, learning_rate=0.001):
+        super().__init__(train_feats, train_labels, test_feats)
+        self.task_type = task_type
+        self.num_epochs = num_epochs
+        self.learning_rate = learning_rate
 
-    # check if GPU is available
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    def fit(self):
+        input_dim = self.train_feats.shape[1]
+        if self.task_type == "regression":
+            self.num_classes = 1
+            self.criterion = nn.MSELoss()
+        elif self.task_type == "classification":
+            self.num_classes = len(np.unique(self.train_labels))
+            self.criterion = nn.CrossEntropyLoss()
+        else:
+            raise ValueError(f"Unknown task type: {self.task_type}")
 
-    # convert arrays to tensors
-    train_feats = torch.tensor(train_feats, dtype=torch.float32)
-    train_labels = torch.tensor(train_labels, dtype=torch.long)
-    test_feats = torch.tensor(test_feats, dtype=torch.float32)
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.train_feats = torch.tensor(self.train_feats, dtype=torch.float32).to(self.device)
+        self.train_labels = torch.tensor(self.train_labels, dtype=torch.long).to(self.device)
+        self.test_feats = torch.tensor(self.test_feats, dtype=torch.float32).to(self.device)
 
-    # move data to device
-    train_feats, train_labels = train_feats.to(device), train_labels.to(device)
-    test_feats = test_feats.to(device)
+        self.model = LPClassifier(input_dim, self.num_classes).to(self.device)
+        self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
 
-    # initialize linear model
-    model = LPClassifier(input_dim, num_classes).to(device)
-    criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+        for epoch in range(self.num_epochs):
+            self.model.train()
+            self.optimizer.zero_grad()
+            outputs = self.model(self.train_feats)
+            loss = self.criterion(outputs, self.train_labels)
+            loss.backward()
+            self.optimizer.step()
 
-    # training loop
-    for epoch in range(num_epochs):
-        model.train()
-        optimizer.zero_grad()
-
-        outputs = model(train_feats)
-        loss = criterion(outputs, train_labels)
-        loss.backward()
-        optimizer.step()
-
-        if (epoch + 1) % 10 == 0:
-            print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.4f}")
-
-    # inference
-    model.eval()
-    with torch.no_grad():
-        test_outputs = model(test_feats)
-        _, test_preds = torch.max(test_outputs, 1)
-
-    return test_preds.cpu().numpy()
+    def predict(self) -> np.ndarray:
+        self.model.eval()
+        with torch.no_grad():
+            test_outputs = self.model(self.test_feats)
+            _, test_preds = torch.max(test_outputs, 1)
+        return test_preds.cpu().numpy()
 
 
 class MLPClassifier(nn.Module):
@@ -301,67 +325,60 @@ class MLPClassifier(nn.Module):
         return self.fc2(x)
 
 
-def mlp(
-    *,
-    train_feats: np.ndarray,
-    train_labels: np.ndarray,
-    test_feats: np.ndarray,
-    hidden_dim: int = 64,
-    num_epochs: int = 100,
-    learning_rate: float = 0.001,
-) -> np.ndarray:
+class MLP(BaseAdaptor):
     """
-    Train an MLP classifier.
-
-    Args:
-        train_feats (np.ndarray): Training features.
-        train_labels (np.ndarray): Training labels.
-        test_feats (np.ndarray): Test features.
-        test_labels (np.ndarray): Test labels.
-        hidden_dim (int): Hidden layer size.
-        num_epochs (int): Number of training epochs.
-        learning_rate (float): Learning rate.
-
-    Returns:
-        np.ndarray: Predicted labels for test data.
+    A PyTorch-based Multi-Layer Perceptron (MLP) adaptor for classification and regression tasks.
+    Attributes:
+        train_feats (np.ndarray): Training feature matrix of shape (n_samples, n_features).
+        train_labels (np.ndarray): Training labels corresponding to the training features.
+        test_feats (np.ndarray): Test feature matrix of shape (n_samples, n_features).
+        task_type (str): Type of task, either "classification" or "regression".
+        hidden_dim (int): Number of hidden units in the MLP. Default is 64.
+        num_epochs (int): Number of training epochs. Default is 100.
+        learning_rate (float): Learning rate for the optimizer. Default is 0.001.
+    Methods:
+        fit():
+            Trains the MLP model using the provided training data.
+        predict() -> np.ndarray:
+            Generates predictions for the test data using the trained model.
     """
-    input_dim = train_feats.shape[1]
-    num_classes = len(np.unique(train_labels))
+    def __init__(self, train_feats, train_labels, test_feats, task_type, hidden_dim=64, num_epochs=100, learning_rate=0.001):
+        super().__init__(train_feats, train_labels, test_feats)
+        self.task_type = task_type
+        self.hidden_dim = hidden_dim
+        self.num_epochs = num_epochs
+        self.learning_rate = learning_rate
 
-    # check if GPU is available
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    def fit(self):
+        input_dim = self.train_feats.shape[1]
+        if self.task_type == "regression":
+            self.num_classes = 1
+            self.criterion = nn.MSELoss()
+        elif self.task_type == "classification":
+            self.num_classes = len(np.unique(self.train_labels))
+            self.criterion = nn.CrossEntropyLoss()
+        else:
+            raise ValueError(f"Unknown task type: {self.task_type}")
 
-    # convert arrays to tensors
-    train_feats = torch.tensor(train_feats, dtype=torch.float32)
-    train_labels = torch.tensor(train_labels, dtype=torch.long)
-    test_feats = torch.tensor(test_feats, dtype=torch.float32)
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.train_feats = torch.tensor(self.train_feats, dtype=torch.float32).to(self.device)
+        self.train_labels = torch.tensor(self.train_labels, dtype=torch.long).to(self.device)
+        self.test_feats = torch.tensor(self.test_feats, dtype=torch.float32).to(self.device)
 
-    # Move data to device
-    train_feats, train_labels = train_feats.to(device), train_labels.to(device)
-    test_feats = test_feats.to(device)
+        self.model = MLPClassifier(input_dim, self.hidden_dim, self.num_classes).to(self.device)
+        self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
 
-    # Initialize model
-    model = MLPClassifier(input_dim, hidden_dim, num_classes).to(device)
-    criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+        for epoch in range(self.num_epochs):
+            self.model.train()
+            self.optimizer.zero_grad()
+            outputs = self.model(self.train_feats)
+            loss = self.criterion(outputs, self.train_labels)
+            loss.backward()
+            self.optimizer.step()
 
-    # Training loop
-    for epoch in range(num_epochs):
-        model.train()
-        optimizer.zero_grad()
-
-        outputs = model(train_feats)
-        loss = criterion(outputs, train_labels)
-        loss.backward()
-        optimizer.step()
-
-        if (epoch + 1) % 10 == 0:
-            print(f"Epoch [{epoch+1}/{num_epochs}], Loss: {loss.item():.4f}")
-
-    # Evaluation
-    model.eval()
-    with torch.no_grad():
-        test_outputs = model(test_feats)
-        _, test_preds = torch.max(test_outputs, 1)
-
-    return test_preds.cpu().numpy()
+    def predict(self) -> np.ndarray:
+        self.model.eval()
+        with torch.no_grad():
+            test_outputs = self.model(self.test_feats)
+            _, test_preds = torch.max(test_outputs, 1)
+        return test_preds.cpu().numpy()

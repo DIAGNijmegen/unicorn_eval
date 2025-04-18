@@ -13,19 +13,23 @@
 #  limitations under the License.
 
 import json
+from multiprocessing import Pool
 from pathlib import Path
 from pprint import pformat
-from multiprocessing import Pool
 
 import numpy as np
 import openslide
 import pandas as pd
-import torch
 
 from unicorn_eval.helpers import get_max_workers
-from unicorn_eval.utils import (aggregate_features, evaluate_predictions,
-                                extract_data, extract_embeddings_and_labels,
-                                normalize_metric, write_json_file)
+from unicorn_eval.utils import (
+    aggregate_features,
+    evaluate_predictions,
+    extract_data,
+    extract_embeddings_and_labels,
+    normalize_metric,
+    write_json_file,
+)
 
 INPUT_DIRECTORY = Path("/input")
 OUTPUT_DIRECTORY = Path("/output")
@@ -358,7 +362,7 @@ def main():
 
         if modality == "vision":
 
-            adaptor = adaptors[task_name]
+            adaptor_name = adaptors[task_name]
 
             shot_embeddings = results["shot_embeddings"]
             shot_labels = results["shot_labels"]
@@ -382,7 +386,7 @@ def main():
                 case_extra_labels = get_cases_extra_labels_detection(results["cases_image_sizes"], results["cases_image_spacings"])
 
             predictions = aggregate_features(
-                adaptor=adaptor,
+                adaptor_name=adaptor_name,
                 task_type=task_type,
                 train_feats=shot_embeddings,
                 train_cases=shot_case_ids,

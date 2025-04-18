@@ -1,13 +1,19 @@
+import json
 from functools import partial
 
 import numpy as np
-import json
 from sklearn.metrics import cohen_kappa_score
 from sksurv.metrics import concordance_index_censored
 
-from unicorn_eval.adaptors import (density_map, knn_probing, linear_probing, logistic_regression,
-                                   mlp, segmentation_upsampling,
-                                   weighted_knn_probing)
+from unicorn_eval.adaptors import (
+    KNN,
+    WeightedKNN,
+    DensityMap,
+    LinearProbing,
+    LogisticRegression,
+    MLP,
+    SegmentationUpsampling,
+)
 from unicorn_eval.metrics.dice import compute_dice_score
 from unicorn_eval.metrics.f1_score import compute_f1
 from unicorn_eval.metrics.vision_language import compute_average_language_metric
@@ -53,7 +59,7 @@ METRIC_DICT = {
 
 def aggregate_features(
     *,
-    adaptor: str,
+    adaptor_name: str,
     task_type: str,
     train_feats: np.ndarray,
     train_labels: np.ndarray,
@@ -66,36 +72,55 @@ def aggregate_features(
     test_image_sizes=None,
 ):
     num_train_samples = len(train_feats)
-    if "-nn" in adaptor:
-        k = int(adaptor.split("-nn")[0])
+    if "-nn" in adaptor_name:
+        k = int(adaptor_name.split("-nn")[0])
         k = min(k, num_train_samples)
-        if "weighted" in adaptor:
-            predictions = weighted_knn_probing(
-                train_feats=train_feats, train_labels=train_labels, test_feats=test_feats, task_type=task_type, k=k
+        if "weighted" in adaptor_name:
+            adaptor = WeightedKNN(
+                train_feats=train_feats,
+                train_labels=train_labels,
+                test_feats=test_feats,
+                task_type=task_type,
+                k=k
             )
         else:
-            predictions = knn_probing(
-                train_feats=train_feats, train_labels=train_labels, test_feats=test_feats, task_type=task_type, k=k, num_workers=4
+            adaptor = KNN(
+                train_feats=train_feats,
+                train_labels=train_labels,
+                test_feats=test_feats,
+                task_type=task_type,
+                k=k
             )
-    elif adaptor == "logistic-regression":
-        predictions = logistic_regression(
-            train_feats=train_feats, train_labels=train_labels, test_feats=test_feats, max_iter=1000, C=1.0, solver="lbfgs"
-        )
-    elif adaptor == "linear-probing":
-        predictions = linear_probing(
-            train_feats=train_feats, train_labels=train_labels, test_feats=test_feats, num_epochs=100, learning_rate=0.001
-        )
-    elif adaptor == "mlp":
-        predictions = mlp(
+    elif adaptor_name == "logistic-regression":
+        adaptor = LogisticRegression(
             train_feats=train_feats,
             train_labels=train_labels,
             test_feats=test_feats,
+            max_iter=1000,
+            C=1.0,
+            solver="lbfgs",
+        )
+    elif adaptor_name == "linear-probing":
+        adaptor = LinearProbing(
+            train_feats=train_feats,
+            train_labels=train_labels,
+            test_feats=test_feats,
+            task_type=task_type,
+            num_epochs=100,
+            learning_rate=0.001,
+        )
+    elif adaptor_name == "mlp":
+        adaptor = MLP(
+            train_feats=train_feats,
+            train_labels=train_labels,
+            test_feats=test_feats,
+            task_type=task_type,
             hidden_dim=256,
             num_epochs=100,
             learning_rate=0.001,
         )
-    elif adaptor == "density-map":
-        predictions = density_map(
+    elif adaptor_name == "density-map":
+        adaptor = DensityMap(
             train_feats=train_feats,
             train_coords=train_coords,
             train_cases=train_cases,
@@ -106,20 +131,22 @@ def aggregate_features(
             patch_size=patch_size[0],
             heatmap_size=16,
         )
-    elif adaptor == "segmentation-upsampling":
-        predictions = segmentation_upsampling(
+    elif adaptor_name == "segmentation-upsampling":
+        adaptor = SegmentationUpsampling(
             train_feats=train_feats,
-            train_coords=train_coords,
-            train_cases=train_cases,
             train_labels=train_labels,
             test_feats=test_feats,
+            train_coords=train_coords,
             test_coords=test_coords,
+            train_cases=train_cases,
             test_cases=test_cases,
             test_image_sizes=test_image_sizes,
             patch_size=patch_size[0],
         )
     else:
-        raise ValueError(f"Unknown adaptor: {adaptor}")
+        raise ValueError(f"Unknown adaptor: {adaptor_name}")
+    adaptor.fit()
+    predictions = adaptor.predict()
     return predictions
 
 
