@@ -256,8 +256,8 @@ class SegmentationUpsampling(DenseAdaptor):
         train_feats,
         train_labels,
         test_feats,
-        train_coords,
-        test_coords,
+        train_coordinates,
+        test_coordinates,
         train_cases,
         test_cases,
         test_image_sizes,
@@ -265,7 +265,7 @@ class SegmentationUpsampling(DenseAdaptor):
         num_epochs=20,
         learning_rate=1e-5,
     ):
-        super().__init__(train_feats, train_labels, test_feats, train_coords, test_coords)
+        super().__init__(train_feats, train_labels, test_feats, train_coordinates, test_coordinates)
         self.train_cases = train_cases
         self.test_cases = test_cases
         self.test_image_sizes = test_image_sizes
@@ -279,7 +279,7 @@ class SegmentationUpsampling(DenseAdaptor):
         num_classes = len(np.unique(self.train_labels))
 
         train_data = construct_segmentation_labels(
-            self.train_coords,
+            self.train_coordinates,
             self.train_feats,
             self.train_cases,
             self.train_labels,
@@ -299,7 +299,7 @@ class SegmentationUpsampling(DenseAdaptor):
 
     def predict(self) -> list:
         test_data = construct_segmentation_labels(
-            self.test_coords,
+            self.test_coordinates,
             self.test_feats,
             cases=self.test_cases,
             patch_size=self.patch_size,

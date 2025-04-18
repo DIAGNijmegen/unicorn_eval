@@ -272,18 +272,18 @@ class DensityMap(DenseAdaptor):
     def __init__(
         self,
         train_feats,
-        train_coords,
+        train_coordinates,
         train_cases,
         train_labels,
         test_feats,
-        test_coords,
+        test_coordinates,
         test_cases,
         patch_size=224,
         heatmap_size=16,
         num_epochs=200,
         learning_rate=1e-5,
     ):
-        super().__init__(train_feats, train_labels, test_feats, train_coords, test_coords)
+        super().__init__(train_feats, train_labels, test_feats, train_coordinates, test_coordinates)
         self.train_cases = train_cases
         self.test_cases = test_cases
         self.patch_size = patch_size
@@ -296,7 +296,7 @@ class DensityMap(DenseAdaptor):
         input_dim = self.train_feats[0].shape[1]
 
         train_data = construct_detection_labels(
-            self.train_coords,
+            self.train_coordinates,
             self.train_feats,
             self.train_cases,
             self.train_labels,
@@ -323,7 +323,7 @@ class DensityMap(DenseAdaptor):
 
     def predict(self) -> list:
         test_data = construct_detection_labels(
-            self.test_coords,
+            self.test_coordinates,
             self.test_feats,
             cases=self.test_cases,
             patch_size=self.patch_size,

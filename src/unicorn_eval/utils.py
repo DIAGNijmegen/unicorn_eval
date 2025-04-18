@@ -7,12 +7,12 @@ from sksurv.metrics import concordance_index_censored
 
 from unicorn_eval.adaptors import (
     KNN,
-    WeightedKNN,
+    MLP,
     DensityMap,
     LinearProbing,
     LogisticRegression,
-    MLP,
     SegmentationUpsampling,
+    WeightedKNN,
 )
 from unicorn_eval.metrics.dice import compute_dice_score
 from unicorn_eval.metrics.f1_score import compute_f1
@@ -65,8 +65,8 @@ def aggregate_features(
     train_labels: np.ndarray,
     test_feats: np.ndarray,
     train_cases,
-    train_coords=None,
-    test_coords=None,
+    train_coordinates=None,
+    test_coordinates=None,
     test_cases=None,
     patch_size=224,
     test_image_sizes=None,
@@ -122,11 +122,11 @@ def aggregate_features(
     elif adaptor_name == "density-map":
         adaptor = DensityMap(
             train_feats=train_feats,
-            train_coords=train_coords,
+            train_coordinates=train_coordinates,
             train_cases=train_cases,
             train_labels=train_labels,
             test_feats=test_feats,
-            test_coords=test_coords,
+            test_coordinates=test_coordinates,
             test_cases=test_cases,
             patch_size=patch_size[0],
             heatmap_size=16,
@@ -136,8 +136,8 @@ def aggregate_features(
             train_feats=train_feats,
             train_labels=train_labels,
             test_feats=test_feats,
-            train_coords=train_coords,
-            test_coords=test_coords,
+            train_coordinates=train_coordinates,
+            test_coordinates=test_coordinates,
             train_cases=train_cases,
             test_cases=test_cases,
             test_image_sizes=test_image_sizes,

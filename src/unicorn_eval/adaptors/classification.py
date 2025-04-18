@@ -1,10 +1,8 @@
-from typing import Literal, Union, Callable, Optional
-
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from sklearn.linear_model import LogisticRegression
+import sklearn
 from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
 from sklearn.metrics.pairwise import cosine_similarity, euclidean_distances
 
@@ -116,7 +114,7 @@ class WeightedKNN(BaseAdaptor):
         fit():
             Preprocesses the features and sets up the similarity function and class-related attributes
             based on the task type.
-        predict() -> Union[np.ndarray, tuple[np.ndarray, np.ndarray]]:
+        predict() -> np.ndarray | tuple[np.ndarray, np.ndarray]:
             Predicts the output for the test features based on the k-nearest neighbors. For classification
             tasks, it can optionally return class probabilities.
     """
@@ -129,8 +127,6 @@ class WeightedKNN(BaseAdaptor):
         self.normalize_feats = normalize_feats
         self.return_probabilities = return_probabilities
         self.class_values = class_values
-        self.train_feats = None
-        self.test_feats = None
         self.similarity_fn = None
         self.unique_classes = None
         self.class_to_idx = None
@@ -161,7 +157,7 @@ class WeightedKNN(BaseAdaptor):
             self.class_to_idx = {cls: idx for idx, cls in enumerate(self.unique_classes)}
             self.num_classes = len(self.unique_classes)
 
-    def predict(self) -> Union[np.ndarray, tuple[np.ndarray, np.ndarray]]:
+    def predict(self) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
         if self.train_feats is None or self.test_feats is None or self.similarity_fn is None:
             raise ValueError("Model has not been fitted yet. Call `fit` before `predict`.")
 
@@ -230,14 +226,14 @@ class LogisticRegression(BaseAdaptor):
         self.solver = solver
 
     def fit(self):
-        self.model = LogisticRegression(C=self.C, max_iter=self.max_iter, solver=self.solver, random_state=0)
+        self.model = sklearn.linear_modelLogisticRegression(C=self.C, max_iter=self.max_iter, solver=self.solver, random_state=0)
         self.model.fit(self.train_feats, self.train_labels)
 
     def predict(self) -> np.ndarray:
         return self.model.predict(self.test_feats)
 
 
-class LPClassifier(nn.Module):
+class LinearClassifier(nn.Module):
     """
     A simple linear classifier.
     """
@@ -290,7 +286,7 @@ class LinearProbing(BaseAdaptor):
         self.train_labels = torch.tensor(self.train_labels, dtype=torch.long).to(self.device)
         self.test_feats = torch.tensor(self.test_feats, dtype=torch.float32).to(self.device)
 
-        self.model = LPClassifier(input_dim, self.num_classes).to(self.device)
+        self.model = LinearClassifier(input_dim, self.num_classes).to(self.device)
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
 
         for epoch in range(self.num_epochs):
