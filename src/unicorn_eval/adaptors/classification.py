@@ -226,7 +226,7 @@ class LogisticRegression(BaseAdaptor):
         self.solver = solver
 
     def fit(self):
-        self.model = sklearn.linear_modelLogisticRegression(C=self.C, max_iter=self.max_iter, solver=self.solver, random_state=0)
+        self.model = sklearn.linear_model.LogisticRegression(C=self.C, max_iter=self.max_iter, solver=self.solver, random_state=0)
         self.model.fit(self.train_feats, self.train_labels)
 
     def predict(self) -> np.ndarray:
