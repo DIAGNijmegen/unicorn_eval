@@ -18,3 +18,7 @@ Want to use a custom method to convert vision features to predictions?
 - Submit a pull request with a short description of your method, giving it a unique name that can be selected at submission time.
 
 Once approved and merged, you’ll be able to submit your model using your custom adaptor.
+
+### 🔗 Supported Adaptors
+
+For a full list of supported adaptors, see the [Supported Adaptors](src/unicorn_eval/adaptors/README.md).
