@@ -91,125 +91,122 @@ def adapt_features(
     shot_extra_labels=None,
 ):
     num_shots = len(shot_features)
-    if adaptor_name.startswith("unicorn"):
-        if "nearest-neighbour" in adaptor_name:
-            k = int(adaptor_name.split("-")[1])
-            k = min(k, num_shots)
-            if "weighted" in adaptor_name:
-                if task_type == "classification":
-                    adaptor = WeightedKNN(
-                        shot_features=shot_features,
-                        shot_labels=shot_labels,
-                        test_features=test_features,
-                        k=k
-                    )
-                elif task_type == "regression":
-                    adaptor = WeightedKNNRegressor(
-                        shot_features=shot_features,
-                        shot_labels=shot_labels,
-                        test_features=test_features,
-                        k=k
-                    )
-            else:
-                if task_type == "classification":
-                    adaptor = KNN(
-                        shot_features=shot_features,
-                        shot_labels=shot_labels,
-                        test_features=test_features,
-                        k=k
-                    )
-                elif task_type == "regression":
-                    adaptor = KNNRegressor(
-                        shot_features=shot_features,
-                        shot_labels=shot_labels,
-                        test_features=test_features,
-                        k=k
-                    )
-        elif adaptor_name == "unicorn-logistic-regression":
-            assert task_type == "classification"
-            adaptor = LogisticRegression(
-                shot_features=shot_features,
-                shot_labels=shot_labels,
-                test_features=test_features,
-                max_iterations=1000,
-                C=1.0,
-                solver="lbfgs",
-            )
-        elif "linear-probing" in adaptor_name:
+    if "-nn" in adaptor_name:
+        k = int(adaptor_name.split("-")[0])
+        k = min(k, num_shots)
+        if "weighted" in adaptor_name:
             if task_type == "classification":
-                adaptor = LinearProbing(
+                adaptor = WeightedKNN(
                     shot_features=shot_features,
                     shot_labels=shot_labels,
-                    shot_extra_labels=shot_extra_labels,
                     test_features=test_features,
-                    num_epochs=100,
-                    learning_rate=0.001,
+                    k=k
                 )
             elif task_type == "regression":
-                survival = False
-                if "survival" in adaptor_name:
-                    survival = True
-                adaptor = LinearProbingRegressor(
+                adaptor = WeightedKNNRegressor(
                     shot_features=shot_features,
                     shot_labels=shot_labels,
-                    shot_extra_labels=shot_extra_labels,
                     test_features=test_features,
-                    survival=survival,
-                    num_epochs=100,
-                    learning_rate=0.001,
+                    k=k
                 )
-        elif "2-layer-perceptron" in adaptor_name:
-            if task_type == "classification":
-                adaptor = TwoLayerPerceptron(
-                    shot_features=shot_features,
-                    shot_labels=shot_labels,
-                    shot_extra_labels=shot_extra_labels,
-                    test_features=test_features,
-                    survival=survival,
-                    hidden_dim=256,
-                    num_epochs=100,
-                    learning_rate=0.001,
-                )
-            elif task_type == "regression":
-                survival = False
-                if "survival" in adaptor_name:
-                    survival = True
-                adaptor = TwoLayerPerceptronRegressor(
-                    shot_features=shot_features,
-                    shot_labels=shot_labels,
-                    shot_extra_labels=shot_extra_labels,
-                    test_features=test_features,
-                    survival=survival,
-                    hidden_dim=256,
-                    num_epochs=100,
-                    learning_rate=0.001,
-                )
-        elif adaptor_name == "unicorn-density-map":
-            adaptor = DensityMap(
-                shot_features=shot_features,
-                shot_labels=shot_labels,
-                shot_coordinates=shot_coordinates,
-                shot_names=shot_names,
-                test_features=test_features,
-                test_coordinates=test_coordinates,
-                test_names=test_names,
-                patch_size=patch_size[0],
-                heatmap_size=16,
-            )
-        elif adaptor_name == "unicorn-segmentation-upsampling":
-            adaptor = SegmentationUpsampling(
-                shot_features=shot_features,
-                shot_labels=shot_labels,
-                shot_coordinates=shot_coordinates,
-                shot_names=shot_names,
-                test_features=test_features,
-                test_coordinates=test_coordinates,
-                test_names=test_names,
-                test_image_sizes=test_image_sizes,
-                patch_size=patch_size[0],
-            )
         else:
-            raise ValueError(f"Unknown adaptor: {adaptor_name}")
+            if task_type == "classification":
+                adaptor = KNN(
+                    shot_features=shot_features,
+                    shot_labels=shot_labels,
+                    test_features=test_features,
+                    k=k
+                )
+            elif task_type == "regression":
+                adaptor = KNNRegressor(
+                    shot_features=shot_features,
+                    shot_labels=shot_labels,
+                    test_features=test_features,
+                    k=k
+                )
+    elif adaptor_name == "logistic-regression":
+        assert task_type == "classification"
+        adaptor = LogisticRegression(
+            shot_features=shot_features,
+            shot_labels=shot_labels,
+            test_features=test_features,
+            max_iterations=1000,
+            C=1.0,
+            solver="lbfgs",
+        )
+    elif "linear-probing" in adaptor_name:
+        if task_type == "classification":
+            adaptor = LinearProbing(
+                shot_features=shot_features,
+                shot_labels=shot_labels,
+                shot_extra_labels=shot_extra_labels,
+                test_features=test_features,
+                num_epochs=100,
+                learning_rate=0.001,
+            )
+        elif task_type == "regression":
+            survival = False
+            if "survival" in adaptor_name:
+                survival = True
+            adaptor = LinearProbingRegressor(
+                shot_features=shot_features,
+                shot_labels=shot_labels,
+                shot_extra_labels=shot_extra_labels,
+                test_features=test_features,
+                survival=survival,
+                num_epochs=100,
+                learning_rate=0.001,
+            )
+    elif "mlp" in adaptor_name:
+        if task_type == "classification":
+            adaptor = TwoLayerPerceptron(
+                shot_features=shot_features,
+                shot_labels=shot_labels,
+                shot_extra_labels=shot_extra_labels,
+                test_features=test_features,
+                survival=survival,
+                hidden_dim=256,
+                num_epochs=100,
+                learning_rate=0.001,
+            )
+        elif task_type == "regression":
+            survival = False
+            if "survival" in adaptor_name:
+                survival = True
+            adaptor = TwoLayerPerceptronRegressor(
+                shot_features=shot_features,
+                shot_labels=shot_labels,
+                shot_extra_labels=shot_extra_labels,
+                test_features=test_features,
+                survival=survival,
+                hidden_dim=256,
+                num_epochs=100,
+                learning_rate=0.001,
+            )
+    elif adaptor_name == "density-map":
+        adaptor = DensityMap(
+            shot_features=shot_features,
+            shot_labels=shot_labels,
+            shot_coordinates=shot_coordinates,
+            shot_names=shot_names,
+            test_features=test_features,
+            test_coordinates=test_coordinates,
+            test_names=test_names,
+            patch_size=patch_size[0],
+            heatmap_size=16,
+        )
+    elif adaptor_name == "segmentation-upsampling":
+        adaptor = SegmentationUpsampling(
+            shot_features=shot_features,
+            shot_labels=shot_labels,
+            shot_coordinates=shot_coordinates,
+            shot_names=shot_names,
+            test_features=test_features,
+            test_coordinates=test_coordinates,
+            test_names=test_names,
+            test_image_sizes=test_image_sizes,
+            patch_size=patch_size[0],
+        )
     else:
         raise ValueError(f"Unknown adaptor: {adaptor_name}")
     adaptor.fit()
