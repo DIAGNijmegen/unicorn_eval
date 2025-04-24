@@ -75,7 +75,7 @@ METRIC_DICT = {
 }
 
 
-def aggregate_features(
+def adapt_features(
     *,
     adaptor_name: str,
     task_type: str,

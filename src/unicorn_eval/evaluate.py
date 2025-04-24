@@ -23,7 +23,7 @@ import pandas as pd
 
 from unicorn_eval.helpers import get_max_workers
 from unicorn_eval.utils import (
-    aggregate_features,
+    adapt_features,
     evaluate_predictions,
     extract_data,
     extract_embeddings_and_labels,
@@ -386,7 +386,7 @@ def main():
 
                 case_extra_labels = get_cases_extra_labels_detection(results["cases_image_sizes"], results["cases_image_spacings"])
 
-            predictions = aggregate_features(
+            predictions = adapt_features(
                 adaptor_name=adaptor_name,
                 task_type=task_type,
                 shot_features=shot_embeddings,
