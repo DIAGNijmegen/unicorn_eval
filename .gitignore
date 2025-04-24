@@ -174,4 +174,4 @@ cython_debug/
 .pypirc
 
 # models
-models/*.bin
+models/**/*.bin
