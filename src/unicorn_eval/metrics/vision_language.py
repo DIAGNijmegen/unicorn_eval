@@ -21,6 +21,7 @@ from pycocoevalcap.cider.cider import Cider
 from pycocoevalcap.meteor.meteor import Meteor
 from pycocoevalcap.rouge.rouge import Rouge
 from tqdm import tqdm
+from pathlib import Path
 from transformers import logging
 
 logging.set_verbosity_error()
@@ -144,13 +145,13 @@ def compute_bert_score(reports_true, reports_pred):
     """
     p_list, r_list, f1_list = [], [], []
 
-    cache_directory = "/opt/app/unicorn_eval/src/unicorn_eval/models/multilingual_bert/"
+    model_directory = "/opt/app/unicorn_eval/models/multilingual_bert"
 
-    # Ensure the cache directory exists
-    os.makedirs(cache_directory, exist_ok=True)
+    # Ensure the model directory exists
+    assert Path(model_directory).exists(), f"Model directory {model_directory} does not exist."
 
     scorer = BERTScorer(
-        model_type=cache_directory, num_layers=12, lang="nl", device="cpu"  # local path
+        model_type=model_directory, num_layers=12, lang="nl", device="cpu"  # local path
     )
     for text_true, text_pred in tqdm(zip(reports_true, reports_pred)):
         p, r, f1 = scorer.score([text_true], [text_pred])

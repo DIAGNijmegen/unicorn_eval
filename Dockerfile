@@ -46,4 +46,8 @@ RUN python -m pip install -r requirements.in
 COPY --chown=user:user . /opt/app/unicorn_eval
 RUN python -m pip install /opt/app/unicorn_eval
 
+# download Bert model weights from Hugging Face
+RUN curl -L -o /opt/app/unicorn_eval/models/pytorch_model.bin \
+    "https://huggingface.co/google-bert/bert-base-multilingual-cased/resolve/main/pytorch_model.bin"
+
 ENTRYPOINT ["unicorn_eval"]
