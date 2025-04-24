@@ -366,7 +366,8 @@ def main():
 
             shot_embeddings = results["shot_embeddings"]
             shot_labels = results["shot_labels"]
-            shot_case_ids = results["shot_ids"]
+            shot_extra_labels = results["shot_extra_labels"]
+            shot_ids = results["shot_ids"]
             case_embeddings = results["case_embeddings"]
 
             case_extra_labels = results["case_extra_labels"]
@@ -388,15 +389,16 @@ def main():
             predictions = aggregate_features(
                 adaptor_name=adaptor_name,
                 task_type=task_type,
-                train_feats=shot_embeddings,
-                train_cases=shot_case_ids,
-                train_labels=shot_labels,
-                test_feats=case_embeddings,
-                train_coordinates=results["shot_coordinates"],
+                shot_features=shot_embeddings,
+                shot_names=shot_ids,
+                shot_labels=shot_labels,
+                test_features=case_embeddings,
+                shot_coordinates=results["shot_coordinates"],
                 test_coordinates=results["cases_coordinates"],
-                test_cases=case_ids,
+                test_names=case_ids,
                 patch_size=patch_size,
                 test_image_sizes=case_image_size,
+                shot_extra_labels=shot_extra_labels,
             )
 
         elif modality == "vision-language":
