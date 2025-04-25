@@ -52,7 +52,7 @@ RUN python -c "\
 from transformers import AutoModel, AutoTokenizer; \
 model = AutoModel.from_pretrained('bert-base-multilingual-cased'); \
 tokenizer = AutoTokenizer.from_pretrained('bert-base-multilingual-cased'); \
-model.save_pretrained('/opt/app/unicorn_eval//models/bert-base-multilingual-cased'); \
-tokenizer.save_pretrained('/opt/app/unicorn_eval//models/bert-base-multilingual-cased')"
+model.save_pretrained('/opt/app/unicorn_eval/models/bert-base-multilingual-cased'); \
+tokenizer.save_pretrained('/opt/app/unicorn_eval/models/bert-base-multilingual-cased')"
 
 ENTRYPOINT ["unicorn_eval"]

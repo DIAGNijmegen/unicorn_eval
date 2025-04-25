@@ -145,7 +145,7 @@ def compute_bert_score(reports_true, reports_pred):
     """
     p_list, r_list, f1_list = [], [], []
 
-    model_directory = "/opt/app/unicorn_eval/models/multilingual_bert"
+    model_directory = "/opt/app/unicorn_eval/models/bert-base-multilingual-cased"
 
     # Ensure the model directory exists
     assert Path(model_directory).exists(), f"Model directory {model_directory} does not exist."
