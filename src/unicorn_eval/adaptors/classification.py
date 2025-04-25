@@ -149,7 +149,7 @@ class WeightedKNN(CaseLevelTaskAdaptor):
 
         self.unique_classes = np.unique(self.shot_labels)
         self.class_to_idx = {cls: idx for idx, cls in enumerate(self.unique_classes)}
-        self.num_classes = len(self.unique_classes)
+        self.num_classes =  int(self.shot_labels.max()) + 1
 
     def predict(self) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
         if self.shot_features is None or self.test_features is None or self.similarity_fn is None:
@@ -260,7 +260,7 @@ class LinearProbing(CaseLevelTaskAdaptor):
 
     def fit(self):
         input_dim = self.shot_features.shape[1]
-        self.num_classes = len(np.unique(self.shot_labels))
+        self.num_classes = int(self.shot_labels.max()) + 1
         self.criterion = nn.CrossEntropyLoss()
 
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -333,7 +333,7 @@ class TwoLayerPerceptron(CaseLevelTaskAdaptor):
 
     def fit(self):
         input_dim = self.shot_features.shape[1]
-        self.num_classes = len(np.unique(self.shot_labels))
+        self.num_classes = int(self.shot_labels.max()) + 1
         self.criterion = nn.CrossEntropyLoss()
 
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
