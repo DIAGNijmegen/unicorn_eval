@@ -164,7 +164,6 @@ def adapt_features(
                 shot_labels=shot_labels,
                 shot_extra_labels=shot_extra_labels,
                 test_features=test_features,
-                survival=survival,
                 hidden_dim=256,
                 num_epochs=100,
                 learning_rate=0.001,
