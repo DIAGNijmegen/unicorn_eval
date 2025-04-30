@@ -1,130 +1,130 @@
+#  Copyright 2025 Diagnostic Image Analysis Group, Radboudumc, Nijmegen, The Netherlands
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+
+import tqdm
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import sklearn
-from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
+from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics.pairwise import cosine_similarity, euclidean_distances
 
-from unicorn_eval.adaptors.base import BaseAdaptor
+from unicorn_eval.adaptors.base import CaseLevelTaskAdaptor
 
 
 def preprocess_features(
-    train_feats: np.ndarray,
-    test_feats: np.ndarray,
+    shot_features: np.ndarray,
+    test_features: np.ndarray,
     center: bool = True,
-    normalize_feats: bool = True,
+    normalize_features: bool = True,
 ) -> tuple[np.ndarray, np.ndarray]:
     """
     Preprocess feature vectors by centering and normalizing, optionally converting to NumPy.
 
     Args:
-        train_feats: Training feature array (N_train, D)
-        test_feats: Test feature array (N_test, D)
-        center: Whether to subtract mean of training features
-        normalize_feats: Whether to apply L2 normalization
+        shot_features (np.ndarray): Few-shot feature matrix of shape (n_shots, n_features).
+        test_features (np.ndarray): Test feature matrix of shape (n_test_samples, n_features).
+        center: Whether to subtract mean of few-shot features
+        normalize_features: Whether to apply L2 normalization
 
     Returns:
-        Preprocessed (train_feats, test_feats) as torch.Tensor or np.ndarray
+        Preprocessed (shot_features, test_features) as torch.Tensor or np.ndarray
     """
     if center:
-        mean_feat = train_feats.mean(dim=0, keepdims=True)
-        train_feats = train_feats - mean_feat
-        test_feats = test_feats - mean_feat
+        mean_feature = shot_features.mean(dim=0, keepdims=True)
+        shot_features = shot_features - mean_feature
+        test_features = test_features - mean_feature
 
-    if normalize_feats:
-        train_feats = train_feats / np.linalg.norm(train_feats, axis=-1, keepdims=True)
-        test_feats = test_feats / np.linalg.norm(test_feats, axis=-1, keepdims=True)
+    if normalize_features:
+        shot_features = shot_features / np.linalg.norm(shot_features, axis=-1, keepdims=True)
+        test_features = test_features / np.linalg.norm(test_features, axis=-1, keepdims=True)
 
-    return train_feats, test_feats
+    return shot_features, test_features
 
 
-class KNN(BaseAdaptor):
+class KNN(CaseLevelTaskAdaptor):
     """
-    A class to perform K-Nearest Neighbors (KNN) probing for classification or regression tasks.
-    This class provides functionality to preprocess features and apply KNN models for
-    classification or regression tasks. It supports feature centering and L2 normalization.
+    A class to perform K-Nearest Neighbors (KNN) probing for classification tasks.
     Attributes:
+        shot_features (np.ndarray): Few-shot feature matrix of shape (n_shots, n_features).
+        shot_labels (np.ndarray): Few-shot labels.
+        test_features (np.ndarray): Test feature matrix of shape (n_test_samples, n_features).
         k (int): Number of neighbors to consider for KNN.
-        task_type (Literal["classification", "regression"]): The type of task to perform.
         num_workers (int): Number of parallel jobs for sklearn models. Default is 8.
-        center_feats (bool): Whether to subtract the mean from features. Default is False.
-        normalize_feats (bool): Whether to L2 normalize features. Default is False.
+        center_features (bool): Whether to subtract the mean from features. Default is False.
+        normalize_features (bool): Whether to L2 normalize features. Default is False.
     Methods:
-        fit(train_feats: np.ndarray, train_labels: np.ndarray):
-            Fits the KNN model using the provided training features and labels.
-        predict(test_feats: np.ndarray) -> np.ndarray:
+        fit():
+            Fits the KNN model using the provided few-shot features and labels.
+        predict() -> np.ndarray:
             Predicts the labels or values for the provided test features.
-        preprocess_features(train_feats: np.ndarray, test_feats: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
-            Preprocesses the training and test features by centering and/or normalizing them.
     """
-    def __init__(self, train_feats, train_labels, test_feats, k, task_type, num_workers=8, center_feats=False, normalize_feats=False):
-        super().__init__(train_feats, train_labels, test_feats)
+    def __init__(self, shot_features, shot_labels, test_features, k, num_workers=8, center_features=False, normalize_features=False):
+        super().__init__(shot_features, shot_labels, test_features)
         self.k = k
-        self.task_type = task_type
         self.num_workers = num_workers
-        self.center_feats = center_feats
-        self.normalize_feats = normalize_feats
+        self.center_features = center_features
+        self.normalize_features = normalize_features
         self.model = None
 
     def fit(self):
-        train_feats, _ = preprocess_features(
-            self.train_feats, self.test_feats, center=self.center_feats, normalize_feats=self.normalize_feats
+        processed_shot_features, _ = preprocess_features(
+            self.shot_features, self.test_features, center=self.center_features, normalize_features=self.normalize_features
         )
 
-        if self.task_type == "classification":
-            self.model = KNeighborsClassifier(n_neighbors=self.k, n_jobs=self.num_workers)
-        elif self.task_type == "regression":
-            self.model = KNeighborsRegressor(n_neighbors=self.k, n_jobs=self.num_workers)
-        else:
-            raise ValueError(f"Unknown task type: {self.task_type}")
-
-        self.model.fit(train_feats, self.train_labels)
+        self.model = KNeighborsClassifier(n_neighbors=self.k, n_jobs=self.num_workers)
+        self.model.fit(processed_shot_features, self.shot_labels)
 
     def predict(self) -> np.ndarray:
-        _, test_feats = preprocess_features(
-            self.train_feats, self.test_feats, center=self.center_feats, normalize_feats=self.normalize_feats
+        _, processed_test_features = preprocess_features(
+            self.shot_features, self.test_features, center=self.center_features, normalize_features=self.normalize_features
         )
 
         if self.model is None:
             raise ValueError("Model has not been fitted yet. Call `fit` before `predict`.")
 
-        return self.model.predict(test_feats)
+        return self.model.predict(processed_test_features)
 
 
-class WeightedKNN(BaseAdaptor):
+class WeightedKNN(CaseLevelTaskAdaptor):
     """
     WeightedKNN is a k-Nearest Neighbors (k-NN) based adaptor that supports weighted similarity
-    for classification, ordinal classification, and regression tasks. It allows customization of
-    distance metrics, feature preprocessing, and output formats.
+    for classification tasks. It allows customization of
+    distance metrics.
     Attributes:
-        train_feats (np.ndarray): Training feature matrix.
-        train_labels (np.ndarray): Labels corresponding to the training features.
-        test_feats (np.ndarray): Test feature matrix.
+        shot_features (np.ndarray): Few-shot feature matrix of shape (n_shots, n_features).
+        shot_labels (np.ndarray): Few-shot labels.
+        test_features (np.ndarray): Test feature matrix of shape (n_test_samples, n_features).
         k (int): Number of nearest neighbors to consider.
-        task_type (str): Type of task, one of ["classification", "ordinal-classification", "regression"].
         metric (str or callable): Similarity metric to use. Options are "cosine", "euclidean", or a callable function.
-        center_feats (bool): Whether to center the features during preprocessing.
-        normalize_feats (bool): Whether to normalize the features during preprocessing.
-        return_probabilities (bool): Whether to return class probabilities for classification tasks.
-        class_values (np.ndarray or None): Array of possible class values for regression tasks.
+        center_features (bool): Whether to center the features during preprocessing.
+        normalize_features (bool): Whether to normalize the features during preprocessing.
+        return_probabilities (bool): Whether to return class probabilities instead of predictions.
     Methods:
-        __init__(train_feats, train_labels, test_feats, k, task_type, metric="cosine", center_feats=False, normalize_feats=False, return_probabilities=False, class_values=None):
-            Initializes the WeightedKNN with the given parameters.
         fit():
             Preprocesses the features and sets up the similarity function and class-related attributes
             based on the task type.
         predict() -> np.ndarray | tuple[np.ndarray, np.ndarray]:
-            Predicts the output for the test features based on the k-nearest neighbors. For classification
-            tasks, it can optionally return class probabilities.
+            Predicts the output for the test features based on the k-nearest neighbors.
     """
-    def __init__(self, train_feats, train_labels, test_feats, k, task_type, metric="cosine", center_feats=False, normalize_feats=False, return_probabilities=False, class_values=None):
-        super().__init__(train_feats, train_labels, test_feats)
+    def __init__(self, shot_features, shot_labels, test_features, k, metric="cosine", center_features=False, normalize_features=False, return_probabilities=False, class_values=None):
+        super().__init__(shot_features, shot_labels, test_features)
         self.k = k
-        self.task_type = task_type
         self.metric = metric
-        self.center_feats = center_feats
-        self.normalize_feats = normalize_feats
+        self.center_features = center_features
+        self.normalize_features = normalize_features
         self.return_probabilities = return_probabilities
         self.class_values = class_values
         self.similarity_fn = None
@@ -132,14 +132,9 @@ class WeightedKNN(BaseAdaptor):
         self.class_to_idx = None
         self.num_classes = None
 
-        assert not (
-            task_type == "regression" and return_probabilities
-        ), "Cannot return probabilities for regression."
-
-
     def fit(self):
-        self.train_feats, self.test_feats = preprocess_features(
-            self.train_feats, self.test_feats, center=self.center_feats, normalize_feats=self.normalize_feats
+        self.shot_features, self.test_features = preprocess_features(
+            self.shot_features, self.test_features, center=self.center_features, normalize_features=self.normalize_features
         )
 
         # define similarity function
@@ -152,85 +147,79 @@ class WeightedKNN(BaseAdaptor):
         else:
             raise ValueError(f"Unsupported metric: {self.metric}")
 
-        if self.task_type in ["classification", "ordinal-classification"]:
-            self.unique_classes = np.unique(self.train_labels)
-            self.class_to_idx = {cls: idx for idx, cls in enumerate(self.unique_classes)}
-            self.num_classes = len(self.unique_classes)
+        self.unique_classes = np.unique(self.shot_labels)
+        self.class_to_idx = {cls: idx for idx, cls in enumerate(self.unique_classes)}
+        self.num_classes =  int(self.shot_labels.max()) + 1
 
     def predict(self) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
-        if self.train_feats is None or self.test_feats is None or self.similarity_fn is None:
+        if self.shot_features is None or self.test_features is None or self.similarity_fn is None:
             raise ValueError("Model has not been fitted yet. Call `fit` before `predict`.")
 
-        predictions = []
-        all_probs = []
+        test_predictions = []
+        test_probabilities = []
 
-        for test_point in self.test_feats:
-            sim = self.similarity_fn(test_point.reshape(1, -1), self.train_feats).flatten()
-            k_indices = np.argsort(-sim)[:self.k]
-            k_labels = self.train_labels[k_indices]
-            k_similarities = sim[k_indices]
+        for test_point in self.test_features:
+            similarities = self.similarity_fn(test_point.reshape(1, -1), self.shot_features).flatten()
+            k_indices = np.argsort(-similarities)[:self.k]
+            k_labels = self.shot_labels[k_indices]
+            k_similarities = similarities[k_indices]
 
-            if self.task_type == "regression":
-                weighted_avg = np.sum(k_labels * k_similarities) / (np.sum(k_similarities) + 1e-8)
-                if self.class_values is not None:
-                    diffs = np.abs(self.class_values - weighted_avg)
-                    class_label = self.class_values[np.argmin(diffs)]
-                    predictions.append(class_label)
-                else:
-                    predictions.append(weighted_avg)
+            class_weights = np.zeros(self.num_classes)
+            for label, similarity in zip(k_labels, k_similarities):
+                class_weights[self.class_to_idx[label]] += similarity
 
-            elif self.task_type in ["classification", "ordinal-classification"]:
-                class_weights = np.zeros(self.num_classes)
-                for label, sim in zip(k_labels, k_similarities):
-                    class_weights[self.class_to_idx[label]] += sim
+            class_probabilities = class_weights / (np.sum(class_weights) + 1e-8)
+            test_probabilities.append(class_probabilities)
 
-                class_probs = class_weights / (np.sum(class_weights) + 1e-8)
-                all_probs.append(class_probs)
+            if self.task_type == "ordinal-classification":
+                expected_value = np.dot(class_probabilities, self.unique_classes)
+                predicted_class = int(np.round(expected_value))
+            else:
+                predicted_class = self.unique_classes[np.argmax(class_probabilities)]
 
-                if self.task_type == "ordinal-classification":
-                    expected_val = np.dot(class_probs, self.unique_classes)
-                    predicted_class = int(np.round(expected_val))
-                else:
-                    predicted_class = self.unique_classes[np.argmax(class_probs)]
+            test_predictions.append(predicted_class)
 
-                predictions.append(predicted_class)
-
-        predictions = np.array(predictions)
-        if self.return_probabilities and self.task_type in ["classification", "ordinal-classification"]:
-            return predictions, np.vstack(all_probs)
-        return predictions
+        test_predictions = np.array(test_predictions)
+        if self.return_probabilities:
+            return np.vstack(test_probabilities)
+        return test_predictions
 
 
-class LogisticRegression(BaseAdaptor):
+class LogisticRegression(CaseLevelTaskAdaptor):
     """
-    An adaptor for logistic regression that extends the BaseAdaptor class. This class
+    An adaptor for logistic regression that extends the CaseLevelTaskAdaptor class. This class
     provides functionality to train a logistic regression model and make predictions
-    using the provided training and testing features.
+    using the provided few-shot and testing features.
     Attributes:
-        train_feats (np.ndarray): The feature matrix for training the model.
-        train_labels (np.ndarray): The labels corresponding to the training features.
-        test_feats (np.ndarray): The feature matrix for testing the model.
-        max_iter (int): The maximum number of iterations for the solver to converge. Default is 1000.
+        shot_features (np.ndarray): Few-shot feature matrix of shape (n_shots, n_features).
+        shot_labels (np.ndarray): Few-shot labels.
+        test_features (np.ndarray): Test feature matrix of shape (n_test_samples, n_features).
+        max_iterations (int): The maximum number of iterations for the solver to converge. Default is 1000.
         C (float): Inverse of regularization strength; smaller values specify stronger regularization. Default is 1.0.
         solver (str): The algorithm to use in the optimization problem. Default is "lbfgs".
     Methods:
         fit():
-            Trains the logistic regression model using the training features and labels.
+            Trains the logistic regression model using the few-shot features and labels.
         predict() -> np.ndarray:
             Predicts the labels for the test features using the trained model.
     """
-    def __init__(self, train_feats, train_labels, test_feats, max_iter=1000, C=1.0, solver="lbfgs"):
-        super().__init__(train_feats, train_labels, test_feats)
-        self.max_iter = max_iter
+    def __init__(self, shot_features, shot_labels, test_features, max_iterations=1000, C=1.0, solver="lbfgs"):
+        super().__init__(shot_features, shot_labels, test_features)
+        self.max_iterations = max_iterations
         self.C = C
         self.solver = solver
 
     def fit(self):
-        self.model = sklearn.linear_model.LogisticRegression(C=self.C, max_iter=self.max_iter, solver=self.solver, random_state=0)
-        self.model.fit(self.train_feats, self.train_labels)
+        self.model = sklearn.linear_model.LogisticRegression(
+            C=self.C,
+            max_iter=self.max_iterations,
+            solver=self.solver,
+            random_state=0
+        )
+        self.model.fit(self.shot_features, self.shot_labels)
 
     def predict(self) -> np.ndarray:
-        return self.model.predict(self.test_feats)
+        return self.model.predict(self.test_features)
 
 
 class LinearClassifier(nn.Module):
@@ -246,66 +235,64 @@ class LinearClassifier(nn.Module):
         return self.fc(x)
 
 
-class LinearProbing(BaseAdaptor):
+class LinearProbing(CaseLevelTaskAdaptor):
     """
-    A class for performing linear probing on features for classification or regression tasks.
+    A class for performing linear probing on features for classification tasks.
     Linear probing involves training a simple linear model on top of pre-extracted features
     to evaluate their quality for a specific task.
     Attributes:
-        train_feats (np.ndarray): The training feature matrix of shape (n_samples, n_features).
-        train_labels (np.ndarray): The training labels corresponding to the training features.
-        test_feats (np.ndarray): The test feature matrix of shape (n_samples, n_features).
-        task_type (str): The type of task, either "classification" or "regression".
+        shot_features (np.ndarray): Few-shot feature matrix of shape (n_shots, n_features).
+        shot_labels (np.ndarray): Few-shot labels.
+        test_features (np.ndarray): Test feature matrix of shape (n_test_samples, n_features).
         num_epochs (int): The number of epochs for training the linear model. Default is 100.
         learning_rate (float): The learning rate for the optimizer. Default is 0.001.
+        shot_extra_labels (np.ndarray): Optional additional labels for training, used in survival analysis.
     Methods:
         fit():
-            Trains a linear model on the training features and labels using the specified task type.
+            Trains a linear model on the few-shot features and labels using the specified task type.
         predict() -> np.ndarray:
             Predicts the labels for the test features using the trained model.
     """
-    def __init__(self, train_feats, train_labels, test_feats, task_type, num_epochs=100, learning_rate=0.001):
-        super().__init__(train_feats, train_labels, test_feats)
-        self.task_type = task_type
+    def __init__(self, shot_features, shot_labels, test_features, num_epochs=100, learning_rate=0.001, shot_extra_labels=None):
+        super().__init__(shot_features, shot_labels, test_features, shot_extra_labels)
         self.num_epochs = num_epochs
         self.learning_rate = learning_rate
 
     def fit(self):
-        input_dim = self.train_feats.shape[1]
-        if self.task_type == "regression":
-            self.num_classes = 1
-            self.criterion = nn.MSELoss()
-        elif self.task_type == "classification":
-            self.num_classes = len(np.unique(self.train_labels))
-            self.criterion = nn.CrossEntropyLoss()
-        else:
-            raise ValueError(f"Unknown task type: {self.task_type}")
+        input_dim = self.shot_features.shape[1]
+        self.num_classes = int(self.shot_labels.max()) + 1
+        self.criterion = nn.CrossEntropyLoss()
 
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.train_feats = torch.tensor(self.train_feats, dtype=torch.float32).to(self.device)
-        self.train_labels = torch.tensor(self.train_labels, dtype=torch.long).to(self.device)
-        self.test_feats = torch.tensor(self.test_feats, dtype=torch.float32).to(self.device)
+        self.shot_features = torch.tensor(self.shot_features, dtype=torch.float32).to(self.device)
+        self.shot_labels = torch.tensor(self.shot_labels, dtype=torch.long).to(self.device)
+        self.test_features = torch.tensor(self.test_features, dtype=torch.float32).to(self.device)
 
         self.model = LinearClassifier(input_dim, self.num_classes).to(self.device)
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
 
-        for epoch in range(self.num_epochs):
+        total_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
+        print(f"🚀 Starting training on {self.device} with {total_params:,} trainable parameters.")
+        print(self.model)
+
+        for epoch in tqdm.tqdm(range(self.num_epochs), desc="Training", unit="epoch", leave=True):
             self.model.train()
             self.optimizer.zero_grad()
-            outputs = self.model(self.train_feats)
-            loss = self.criterion(outputs, self.train_labels)
+            logits = self.model(self.shot_features)
+            loss = self.criterion(logits, self.shot_labels)
             loss.backward()
             self.optimizer.step()
+            tqdm.tqdm.write(f"Epoch {epoch+1}/{self.num_epochs} - Loss: {loss.item():.4f}")
 
     def predict(self) -> np.ndarray:
         self.model.eval()
         with torch.no_grad():
-            test_outputs = self.model(self.test_feats)
-            _, test_preds = torch.max(test_outputs, 1)
-        return test_preds.cpu().numpy()
+            logits = self.model(self.test_features)
+            _, test_predictions = torch.max(logits, 1)
+        return test_predictions.cpu().numpy()
 
 
-class MLPClassifier(nn.Module):
+class TwoLayerPerceptronClassifier(nn.Module):
     """
     A simple MLP classifier with one hidden layer.
     """
@@ -321,60 +308,58 @@ class MLPClassifier(nn.Module):
         return self.fc2(x)
 
 
-class MLP(BaseAdaptor):
+class TwoLayerPerceptron(CaseLevelTaskAdaptor):
     """
-    A PyTorch-based Multi-Layer Perceptron (MLP) adaptor for classification and regression tasks.
+    A PyTorch-based 2-Layer Perceptron adaptor for classification tasks.
     Attributes:
-        train_feats (np.ndarray): Training feature matrix of shape (n_samples, n_features).
-        train_labels (np.ndarray): Training labels corresponding to the training features.
-        test_feats (np.ndarray): Test feature matrix of shape (n_samples, n_features).
-        task_type (str): Type of task, either "classification" or "regression".
-        hidden_dim (int): Number of hidden units in the MLP. Default is 64.
+        shot_features (np.ndarray): Few-shot feature matrix of shape (n_shots, n_features).
+        shot_labels (np.ndarray): Few-shot labels.
+        test_features (np.ndarray): Test feature matrix of shape (n_test_samples, n_features).
+        hidden_dim (int): Number of hidden units in the model. Default is 256.
         num_epochs (int): Number of training epochs. Default is 100.
         learning_rate (float): Learning rate for the optimizer. Default is 0.001.
+        shot_extra_labels (np.ndarray): Optional additional labels for training, used in survival analysis.
     Methods:
         fit():
-            Trains the MLP model using the provided training data.
+            Fits the model using the provided few-shot data.
         predict() -> np.ndarray:
-            Generates predictions for the test data using the trained model.
+            Generates predictions for the test data using the fitted model.
     """
-    def __init__(self, train_feats, train_labels, test_feats, task_type, hidden_dim=64, num_epochs=100, learning_rate=0.001):
-        super().__init__(train_feats, train_labels, test_feats)
-        self.task_type = task_type
+    def __init__(self, shot_features, shot_labels, test_features, hidden_dim=256, num_epochs=100, learning_rate=0.001, shot_extra_labels=None):
+        super().__init__(shot_features, shot_labels, test_features, shot_extra_labels)
         self.hidden_dim = hidden_dim
         self.num_epochs = num_epochs
         self.learning_rate = learning_rate
 
     def fit(self):
-        input_dim = self.train_feats.shape[1]
-        if self.task_type == "regression":
-            self.num_classes = 1
-            self.criterion = nn.MSELoss()
-        elif self.task_type == "classification":
-            self.num_classes = len(np.unique(self.train_labels))
-            self.criterion = nn.CrossEntropyLoss()
-        else:
-            raise ValueError(f"Unknown task type: {self.task_type}")
+        input_dim = self.shot_features.shape[1]
+        self.num_classes = int(self.shot_labels.max()) + 1
+        self.criterion = nn.CrossEntropyLoss()
 
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.train_feats = torch.tensor(self.train_feats, dtype=torch.float32).to(self.device)
-        self.train_labels = torch.tensor(self.train_labels, dtype=torch.long).to(self.device)
-        self.test_feats = torch.tensor(self.test_feats, dtype=torch.float32).to(self.device)
+        self.shot_features = torch.tensor(self.shot_features, dtype=torch.float32).to(self.device)
+        self.shot_labels = torch.tensor(self.shot_labels, dtype=torch.long).to(self.device)
+        self.test_features = torch.tensor(self.test_features, dtype=torch.float32).to(self.device)
 
-        self.model = MLPClassifier(input_dim, self.hidden_dim, self.num_classes).to(self.device)
+        self.model = TwoLayerPerceptronClassifier(input_dim, self.hidden_dim, self.num_classes).to(self.device)
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
 
-        for epoch in range(self.num_epochs):
+        total_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
+        print(f"🚀 Starting training on {self.device} with {total_params:,} trainable parameters.")
+        print(self.model)
+
+        for epoch in tqdm.tqdm(range(self.num_epochs), desc="Training", unit="epoch", leave=True):
             self.model.train()
             self.optimizer.zero_grad()
-            outputs = self.model(self.train_feats)
-            loss = self.criterion(outputs, self.train_labels)
+            logits = self.model(self.shot_features)
+            loss = self.criterion(logits, self.shot_labels)
             loss.backward()
             self.optimizer.step()
+            tqdm.tqdm.write(f"Epoch {epoch+1}/{self.num_epochs} - Loss: {loss.item():.4f}")
 
     def predict(self) -> np.ndarray:
         self.model.eval()
         with torch.no_grad():
-            test_outputs = self.model(self.test_feats)
-            _, test_preds = torch.max(test_outputs, 1)
-        return test_preds.cpu().numpy()
+            logits = self.model(self.test_features)
+            _, test_predictions = torch.max(logits, 1)
+        return test_predictions.cpu().numpy()

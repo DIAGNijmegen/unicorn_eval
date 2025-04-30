@@ -1,3 +1,17 @@
+#  Copyright 2025 Diagnostic Image Analysis Group, Radboudumc, Nijmegen, The Netherlands
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+
 import numpy as np
 import scipy.ndimage as ndimage
 import torch
@@ -7,7 +21,7 @@ from scipy.ndimage import filters, gaussian_filter
 from torch.utils.data import DataLoader, Dataset
 from torch.utils.data._utils.collate import default_collate
 
-from unicorn_eval.adaptors.base import DenseAdaptor
+from unicorn_eval.adaptors.base import PatchLevelTaskAdaptor
 
 
 class DetectionDecoder(nn.Module):
@@ -228,7 +242,7 @@ def coordinates_to_heatmap(cell_coords, patch_size=224, heatmap_size=16, sigma=1
 def construct_detection_labels(
     coordinates,
     embeddings,
-    cases,
+    names,
     labels=None,
     patch_size=224,
     heatmap_size=16,
@@ -238,7 +252,7 @@ def construct_detection_labels(
 
     processed_data = []
 
-    for case_idx, case in enumerate(cases):
+    for case_idx, case_name in enumerate(names):
         patch_coordinates = coordinates[case_idx]
         case_embeddings = embeddings[case_idx]
 
@@ -263,29 +277,29 @@ def construct_detection_labels(
                 cell_coordinates = None
                 heatmap = None
 
-            processed_data.append((patch_emb, heatmap, (x_patch, y_patch), f"{case}"))
+            processed_data.append((patch_emb, heatmap, (x_patch, y_patch), f"{case_name}"))
 
     return processed_data
 
 
-class DensityMap(DenseAdaptor):
+class DensityMap(PatchLevelTaskAdaptor):
     def __init__(
         self,
-        train_feats,
-        train_coordinates,
-        train_cases,
-        train_labels,
-        test_feats,
+        shot_features,
+        shot_labels,
+        shot_coordinates,
+        shot_names,
+        test_features,
         test_coordinates,
-        test_cases,
+        test_names,
         patch_size=224,
         heatmap_size=16,
         num_epochs=200,
         learning_rate=1e-5,
     ):
-        super().__init__(train_feats, train_labels, test_feats, train_coordinates, test_coordinates)
-        self.train_cases = train_cases
-        self.test_cases = test_cases
+        super().__init__(shot_features, shot_labels, shot_coordinates, test_features, test_coordinates)
+        self.shot_names = shot_names
+        self.test_names = test_names
         self.patch_size = patch_size
         self.heatmap_size = heatmap_size
         self.num_epochs = num_epochs
@@ -293,13 +307,13 @@ class DensityMap(DenseAdaptor):
         self.decoder = None
 
     def fit(self):
-        input_dim = self.train_feats[0].shape[1]
+        input_dim = self.shot_features[0].shape[1]
 
         train_data = construct_detection_labels(
-            self.train_coordinates,
-            self.train_feats,
-            self.train_cases,
-            self.train_labels,
+            self.shot_coordinates,
+            self.shot_features,
+            self.shot_names,
+            labels=self.shot_labels,
             patch_size=self.patch_size,
             heatmap_size=self.heatmap_size,
         )
@@ -324,8 +338,8 @@ class DensityMap(DenseAdaptor):
     def predict(self) -> list:
         test_data = construct_detection_labels(
             self.test_coordinates,
-            self.test_feats,
-            cases=self.test_cases,
+            self.test_features,
+            self.test_names,
             patch_size=self.patch_size,
             heatmap_size=self.heatmap_size,
             is_train=False,

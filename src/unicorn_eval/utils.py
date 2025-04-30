@@ -1,3 +1,17 @@
+#  Copyright 2025 Diagnostic Image Analysis Group, Radboudumc, Nijmegen, The Netherlands
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+
 import json
 from functools import partial
 
@@ -7,12 +21,16 @@ from sksurv.metrics import concordance_index_censored
 
 from unicorn_eval.adaptors import (
     KNN,
-    MLP,
+    KNNRegressor,
+    TwoLayerPerceptron,
+    TwoLayerPerceptronRegressor,
     DensityMap,
     LinearProbing,
+    LinearProbingRegressor,
     LogisticRegression,
     SegmentationUpsampling,
     WeightedKNN,
+    WeightedKNNRegressor,
 )
 from unicorn_eval.metrics.dice import compute_dice_score
 from unicorn_eval.metrics.f1_score import compute_f1
@@ -57,89 +75,134 @@ METRIC_DICT = {
 }
 
 
-def aggregate_features(
+def adapt_features(
     *,
     adaptor_name: str,
     task_type: str,
-    train_feats: np.ndarray,
-    train_labels: np.ndarray,
-    test_feats: np.ndarray,
-    train_cases,
-    train_coordinates=None,
+    shot_features: np.ndarray,
+    shot_labels: np.ndarray,
+    test_features: np.ndarray,
+    shot_coordinates=None,
     test_coordinates=None,
-    test_cases=None,
+    shot_names=None,
+    test_names=None,
     patch_size=224,
     test_image_sizes=None,
+    shot_extra_labels=None,
 ):
-    num_train_samples = len(train_feats)
+    num_shots = len(shot_features)
     if "-nn" in adaptor_name:
-        k = int(adaptor_name.split("-nn")[0])
-        k = min(k, num_train_samples)
+        k = int(adaptor_name.split("-")[0])
+        k = min(k, num_shots)
         if "weighted" in adaptor_name:
-            adaptor = WeightedKNN(
-                train_feats=train_feats,
-                train_labels=train_labels,
-                test_feats=test_feats,
-                task_type=task_type,
-                k=k
-            )
+            if task_type == "classification":
+                adaptor = WeightedKNN(
+                    shot_features=shot_features,
+                    shot_labels=shot_labels,
+                    test_features=test_features,
+                    k=k
+                )
+            elif task_type == "regression":
+                adaptor = WeightedKNNRegressor(
+                    shot_features=shot_features,
+                    shot_labels=shot_labels,
+                    test_features=test_features,
+                    k=k
+                )
         else:
-            adaptor = KNN(
-                train_feats=train_feats,
-                train_labels=train_labels,
-                test_feats=test_feats,
-                task_type=task_type,
-                k=k
-            )
+            if task_type == "classification":
+                adaptor = KNN(
+                    shot_features=shot_features,
+                    shot_labels=shot_labels,
+                    test_features=test_features,
+                    k=k
+                )
+            elif task_type == "regression":
+                adaptor = KNNRegressor(
+                    shot_features=shot_features,
+                    shot_labels=shot_labels,
+                    test_features=test_features,
+                    k=k
+                )
     elif adaptor_name == "logistic-regression":
+        assert task_type == "classification"
         adaptor = LogisticRegression(
-            train_feats=train_feats,
-            train_labels=train_labels,
-            test_feats=test_feats,
-            max_iter=1000,
+            shot_features=shot_features,
+            shot_labels=shot_labels,
+            test_features=test_features,
+            max_iterations=1000,
             C=1.0,
             solver="lbfgs",
         )
-    elif adaptor_name == "linear-probing":
-        adaptor = LinearProbing(
-            train_feats=train_feats,
-            train_labels=train_labels,
-            test_feats=test_feats,
-            task_type=task_type,
-            num_epochs=100,
-            learning_rate=0.001,
-        )
-    elif adaptor_name == "mlp":
-        adaptor = MLP(
-            train_feats=train_feats,
-            train_labels=train_labels,
-            test_feats=test_feats,
-            task_type=task_type,
-            hidden_dim=256,
-            num_epochs=100,
-            learning_rate=0.001,
-        )
+    elif "linear-probing" in adaptor_name:
+        if task_type == "classification":
+            adaptor = LinearProbing(
+                shot_features=shot_features,
+                shot_labels=shot_labels,
+                shot_extra_labels=shot_extra_labels,
+                test_features=test_features,
+                num_epochs=100,
+                learning_rate=0.001,
+            )
+        elif task_type == "regression":
+            survival = False
+            if "survival" in adaptor_name:
+                survival = True
+            adaptor = LinearProbingRegressor(
+                shot_features=shot_features,
+                shot_labels=shot_labels,
+                shot_extra_labels=shot_extra_labels,
+                test_features=test_features,
+                survival=survival,
+                num_epochs=100,
+                learning_rate=0.001,
+            )
+    elif "mlp" in adaptor_name:
+        if task_type == "classification":
+            adaptor = TwoLayerPerceptron(
+                shot_features=shot_features,
+                shot_labels=shot_labels,
+                shot_extra_labels=shot_extra_labels,
+                test_features=test_features,
+                hidden_dim=256,
+                num_epochs=100,
+                learning_rate=0.001,
+            )
+        elif task_type == "regression":
+            survival = False
+            if "survival" in adaptor_name:
+                survival = True
+            adaptor = TwoLayerPerceptronRegressor(
+                shot_features=shot_features,
+                shot_labels=shot_labels,
+                shot_extra_labels=shot_extra_labels,
+                test_features=test_features,
+                survival=survival,
+                hidden_dim=256,
+                num_epochs=100,
+                learning_rate=0.001,
+            )
     elif adaptor_name == "density-map":
         adaptor = DensityMap(
-            train_feats=train_feats,
-            train_coordinates=train_coordinates,
-            train_cases=train_cases,
-            train_labels=train_labels,
-            test_feats=test_feats,
+            shot_features=shot_features,
+            shot_labels=shot_labels,
+            shot_coordinates=shot_coordinates,
+            shot_names=shot_names,
+            test_features=test_features,
             test_coordinates=test_coordinates,
-            test_cases=test_cases,
+            test_names=test_names,
             patch_size=patch_size[0],
             heatmap_size=16,
         )
     elif adaptor_name == "segmentation-upsampling":
         adaptor = SegmentationUpsampling(
-            train_feats=train_feats,
-            train_labels=train_labels,
-            test_feats=test_feats,
-            train_coordinates=train_coordinates,
+            shot_features=shot_features,
+            shot_labels=shot_labels,
+            shot_coordinates=shot_coordinates,
+            shot_names=shot_names,
+            test_features=test_features,
             test_coordinates=test_coordinates,
-            train_cases=train_cases,
-            test_cases=test_cases,
+            test_names=test_names,
             test_image_sizes=test_image_sizes,
             patch_size=patch_size[0],
         )
@@ -224,6 +287,10 @@ def process_image_representation(data):
     # convert labels to numpy arrays
     data["shot_labels"] = np.array(data["shot_labels"])
     data["case_labels"] = np.array(data["case_labels"])
+    if data["shot_extra_labels"] and data["shot_extra_labels"][0] is not None:
+        data["shot_extra_labels"] = np.concatenate(data["shot_extra_labels"], axis=0)
+    else:
+        data["shot_extra_labels"] = None
     if data["case_extra_labels"] and data["case_extra_labels"][0] is not None:
         data["case_extra_labels"] = np.concatenate(data["case_extra_labels"], axis=0)
     else:
@@ -260,12 +327,13 @@ def extract_embeddings_and_labels(processed_results):
                 "shot_embeddings": [],
                 "shot_coordinates": [],
                 "shot_labels": [],
+                "shot_extra_labels": [],
                 "shot_ids": [],
                 "case_embeddings": [],
                 "cases_coordinates": [],
                 "case_labels": [],
-                "case_ids": [],
                 "case_extra_labels": [],
+                "case_ids": [],
                 "cases_image_sizes": {},
                 "cases_image_spacings": {},
             }
@@ -273,14 +341,15 @@ def extract_embeddings_and_labels(processed_results):
         if result["split"] == "shot":
             tasks[task_name]["shot_embeddings"].append(result["embeddings"])
             tasks[task_name]["shot_labels"].append(result["label"])
+            tasks[task_name]["shot_extra_labels"].append(result["extra_labels"])
             tasks[task_name]["shot_ids"].append(result["case_id"])
             tasks[task_name]["shot_coordinates"].append(result["coordinates"])
         elif result["split"] == "case":
             tasks[task_name]["case_embeddings"].append(result["embeddings"])
             tasks[task_name]["case_labels"].append(result["label"])
+            tasks[task_name]["case_extra_labels"].append(result["extra_labels"])
             tasks[task_name]["prediction"].append(result["prediction"])
             tasks[task_name]["case_ids"].append(result["case_id"])
-            tasks[task_name]["case_extra_labels"].append(result["extra_labels"])
             tasks[task_name]["cases_coordinates"].append(result["coordinates"])
             case_id = result["case_id"]
             image_size = result["image_size"]

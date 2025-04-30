@@ -46,4 +46,13 @@ RUN python -m pip install -r requirements.in
 COPY --chown=user:user . /opt/app/unicorn_eval
 RUN python -m pip install /opt/app/unicorn_eval
 
+# download Bert model weights
+RUN mkdir -p /opt/app/unicorn_eval/models/bert-base-multilingual-cased
+RUN python -c "\
+from transformers import AutoModel, AutoTokenizer; \
+model = AutoModel.from_pretrained('bert-base-multilingual-cased'); \
+tokenizer = AutoTokenizer.from_pretrained('bert-base-multilingual-cased'); \
+model.save_pretrained('/opt/app/unicorn_eval/models/bert-base-multilingual-cased'); \
+tokenizer.save_pretrained('/opt/app/unicorn_eval/models/bert-base-multilingual-cased')"
+
 ENTRYPOINT ["unicorn_eval"]
