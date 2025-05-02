@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 import numpy as np
+import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -23,38 +24,46 @@ from torch.utils.data._utils.collate import default_collate
 from unicorn_eval.adaptors.base import PatchLevelTaskAdaptor
 
 
-class SegmentationDecoder(nn.Module):
-    def __init__(self, input_dim, num_classes):
-        super().__init__()
+def compute_num_upsample_layers(initial_size, target_size):
+    if isinstance(target_size, (tuple, list)):
+        assert target_size[0] == target_size[1], "Only square output sizes supported"
+        target_size = target_size[0]
+    return int(math.log2(target_size / initial_size))
 
-        self.fc = nn.Linear(input_dim, 8 * 8 * 32)
 
-        # reshape to (32, 8, 8) and upscale to (256, 256)
-        self.deconv_layers = nn.Sequential(
-            nn.ConvTranspose2d(
-                32, 64, kernel_size=4, stride=2, padding=1, output_padding=1
-            ),  # 8*8 -> 16*16
-            nn.BatchNorm2d(64),
-            nn.ReLU(),
-            nn.ConvTranspose2d(
-                64, 128, kernel_size=4, stride=2, padding=1, output_padding=1
-            ),  # 16*16 -> 32*32
-            nn.BatchNorm2d(128),
-            nn.ReLU(),
-            nn.ConvTranspose2d(
-                128, 64, kernel_size=4, stride=2, padding=1, output_padding=1
-            ),  # 32*32 -> 64*64
-            nn.BatchNorm2d(64),
-            nn.ReLU(),
-            nn.ConvTranspose2d(
-                64, 32, kernel_size=4, stride=2, padding=1, output_padding=1
-            ),  # 64*64 -> 128*128
-            nn.BatchNorm2d(32),
-            nn.ReLU(),
-            nn.ConvTranspose2d(
-                32, num_classes, kernel_size=3, stride=2, padding=1, output_padding=1
-            ),  # 128*128 -> 256*256
+def build_deconv_layers(self, in_channels, num_layers=5):
+        layers = []
+        current_channels = in_channels
+
+        for _ in range(num_layers - 1):
+            layers.extend([
+                nn.ConvTranspose2d(current_channels, current_channels * 2, kernel_size=4, stride=2, padding=1, output_padding=1),
+                nn.BatchNorm2d(current_channels * 2),
+                nn.ReLU()
+            ])
+            current_channels *= 2
+
+        layers.append(
+            nn.ConvTranspose2d(current_channels, self.num_classes, kernel_size=3, stride=2, padding=1, output_padding=1)
         )
+
+        return nn.Sequential(*layers)
+
+class SegmentationDecoder(nn.Module):
+    def __init__(self, input_dim, num_classes, num_deconv_layers=5):
+        super().__init__()
+        self.spatial_dims = (32, 8, 8)
+        self.num_classes = num_classes
+        num_deconv_layers = compute_num_upsample_layers(input_dim, self.spatial_dims[1:])
+
+        self.fc = nn.Linear(input_dim, np.prod(self.spatial_dims))
+
+        self.deconv_layers = build_deconv_layers(
+            self, 
+            in_channels=self.spatial_dims[0],
+            num_layers=num_deconv_layers,
+        )
+
         self._init_weights()
 
     def _init_weights(self):
@@ -69,7 +78,8 @@ class SegmentationDecoder(nn.Module):
 
     def forward(self, x, output_size):
         x = self.fc(x)  # Expand embedding
-        x = x.view(-1, 32, 8, 8)  # Reshape into spatial format
+        #x = x.view(-1, 32, 8, 8)  
+        x = x.view(-1, *self.spatial_dims) # Reshape into spatial format.
         x = self.deconv_layers(x)  # Upsample to (256, 256)
         x = F.interpolate(
             x, size=output_size, mode="bilinear", align_corners=False
