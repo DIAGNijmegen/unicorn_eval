@@ -20,6 +20,8 @@ from pprint import pformat
 import numpy as np
 import openslide
 import pandas as pd
+from dragon_eval import DragonEval
+from dragon_eval.evaluation import REGRESSION_EPSILON, TASK_TYPE, EvalType
 
 from unicorn_eval.helpers import get_max_workers
 from unicorn_eval.utils import (
@@ -63,9 +65,7 @@ INPUT_SLUGS_DICT = {
     "Task09_segmenting_rois_in_breast_cancer_wsis": [
         "histopathology-region-of-interest-cropout"
     ],
-    "Task20_generating_caption_from_wsi": [
-        "he-staining"
-    ]
+    "Task20_generating_caption_from_wsi": ["he-staining"],
 }
 
 MODEL_OUTPUT_SLUG_DICT = {
@@ -93,6 +93,39 @@ EXTRA_LABEL_SLUG_DICT = {
         "event.json"
     ],
 }
+
+LANGUAGE_TASK_NAMES = [
+    "Task12_predicting_histopathology_sample_origin",
+    "Task13_classifying_pulmonary_nodule_presence",
+    "Task14_classifying_kidney_abnormality",
+    "Task15_hip_kellgren_lawrence_score",
+    "Task16_classifying_colon_histopathology_diagnosis",
+    "Task17_predicting_lesion_size_measurements",
+    "Task18_predicting_prostate_volume_psa_and_psa_density",
+    "Task19_anonymizing_report",
+]
+
+TASK_TYPE.update(
+    {
+        "Task12_predicting_histopathology_sample_origin": EvalType.NONORDINAL_MULTI_CLASS_CLASSIFICATION,
+        "Task13_classifying_pulmonary_nodule_presence": EvalType.BINARY_CLASSIFICATION,
+        "Task14_classifying_kidney_abnormality": EvalType.BINARY_CLASSIFICATION,
+        "Task15_hip_kellgren_lawrence_score": EvalType.NONORDINAL_MULTI_CLASS_CLASSIFICATION,
+        "Task16_classifying_colon_histopathology_diagnosis": EvalType.BINARY_CLASSIFICATION_NON_SHARED_TASK,
+        "Task17_predicting_lesion_size_measurements": EvalType.REGRESSION,
+        "Task18_predicting_prostate_volume_psa_and_psa_density": EvalType.REGRESSION,
+        "Task19_anonymizing_report": EvalType.TEXT_TARGET,
+    }
+)
+
+REGRESSION_EPSILON.update(
+    {
+        "Task17_predicting_lesion_size_measurements": 4,
+        "Task18_predicting_prostate_volume_psa_and_psa_density": np.array(
+            [4, 0.4, 0.04]
+        ),
+    }
+)
 
 
 def process(job):
@@ -142,9 +175,17 @@ def process(job):
 
         if slug_embedding == "image-neural-representation":
             embeddings = np.array(result_algorithm["features"]).astype(np.float32)
-            coordinates, spacing, patch_size, image_size, image_spacing = None, None, None, None, None
+            coordinates, spacing, patch_size, image_size, image_spacing = (
+                None,
+                None,
+                None,
+                None,
+                None,
+            )
         elif slug_embedding == "patch-neural-representation":
-            embeddings, coordinates, spacing, patch_size, image_size, image_spacing = extract_data(result_algorithm)
+            embeddings, coordinates, spacing, patch_size, image_size, image_spacing = (
+                extract_data(result_algorithm)
+            )
 
     elif modality == "vision-language":
 
@@ -280,14 +321,16 @@ def load_json_file(*, location):
     with open(location) as f:
         return json.loads(f.read())
 
+
 def load_tif_file(*, location):
     slide = openslide.OpenSlide(location)
     print("Image dimensions:", slide.dimensions)
     level_0 = slide.read_region((0, 0), 0, slide.dimensions)
- #   save_tif(level_0, location.stem)
+    #   save_tif(level_0, location.stem)
     level_0_np = np.array(level_0)
     class_labels = level_0_np[:, :, 0]  # shape: (H, W)
     return class_labels
+
 
 def write_metrics(*, metrics):
     # write a json document used for ranking results on the leaderboard
@@ -309,14 +352,18 @@ def write_combined_metrics(*, metric_dict: dict[dict]) -> None:
         for metric_name, metric_value in task_metrics["metrics"].items():
             task_identifier = task_name.split("_")[0]
             metrics["metrics"][f"{task_identifier}_{metric_name}"] = metric_value
-            metrics["normalized_metrics"][f"{task_identifier}_{metric_name}"] = normalize_metric(task_name, metric_value)
+            metrics["normalized_metrics"][f"{task_identifier}_{metric_name}"] = (
+                normalize_metric(task_name, metric_value)
+            )
 
         for metric_name, metric_value in task_metrics["additional_metrics"].items():
             task_identifier = task_name.split("_")[0]
             metrics["metrics"][f"{task_identifier}_{metric_name}"] = metric_value
 
     # aggregate metrics when there are multiple tasks
-    metrics["metrics"]["mean"] = np.mean([metric_value for _, metric_value in metrics["normalized_metrics"].items()])
+    metrics["metrics"]["mean"] = np.mean(
+        [metric_value for _, metric_value in metrics["normalized_metrics"].items()]
+    )
 
     write_json_file(
         location=OUTPUT_DIRECTORY / "metrics.json",
@@ -329,12 +376,95 @@ def write_combined_metrics(*, metric_dict: dict[dict]) -> None:
     )
 
 
+def prepare_predictions_language(input_dir: Path, output_dir: Path, gt_dir: Path):
+    """
+    Map the predictions with random filenames to the correct task and fold.
+    """
+    # Collect the uids of the ground truth files
+    task_uids = {}
+    for gt_file in gt_dir.glob("*.json"):
+        with open(gt_file, "r") as f:
+            entries = json.load(f)
+        uids = set([entry["uid"] for entry in entries])
+        task_uids[gt_file.stem] = uids
+
+    # Match the predictions with the correct ground truth file
+    for pred_file in input_dir.rglob("*.json"):
+        if pred_file.name in ["predictions.json", "inputs.json"]:
+            continue
+
+        with open(pred_file, "r") as f:
+            entries = json.load(f)
+
+        uids = set([entry["uid"] for entry in entries])
+        for task, gt_uids in task_uids.items():
+            if uids == gt_uids:
+                output_file = (
+                    output_dir / f"{task}-fold0" / "nlp-predictions-dataset.json"
+                )
+                output_file.parent.mkdir(parents=True, exist_ok=True)
+                with open(output_file, "w") as f:
+                    json.dump(entries, f)
+                break
+
+
+def evaluate_language_predictions():
+    input_dir = (
+        INPUT_DIRECTORY
+        if INPUT_DIRECTORY.exists()
+        else Path("unicorn/test-predictions")
+    )
+    # Make a temp folder
+    temp_metric_output_path = Path("/opt/app/predictions/language_results/metrics.json")
+    temp_metric_output_path.parent.mkdir(parents=True, exist_ok=True)
+    workdir = (
+        Path("/opt/app/predictions")
+        if Path("/opt/app/predictions").exists()
+        else Path("unicorn/workdir")
+    )
+    prepare_predictions_language(
+        input_dir=input_dir,
+        output_dir=workdir,
+        gt_dir=GROUNDTRUTH_DIRECTORY,
+    )
+
+    # determine which task we are evaluating
+    files = list(GROUNDTRUTH_DIRECTORY.glob("*.json"))
+    task_names = [
+        path.stem.replace(".json", "")
+        for path in files
+        if path.stem.replace(".json", "") in LANGUAGE_TASK_NAMES
+    ]
+
+    if task_names:
+        # evaluate
+        DragonEval(
+            ground_truth_path=GROUNDTRUTH_DIRECTORY,
+            predictions_path=workdir,
+            output_file=temp_metric_output_path,
+            folds=[0],
+            tasks=task_names,
+        ).evaluate()
+
+        # load the metrics
+        with open(temp_metric_output_path, "r") as f:
+            return json.load(f)
+
+    else:
+        print("No language tasks found in the ground truth files.")
+        return {}
+
+
 def main():
     print("input folder contents:")
     print_directory_contents(INPUT_DIRECTORY)
     print("=+=" * 10)
     print("grountruth folder contents:")
     print_directory_contents(GROUNDTRUTH_DIRECTORY)
+    print("=+=" * 10)
+
+    print("evaluating language predictions")
+    task_metrics = evaluate_language_predictions()
     print("=+=" * 10)
 
     metrics = {}
@@ -350,8 +480,6 @@ def main():
     with Pool(processes=max_workers) as pool:
         processed_results = pool.map(process, predictions)
     task_values = extract_embeddings_and_labels(processed_results)
-
-    task_metrics = {}
 
     for task_name, results in task_values.items():
 
@@ -383,7 +511,9 @@ def main():
 
             elif task_type == "detection":
 
-                case_extra_labels = get_cases_extra_labels_detection(results["cases_image_sizes"], results["cases_image_spacings"])
+                case_extra_labels = get_cases_extra_labels_detection(
+                    results["cases_image_sizes"], results["cases_image_spacings"]
+                )
 
             predictions = aggregate_features(
                 adaptor_name=adaptor_name,
@@ -401,7 +531,9 @@ def main():
 
         elif modality == "vision-language":
             predictions = [pred["text"] for pred in results["prediction"]]
-            case_labels = [label["text"] for case in results["case_labels"] for label in case]
+            case_labels = [
+                label["text"] for case in results["case_labels"] for label in case
+            ]
             case_extra_labels = None
 
         metrics = evaluate_predictions(
@@ -412,6 +544,8 @@ def main():
             test_extra_labels=case_extra_labels,
         )
         task_metrics[task_name] = metrics
+
+    # Add load language metrics to the task metric
 
     write_combined_metrics(metric_dict=task_metrics)
 
