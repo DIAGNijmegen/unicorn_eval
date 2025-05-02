@@ -36,25 +36,26 @@ def build_deconv_layers(self, in_channels, num_layers=5):
         current_channels = in_channels
 
         for _ in range(num_layers - 1):
+            out_channels = min(128, current_channels * 2)
             layers.extend([
-                nn.ConvTranspose2d(current_channels, current_channels * 2, kernel_size=4, stride=2, padding=1, output_padding=1),
-                nn.BatchNorm2d(current_channels * 2),
+                nn.ConvTranspose2d(current_channels, out_channels, kernel_size=4, stride=2, padding=1, output_padding=1),
+                nn.BatchNorm2d(out_channels),
                 nn.ReLU()
             ])
-            current_channels *= 2
-
+            current_channels = min(128, current_channels * 2)
+            
         layers.append(
-            nn.ConvTranspose2d(current_channels, self.num_classes, kernel_size=3, stride=2, padding=1, output_padding=1)
+            nn.ConvTranspose2d(current_channels, self.num_classes, kernel_size=4, stride=2, padding=1, output_padding=1)
         )
 
         return nn.Sequential(*layers)
 
 class SegmentationDecoder(nn.Module):
-    def __init__(self, input_dim, num_classes, num_deconv_layers=5):
+    def __init__(self, input_dim, patch_size, num_classes, num_deconv_layers=5):
         super().__init__()
         self.spatial_dims = (32, 8, 8)
         self.num_classes = num_classes
-        num_deconv_layers = compute_num_upsample_layers(input_dim, self.spatial_dims[1:])
+        num_deconv_layers = compute_num_upsample_layers(self.spatial_dims[1], patch_size)
 
         self.fc = nn.Linear(input_dim, np.prod(self.spatial_dims))
 
@@ -177,7 +178,7 @@ def custom_collate(batch):
     )
 
 
-def train_decoder(decoder, dataloader, patch_size=224, num_epochs=200, lr=0.001):
+def train_decoder(decoder, dataloader, patch_size, num_epochs=200, lr=0.001):
     """Trains the decoder using the given data."""
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -211,7 +212,7 @@ def train_decoder(decoder, dataloader, patch_size=224, num_epochs=200, lr=0.001)
     return decoder
 
 
-def inference(decoder, dataloader, patch_size=224, test_image_sizes=None):
+def inference(decoder, dataloader, patch_size, test_image_sizes=None):
     """Run inference on the test set and reconstruct into a single 2D array."""
     decoder.eval()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -285,7 +286,7 @@ class SegmentationUpsampling(PatchLevelTaskAdaptor):
         test_coordinates,
         test_names,
         test_image_sizes,
-        patch_size=224,
+        patch_size,
         num_epochs=20,
         learning_rate=1e-5,
     ):
@@ -316,7 +317,7 @@ class SegmentationUpsampling(PatchLevelTaskAdaptor):
             dataset, batch_size=32, shuffle=True, collate_fn=custom_collate
         )
 
-        self.decoder = SegmentationDecoder(input_dim=input_dim, num_classes=num_classes).to(
+        self.decoder = SegmentationDecoder(input_dim=input_dim, patch_size=self.patch_size, num_classes=num_classes).to(
             torch.device("cuda" if torch.cuda.is_available() else "cpu")
         )
         self.decoder = train_decoder(
