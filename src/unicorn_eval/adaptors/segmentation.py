@@ -67,12 +67,12 @@ class SegmentationDecoder(nn.Module):
                 if m.bias is not None:
                     nn.init.zeros_(m.bias)
 
-    def forward(self, x):
+    def forward(self, x, output_size):
         x = self.fc(x)  # Expand embedding
         x = x.view(-1, 32, 8, 8)  # Reshape into spatial format
         x = self.deconv_layers(x)  # Upsample to (256, 256)
         x = F.interpolate(
-            x, size=(224, 224), mode="bilinear", align_corners=False
+            x, size=output_size, mode="bilinear", align_corners=False
         )  # Ensure exact size
         return x
 
@@ -167,7 +167,7 @@ def custom_collate(batch):
     )
 
 
-def train_decoder(decoder, dataloader, num_epochs=200, lr=0.001):
+def train_decoder(decoder, dataloader, patch_size=224, num_epochs=200, lr=0.001):
     """Trains the decoder using the given data."""
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -184,7 +184,7 @@ def train_decoder(decoder, dataloader, num_epochs=200, lr=0.001):
             target_mask = target_mask.to(device)
 
             optimizer.zero_grad()
-            pred_masks = decoder(patch_emb)
+            pred_masks = decoder(patch_emb, output_size=(patch_size, patch_size))
             target_mask = (
                 target_mask.long()
             )  # Convert to LongTensor for CrossEntropyLoss
@@ -219,7 +219,7 @@ def inference(decoder, dataloader, patch_size=224, test_image_sizes=None):
         ) in dataloader:  # patch_emb, segmentation_mask_patch, patch_coordinates, case
             patch_emb = patch_emb.to(device)
 
-            pred_masks = decoder(patch_emb)
+            pred_masks = decoder(patch_emb, output_size=(patch_size, patch_size))
             pred_masks = torch.argmax(
                 pred_masks, dim=1
             )  # gives a [batch_size, height, width] tensor with class labels
@@ -310,7 +310,7 @@ class SegmentationUpsampling(PatchLevelTaskAdaptor):
             torch.device("cuda" if torch.cuda.is_available() else "cpu")
         )
         self.decoder = train_decoder(
-            self.decoder, dataloader, num_epochs=self.num_epochs, lr=self.learning_rate
+            self.decoder, dataloader, patch_size=self.patch_size, num_epochs=self.num_epochs, lr=self.learning_rate
         )
 
     def predict(self) -> list:
