@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 import numpy as np
+import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -23,38 +24,49 @@ from torch.utils.data._utils.collate import default_collate
 from unicorn_eval.adaptors.base import PatchLevelTaskAdaptor
 
 
-class SegmentationDecoder(nn.Module):
-    def __init__(self, input_dim, num_classes):
-        super().__init__()
+def compute_num_upsample_layers(initial_size, target_size):
+    if isinstance(target_size, (tuple, list)):
+        assert target_size[0] == target_size[1], "Only square output sizes supported"
+        target_size = target_size[0]
+    return int(math.log2(target_size / initial_size))
 
-        self.fc = nn.Linear(input_dim, 8 * 8 * 32)
 
-        # reshape to (32, 8, 8) and upscale to (256, 256)
-        self.deconv_layers = nn.Sequential(
-            nn.ConvTranspose2d(
-                32, 64, kernel_size=4, stride=2, padding=1, output_padding=1
-            ),  # 8*8 -> 16*16
-            nn.BatchNorm2d(64),
-            nn.ReLU(),
-            nn.ConvTranspose2d(
-                64, 128, kernel_size=4, stride=2, padding=1, output_padding=1
-            ),  # 16*16 -> 32*32
-            nn.BatchNorm2d(128),
-            nn.ReLU(),
-            nn.ConvTranspose2d(
-                128, 64, kernel_size=4, stride=2, padding=1, output_padding=1
-            ),  # 32*32 -> 64*64
-            nn.BatchNorm2d(64),
-            nn.ReLU(),
-            nn.ConvTranspose2d(
-                64, 32, kernel_size=4, stride=2, padding=1, output_padding=1
-            ),  # 64*64 -> 128*128
-            nn.BatchNorm2d(32),
-            nn.ReLU(),
-            nn.ConvTranspose2d(
-                32, num_classes, kernel_size=3, stride=2, padding=1, output_padding=1
-            ),  # 128*128 -> 256*256
+def build_deconv_layers(self, in_channels, num_layers):
+        layers = []
+        current_channels = in_channels
+
+        for _ in range(num_layers - 1):
+            out_channels = min(128, current_channels * 2)
+            layers.extend([
+                nn.ConvTranspose2d(current_channels, out_channels, kernel_size=4, stride=2, padding=1, output_padding=1),
+                nn.BatchNorm2d(out_channels),
+                nn.ReLU()
+            ])
+            current_channels = min(128, current_channels * 2) # cap the number of channels at 128
+
+        layers.append(
+            nn.ConvTranspose2d(current_channels, self.num_classes, kernel_size=4, stride=2, padding=1, output_padding=1)
         )
+
+        return nn.Sequential(*layers)
+
+
+class SegmentationDecoder(nn.Module):
+    def __init__(self, input_dim, patch_size, num_classes):
+        super().__init__()
+        self.spatial_dims = (32, 8, 8)
+        self.output_size = (patch_size, patch_size)
+        self.num_classes = num_classes
+        num_deconv_layers = compute_num_upsample_layers(self.spatial_dims[1], patch_size)
+
+        self.fc = nn.Linear(input_dim, np.prod(self.spatial_dims))
+
+        self.deconv_layers = build_deconv_layers(
+            self,
+            in_channels=self.spatial_dims[0],
+            num_layers=num_deconv_layers,
+        )
+
         self._init_weights()
 
     def _init_weights(self):
@@ -69,10 +81,10 @@ class SegmentationDecoder(nn.Module):
 
     def forward(self, x):
         x = self.fc(x)  # Expand embedding
-        x = x.view(-1, 32, 8, 8)  # Reshape into spatial format
+        x = x.view(-1, *self.spatial_dims) # Reshape into spatial format.
         x = self.deconv_layers(x)  # Upsample to (256, 256)
         x = F.interpolate(
-            x, size=(224, 224), mode="bilinear", align_corners=False
+            x, size=self.output_size, mode="bilinear", align_corners=False
         )  # Ensure exact size
         return x
 
@@ -201,7 +213,7 @@ def train_decoder(decoder, dataloader, num_epochs=200, lr=0.001):
     return decoder
 
 
-def inference(decoder, dataloader, patch_size=224, test_image_sizes=None):
+def inference(decoder, dataloader, patch_size, test_image_sizes=None):
     """Run inference on the test set and reconstruct into a single 2D array."""
     decoder.eval()
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -244,7 +256,7 @@ def inference(decoder, dataloader, patch_size=224, test_image_sizes=None):
             if case_image_size is not None:
                 predicted_masks[case] = np.zeros(case_image_size, dtype=np.float32)
             else:
-                print(f"Image size not found for case {case}")
+                raise ValueError(f"Image size not found for case {case}")
 
         max_x = min(x + patch_size, predicted_masks[case].shape[0])
         max_y = min(y + patch_size, predicted_masks[case].shape[1])
@@ -258,7 +270,7 @@ def inference(decoder, dataloader, patch_size=224, test_image_sizes=None):
             ] = pred_masks_resized
         else:
             print(
-                f"Skipping assignment for case {case} at ({x}, {y}) due to invalid slice size"
+                f"[WARNING] Skipping assignment for case {case} at ({x}, {y}) due to invalid slice size"
             )
 
     return [v.T for v in predicted_masks.values()]
@@ -275,7 +287,7 @@ class SegmentationUpsampling(PatchLevelTaskAdaptor):
         test_coordinates,
         test_names,
         test_image_sizes,
-        patch_size=224,
+        patch_size,
         num_epochs=20,
         learning_rate=1e-5,
     ):
@@ -306,7 +318,7 @@ class SegmentationUpsampling(PatchLevelTaskAdaptor):
             dataset, batch_size=32, shuffle=True, collate_fn=custom_collate
         )
 
-        self.decoder = SegmentationDecoder(input_dim=input_dim, num_classes=num_classes).to(
+        self.decoder = SegmentationDecoder(input_dim=input_dim, patch_size=self.patch_size, num_classes=num_classes).to(
             torch.device("cuda" if torch.cuda.is_available() else "cpu")
         )
         self.decoder = train_decoder(
