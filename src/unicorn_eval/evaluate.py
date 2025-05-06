@@ -380,16 +380,20 @@ def prepare_predictions_language(input_dir: Path, output_dir: Path, gt_dir: Path
     """
     Map the predictions with random filenames to the correct task and fold.
     """
-    # Collect the uids of the ground truth files
+    # Collect the uids of the ground truth files if the path contains a task name
     task_uids = {}
-    for gt_file in gt_dir.glob("*.json"):
-        with open(gt_file, "r") as f:
-            entries = json.load(f)
-        uids = set([entry["uid"] for entry in entries])
-        task_uids[gt_file.stem] = uids
+    for gt_file in gt_dir.rglob("*.json"):
+        if any(task_name in str(gt_file) for task_name in LANGUAGE_TASK_NAMES):
+            with open(gt_file, "r") as f:
+                entries = json.load(f)
+            matched_task = next(
+                task for task in LANGUAGE_TASK_NAMES if task in str(gt_file)
+            )
+            uids = set(entry["uid"] for entry in entries)
+            task_uids[matched_task] = uids
 
     # Match the predictions with the correct ground truth file
-    for pred_file in input_dir.rglob("*.json"):
+    for pred_file in input_dir.rglob("*/output/nlp-predictions-dataset/*.json"):
         if pred_file.name in ["predictions.json", "inputs.json"]:
             continue
 
@@ -544,8 +548,6 @@ def main():
             test_extra_labels=case_extra_labels,
         )
         task_metrics[task_name] = metrics
-
-    # Add load language metrics to the task metric
 
     write_combined_metrics(metric_dict=task_metrics)
 
