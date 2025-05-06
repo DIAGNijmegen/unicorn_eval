@@ -255,7 +255,7 @@ def inference(decoder, dataloader, patch_size, test_image_sizes=None):
             if case_image_size is not None:
                 predicted_masks[case] = np.zeros(case_image_size, dtype=np.float32)
             else:
-                print(f"Image size not found for case {case}")
+                raise ValueError(f"Image size not found for case {case}")
 
         max_x = min(x + patch_size, predicted_masks[case].shape[0])
         max_y = min(y + patch_size, predicted_masks[case].shape[1])
@@ -269,7 +269,7 @@ def inference(decoder, dataloader, patch_size, test_image_sizes=None):
             ] = pred_masks_resized
         else:
             print(
-                f"Skipping assignment for case {case} at ({x}, {y}) due to invalid slice size"
+                f"[WARNING] Skipping assignment for case {case} at ({x}, {y}) due to invalid slice size"
             )
 
     return [v.T for v in predicted_masks.values()]
