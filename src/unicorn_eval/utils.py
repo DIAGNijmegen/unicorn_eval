@@ -53,12 +53,12 @@ METRIC_DICT = {
         "range": (-1, 1),
     },
     "Task05_detecting_signet_ring_cells_in_he_stained_wsi_of_gastric_cancer": {
-        "name": "froc",
+        "name": "f1",
         "fn": compute_f1,
         "range": (0, 1),
     },
     "Task08_detecting_mitotic_figures_in_breast_cancer_wsis": {
-        "name": "froc",
+        "name": "f1",
         "fn": compute_f1,
         "range": (0, 1),
     },

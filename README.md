@@ -28,7 +28,7 @@ You’re welcome to contribute a custom adaptor! Here's how:
     - A short `README.md` that covers:
       - A clear description of your method
       - A list of tasks, or task types your method is designed for
-    - A **unique name** (we’ll include your **team name** in the adaptor name to ensure you receive credit)
+    - A **unique name** (we’ll include your **team name** in the adaptor name to ensure you receive credit). When naming your method, please be **as specific as possible** — for example, indicate details like the number of layers or specific settings — so that related methods with different configurations can be distinctly named.
     - Any additional dependencies in a `requirements.txt` (details on adding new requirements below)
 
 ✅ Once accepted, your adaptor becomes selectable at submission time — and your team gets full recognition when it’s used!
