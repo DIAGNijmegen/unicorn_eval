@@ -31,7 +31,7 @@ def compute_num_upsample_layers(initial_size, target_size):
     return int(math.log2(target_size / initial_size))
 
 
-def build_deconv_layers(self, in_channels, num_layers=5):
+def build_deconv_layers(self, in_channels, num_layers):
         layers = []
         current_channels = in_channels
 
@@ -42,25 +42,27 @@ def build_deconv_layers(self, in_channels, num_layers=5):
                 nn.BatchNorm2d(out_channels),
                 nn.ReLU()
             ])
-            current_channels = min(128, current_channels * 2)
-            
+            current_channels = min(128, current_channels * 2) # cap the number of channels at 128
+
         layers.append(
             nn.ConvTranspose2d(current_channels, self.num_classes, kernel_size=4, stride=2, padding=1, output_padding=1)
         )
 
         return nn.Sequential(*layers)
 
+
 class SegmentationDecoder(nn.Module):
-    def __init__(self, input_dim, patch_size, num_classes, num_deconv_layers=5):
+    def __init__(self, input_dim, patch_size, num_classes):
         super().__init__()
         self.spatial_dims = (32, 8, 8)
+        self.output_size = (patch_size, patch_size)
         self.num_classes = num_classes
         num_deconv_layers = compute_num_upsample_layers(self.spatial_dims[1], patch_size)
 
         self.fc = nn.Linear(input_dim, np.prod(self.spatial_dims))
 
         self.deconv_layers = build_deconv_layers(
-            self, 
+            self,
             in_channels=self.spatial_dims[0],
             num_layers=num_deconv_layers,
         )
@@ -77,13 +79,12 @@ class SegmentationDecoder(nn.Module):
                 if m.bias is not None:
                     nn.init.zeros_(m.bias)
 
-    def forward(self, x, output_size):
+    def forward(self, x):
         x = self.fc(x)  # Expand embedding
-        #x = x.view(-1, 32, 8, 8)  
         x = x.view(-1, *self.spatial_dims) # Reshape into spatial format.
         x = self.deconv_layers(x)  # Upsample to (256, 256)
         x = F.interpolate(
-            x, size=output_size, mode="bilinear", align_corners=False
+            x, size=self.output_size, mode="bilinear", align_corners=False
         )  # Ensure exact size
         return x
 
@@ -178,7 +179,7 @@ def custom_collate(batch):
     )
 
 
-def train_decoder(decoder, dataloader, patch_size, num_epochs=200, lr=0.001):
+def train_decoder(decoder, dataloader, num_epochs=200, lr=0.001):
     """Trains the decoder using the given data."""
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -195,7 +196,7 @@ def train_decoder(decoder, dataloader, patch_size, num_epochs=200, lr=0.001):
             target_mask = target_mask.to(device)
 
             optimizer.zero_grad()
-            pred_masks = decoder(patch_emb, output_size=(patch_size, patch_size))
+            pred_masks = decoder(patch_emb)
             target_mask = (
                 target_mask.long()
             )  # Convert to LongTensor for CrossEntropyLoss
@@ -230,7 +231,7 @@ def inference(decoder, dataloader, patch_size, test_image_sizes=None):
         ) in dataloader:  # patch_emb, segmentation_mask_patch, patch_coordinates, case
             patch_emb = patch_emb.to(device)
 
-            pred_masks = decoder(patch_emb, output_size=(patch_size, patch_size))
+            pred_masks = decoder(patch_emb)
             pred_masks = torch.argmax(
                 pred_masks, dim=1
             )  # gives a [batch_size, height, width] tensor with class labels
@@ -321,7 +322,7 @@ class SegmentationUpsampling(PatchLevelTaskAdaptor):
             torch.device("cuda" if torch.cuda.is_available() else "cpu")
         )
         self.decoder = train_decoder(
-            self.decoder, dataloader, patch_size=self.patch_size, num_epochs=self.num_epochs, lr=self.learning_rate
+            self.decoder, dataloader, num_epochs=self.num_epochs, lr=self.learning_rate
         )
 
     def predict(self) -> list:
