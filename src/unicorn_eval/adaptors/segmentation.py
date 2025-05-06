@@ -290,7 +290,9 @@ class SegmentationUpsampling(PatchLevelTaskAdaptor):
 
     def fit(self):
         input_dim = self.shot_features[0].shape[1]
-        num_classes = int(self.shot_labels.max()) + 1
+        num_classes = max(
+            [np.max(label) for label in self.shot_labels]
+        ) + 1
 
         train_data = construct_segmentation_labels(
             self.shot_coordinates,
