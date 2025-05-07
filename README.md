@@ -12,8 +12,8 @@ This repository provides:
 
 The UNICORN Challenge evaluates how well foundation models generalize across multiple modalities with minimal task-specific supervision:
 
-- 🧠 **Language** and **Vision-Language** tasks: your algorithm directly outputs predictions.
-- 👁️ **Vision** tasks: your algorithms outputs frozen features. These are passed through **adaptors** — lightweight models - to generate predictions. 
+- 🧠 **Language** and **Vision-Language** tasks: algorithm directly outputs predictions — _no adaptor required_ 
+- 👁️ **Vision** tasks: algorithms outputs frozen features, these are passed through **adaptors** — lightweight models - to generate predictions. 
 
 We provide a few built-in adaptors, but you're highly encouraged to propose your own!<br>
 We maintain the full list of adaptors available on the [Supported Adaptors](src/unicorn_eval/adaptors/README.md) page.
@@ -26,11 +26,9 @@ In **vision tasks**, submissions consist of:
 - An **adaptor** (used to turn features into predictions)
 
 You can experiment with different adaptors **on top of the same algorithm** without using up your submission slots.<br>
-Want to try a different adaptor? Send us a request by email, we’ll run the new adaptor strategy for you on top of the existing features. Requests should be submitted via email using the provided template (see below).
+Want to try a different adaptor? Email us using the provided template (see below) — we’ll run it for you on existing features.
 
 In **language** and **vision-language** tasks, the algorithm outputs predictions directly, so no adaptor is needed.
-
-## Summary
 
 | **Modality**         | **What You Submit**                        | **Are Adaptors Used?** | **Submission Limit Applies To** |
 |-----------------------|--------------------------------------------|-------------------------|-----------------------------------|
@@ -62,7 +60,6 @@ Have a better idea for how to turn features into predictions?
 ### Implementation requirements for contributing a new adaptor
 - Your adaptor method must be implemented as a standalone function, following the baseline template [`base.py`](src/unicorn_eval/adaptors/base.py)
 - It must complete within the allowed time limit of 1h
-- Adaptors must be designed to run on CPU
 - Submissions will be evaluated for correctness, efficiency, and compliance with the [challenge policies](https://unicorn.grand-challenge.org/requirements-and-guidelines/)
 - 🚨 Important: Pre-trained adaptors are not allowed! Be original — you can use the few-shots, for example, for fitting or training your adaptor, but don’t rely on pre-trained solutions
 
