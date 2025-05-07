@@ -26,7 +26,7 @@ In **vision tasks**, submissions consist of:
 - An **adaptor** (used to turn features into predictions)
 
 You can experiment with different adaptors **on top of the same algorithm** without using up your submission slots.<br>
-Want to try a different adaptor? Send us a request by email, we’ll run the new adaptor strategy for you on top of the existing features. Requests should be submitted via email using the provided template (to be shared soon).
+Want to try a different adaptor? Send us a request by email, we’ll run the new adaptor strategy for you on top of the existing features. Requests should be submitted via email using the provided template (see below).
 
 In **language** and **vision-language** tasks, the algorithm outputs predictions directly, so no adaptor is needed.
 
@@ -52,7 +52,7 @@ Have a better idea for how to turn features into predictions?
     - A short `README.md` that covers:
       - A clear description of your method
       - A list of tasks, or task types your method is designed for
-    - A **unique name** (we’ll include your **team name** in the adaptor name to ensure you receive credit). When naming your method, please be **as specific as possible** — for example, indicate details like the number of layers or specific settings — so that related methods with different configurations can be distinctly named.
+    - A **unique name** (we will include your **team name** in the adaptor name to ensure you receive credit). When naming your method, please be **as specific as possible** — for example, indicate details like the number of layers or specific settings — so that related methods with different configurations can be distinctly named.
     - Any additional dependencies in a `requirements.txt` (details on adding new requirements below)
 
 ✅ Once accepted, your adaptor becomes selectable at submission time — and your team gets full recognition when it’s used!
@@ -88,7 +88,7 @@ You can request us to apply additional adaptors to your **existing vision submis
 2. For each submission that you want to rerun a new adaptor, specify:
    - The full submission link<br>
      _Example:_ `https://unicorn.grand-challenge.org/evaluation/30/submissions/bc9b9fe2-1f8d-4b9e-af7b-0edb87b127a4/`
-   - The adaptor(s) you want to apply (chosen from the [Supported Adaptors](src/unicorn_eval/adaptors/README.md)).<br>
+   - The new adaptor(s) you want to apply (chosen from the [Supported Adaptors](src/unicorn_eval/adaptors/README.md)).<br>
     ⚠️ Responsible use: You’re welcome to submit additional adaptor run requests over time. However, to ensure fair access for all participants, we ask that each request remains targeted and minimal (e.g., max 2 adaptors per leaderboard per request). Bulk or unfocused requests may be deprioritized.
 
 3. Email your request to `support@unicorn-challenge.com` containing the following template:
