@@ -64,8 +64,8 @@ Have a better idea for how to turn features into predictions?
 - 🚨 Important: Pre-trained adaptors are not allowed! Be original — you can use the few-shots, for example, for fitting or training your adaptor, but don’t rely on pre-trained solutions
 
 ### Dependencies
-- Each method must be able to run in the [provided isolated environment](https://github.com/DIAGNijmegen/unicorn_eval/blob/improve-code-readability/Dockerfile)
-- Additional dependencies can be requested but:
+- Each method must be able to run in the [provided isolated environment](Dockerfile)
+- Additional dependencies can be requested, but:
   - Approval of new dependencies is not guaranteed, dependencies will be evaluated based on compatibility with other packages
   - Organizers reserve the right to modify the list of dependencies over time, though we aim to maintain compatibility with existing adaptors
   - When specifying dependencies, use the least restrictive version (e.g., package>=1.0.0) to ensure flexibility
@@ -75,14 +75,14 @@ Have a better idea for how to turn features into predictions?
 
 ## 📤 Requesting New Adaptor Runs
 
-You can request us to apply additional adaptors to your **existing vision submission**.
+You can request us to apply additional adaptors to your **existing vision submission** without impacting your submission limit.
 
 ### 📧 Submission Instructions
 
 1. Go to your submission URL: `https://unicorn.grand-challenge.org/evaluation/<leaderboard-specific-number>/submissions/<your-submission-id>/`  
    **(Use only this format — not other links)**
 
-2. For each submission that you want to rerun a new adaptor, specify:
+2. For each submission that you want to rerun with a new adaptor, specify:
    - The full submission link<br>
      _Example:_ `https://unicorn.grand-challenge.org/evaluation/30/submissions/bc9b9fe2-1f8d-4b9e-af7b-0edb87b127a4/`
    - The new adaptor(s) you want to apply (chosen from the [Supported Adaptors](src/unicorn_eval/adaptors/README.md)).<br>
