@@ -31,10 +31,12 @@ from unicorn_eval.adaptors import (
     SegmentationUpsampling,
     WeightedKNN,
     WeightedKNNRegressor,
+    MLPRegressor
 )
 from unicorn_eval.metrics.dice import compute_dice_score
 from unicorn_eval.metrics.f1_score import compute_f1
 from unicorn_eval.metrics.vision_language import compute_average_language_metric
+from unicorn_eval.metrics.sensitivity import compute_cpm
 
 METRIC_DICT = {
     "Task01_classifying_he_prostate_biopsies_into_isup_scores": {
@@ -55,6 +57,11 @@ METRIC_DICT = {
     "Task05_detecting_signet_ring_cells_in_he_stained_wsi_of_gastric_cancer": {
         "name": "f1",
         "fn": compute_f1,
+        "range": (0, 1),
+    },
+        "Task07_detecting_lung_nodules_in_thoracic_ct": {
+        "name": "sensitivity",
+        "fn": compute_cpm,
         "range": (0, 1),
     },
     "Task08_detecting_mitotic_figures_in_breast_cancer_wsis": {
@@ -89,7 +96,14 @@ def adapt_features(
     patch_size=224,
     test_image_sizes=None,
     shot_extra_labels=None,
+    test_image_spacing=None,
+    test_image_origins=None,
+    test_image_directions=None,
+    train_image_spacing=None,
+    train_image_origins=None,
+    train_image_directions=None
 ):
+    adaptor = None 
     num_shots = len(shot_features)
     if "-nn" in adaptor_name:
         k = int(adaptor_name.split("-")[0])
@@ -182,6 +196,28 @@ def adapt_features(
                 num_epochs=100,
                 learning_rate=0.001,
             )
+        elif task_type == "detection":
+            adaptor = MLPRegressor(
+            shot_features=shot_features,
+            shot_labels=shot_labels,
+            shot_coordinates=shot_coordinates,
+            shot_ids=shot_names,
+            test_features=test_features,
+            test_coordinates=test_coordinates,
+            test_ids=test_names,
+            patch_size=patch_size,
+            test_image_origins= test_image_origins, 
+            test_image_spacings= test_image_spacing,
+            test_image_directions= test_image_directions,
+            train_image_spacings= train_image_spacing,
+            train_image_origins= train_image_origins,
+            train_image_directions= train_image_directions,
+            hidden_dim=64,
+            num_epochs=50,
+            lr=1e-3,
+            #shot_extra_labels=shot_extra_labels,
+        )
+
     elif adaptor_name == "density-map":
         adaptor = DensityMap(
             shot_features=shot_features,
@@ -206,8 +242,11 @@ def adapt_features(
             test_image_sizes=test_image_sizes,
             patch_size=patch_size[0],
         )
+
     else:
         raise ValueError(f"Unknown adaptor: {adaptor_name}")
+
+
     adaptor.fit()
     predictions = adaptor.predict()
     return predictions
@@ -224,6 +263,12 @@ def convert_numpy_types(obj):
 
 
 def evaluate_predictions(task_name, case_ids, test_predictions, test_labels, test_extra_labels=None):
+
+    # ── sanity-check ─────────────────────────────
+    print("\n[EVAL]", task_name)
+    print("  test_labels      :", test_labels)
+    print("  test_predictions :", test_predictions)
+    # ─────────────────────────────────────────────
 
     metrics = {
         "predictions": [],  # list to store individual case results
@@ -260,6 +305,15 @@ def evaluate_predictions(task_name, case_ids, test_predictions, test_labels, tes
         metric_dict[metric_name] = metric_value
     elif task_name == "Task05_detecting_signet_ring_cells_in_he_stained_wsi_of_gastric_cancer":
         metric_value = metric_fn(test_labels, test_predictions, 8)
+        metric_dict[metric_name] = metric_value
+    elif task_name == "Task07_detecting_lung_nodules_in_thoracic_ct":
+        predictions_list    = test_predictions
+        ground_truth_list   = test_labels
+        metric_value = metric_fn(
+            predictions_list,
+            ground_truth_list,
+            test_extra_labels
+        )
         metric_dict[metric_name] = metric_value
     elif task_name == "Task08_detecting_mitotic_figures_in_breast_cancer_wsis":
         metric_value = metric_fn(test_labels, test_predictions, 16)
@@ -298,17 +352,84 @@ def process_image_representation(data):
     return data
 
 
-def process_detection(data):
+
+def process_detection(data, task_name: str | None = None):
+
     def extract_points(labels):
-        return [np.array([(p["point"][0], p["point"][1]) for p in gt["points"]]).tolist() for gt in labels]
-    # add comment
+        """
+        Pull out coordinate tuples from a list of GT dictionaries.
+
+        * Keeps the first three coordinates when available.
+        * Falls back to the first two coordinates for 2‑D points.
+
+
+        Returns
+        -------
+        list[list[tuple]]
+            Two‑level list: ``[case_idx][pt_idx] -> tuple``.
+        """
+        pts_all = []
+        for gt in labels:
+            case_pts = []
+            for p in gt.get("points", []):
+                pt = p.get("point")
+                if pt is None:
+                    continue
+                case_pts.append(tuple(pt[:3]) if len(pt) >= 3 else tuple(pt[:2]))
+            pts_all.append(case_pts)
+        return pts_all
+
+    # ---------------------------------------------------------------------
+    # 1. points
     data["shot_labels"] = extract_points(data["shot_labels"])
     data["case_labels"] = extract_points(data["case_labels"])
-    if data["case_extra_labels"] and data["case_extra_labels"][0] is not None:
-        data["case_extra_labels"] = np.concatenate(data["case_extra_labels"], axis=0)
-    else:
+
+    # ---------------------------------------------------------------------
+    # 2. extra labels
+    extra_list = data.get("case_extra_labels")
+    if not extra_list or extra_list[0] is None:
         data["case_extra_labels"] = None
+        return data
+
+    if task_name == "Task07_detecting_lung_nodules_in_thoracic_ct":
+        # build: [{'point': …, 'diameter': …, 'name': …}, …]
+        diameter_records = []
+
+        for case_id, case_extra in enumerate(extra_list):
+            if isinstance(case_extra, dict):
+                # expected structure: {<study_id>: {'points': […]}}
+                nested = next(iter(case_extra.values()), {})
+                for idx, p in enumerate(nested.get("points", [])):
+                    diameter_records.append(
+                        {
+                            "point": tuple(p["point"][:3]),
+                            "diameter": float(p["diameter"]),
+                            "name": p.get("name", f"case{case_id}_pt{idx}"),
+                        }
+                    )
+
+            elif isinstance(case_extra, (list, np.ndarray)):
+                for idx, d in enumerate(case_extra):
+                    diameter_records.append(
+                        {"point": None, "diameter": float(d), "name": f"case{case_id}_pt{idx}"}
+                    )
+
+            elif isinstance(case_extra, (int, float)):
+                diameter_records.append(
+                    {"point": None, "diameter": float(case_extra), "name": f"case{case_id}"}
+                )
+
+            else:
+                raise ValueError(f"Unsupported extra_label type: {type(case_extra)}")
+
+        data["case_extra_labels"] = diameter_records
+
+    else:
+        data["case_extra_labels"] = np.concatenate(extra_list, axis=0)
+
     return data
+
+
 
 
 def extract_embeddings_and_labels(processed_results):
@@ -326,6 +447,9 @@ def extract_embeddings_and_labels(processed_results):
                 "prediction": [],
                 "shot_embeddings": [],
                 "shot_coordinates": [],
+                "shot_image_spacings": {},
+                "shot_image_origins": {},
+                "shot_image_directions": {},
                 "shot_labels": [],
                 "shot_extra_labels": [],
                 "shot_ids": [],
@@ -336,32 +460,43 @@ def extract_embeddings_and_labels(processed_results):
                 "case_ids": [],
                 "cases_image_sizes": {},
                 "cases_image_spacings": {},
+                "cases_image_origins": {},
+                "cases_image_directions": {},
             }
 
         if result["split"] == "shot":
             tasks[task_name]["shot_embeddings"].append(result["embeddings"])
             tasks[task_name]["shot_labels"].append(result["label"])
-            tasks[task_name]["shot_extra_labels"].append(result["extra_labels"])
+            tasks[task_name]["shot_extra_labels"].append(result.get("extra_labels"))
             tasks[task_name]["shot_ids"].append(result["case_id"])
             tasks[task_name]["shot_coordinates"].append(result["coordinates"])
+            shot_id = result["case_id"]
+            tasks[task_name]["shot_image_spacings"][shot_id] = result["image_spacing"]
+            tasks[task_name]["shot_image_origins"][shot_id] = result["image_origin"]
+            tasks[task_name]["shot_image_directions"][shot_id] =  result["image_direction"]
+
         elif result["split"] == "case":
             tasks[task_name]["case_embeddings"].append(result["embeddings"])
             tasks[task_name]["case_labels"].append(result["label"])
-            tasks[task_name]["case_extra_labels"].append(result["extra_labels"])
-            tasks[task_name]["prediction"].append(result["prediction"])
+            tasks[task_name]["case_extra_labels"].append(result.get("extra_labels"))
+            tasks[task_name]["prediction"].append(result.get("prediction"))
             tasks[task_name]["case_ids"].append(result["case_id"])
             tasks[task_name]["cases_coordinates"].append(result["coordinates"])
             case_id = result["case_id"]
             image_size = result["image_size"]
+            # record per-case image metadata
             tasks[task_name]["cases_image_spacings"][case_id] = result["image_spacing"]
             tasks[task_name]["cases_image_sizes"][case_id] = image_size
+            tasks[task_name]["cases_image_origins"][case_id] = result["image_origin"]
+            tasks[task_name]["cases_image_directions"][case_id] =  result["image_direction"]
 
-    for task_name, task_data in tasks.items():
-        task_type = task_data["task_type"]
-        if task_type in ["classification", "regression"]:
-            tasks[task_name] = process_image_representation(task_data)
-        elif task_type == "detection":
-            tasks[task_name] = process_detection(task_data)
+    # now post-process each task
+    for task_name, data in tasks.items():
+        tt = data["task_type"]
+        if tt in ["classification", "regression"]:
+            tasks[task_name] = process_image_representation(data)
+        elif tt == "detection":
+            tasks[task_name] = process_detection(data)
 
     return tasks
 
@@ -372,6 +507,10 @@ def extract_data(patch_neural_representation):
     patch_size = patch_neural_representation["meta"]["patch-size"]
     image_size = patch_neural_representation["meta"]["image-size"]
     image_spacing = patch_neural_representation["meta"]["image-spacing"]
+    # now grab origin & direction directly from the meta block:
+    image_origin    = patch_neural_representation["meta"]["image-origin"]
+    image_direction = patch_neural_representation["meta"]["image-direction"]
+    
 
     # Extract patches
     patches = patch_neural_representation["patches"]
@@ -380,7 +519,7 @@ def extract_data(patch_neural_representation):
     features = np.array([p["features"] for p in patches]).astype(np.float32)
     coordinates = np.array([p["coordinates"] for p in patches])
 
-    return features, coordinates, spacing, patch_size, image_size, image_spacing
+    return features, coordinates, spacing, patch_size, image_size, image_spacing, image_origin, image_direction
 
 
 def normalize_metric(task_name, metric_value):

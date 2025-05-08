@@ -17,10 +17,11 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from torch.utils.data import DataLoader, TensorDataset
 import sklearn
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics.pairwise import cosine_similarity, euclidean_distances
-
+from typing import Optional
 from unicorn_eval.adaptors.base import CaseLevelTaskAdaptor
 
 
@@ -222,17 +223,121 @@ class LogisticRegression(CaseLevelTaskAdaptor):
         return self.model.predict(self.test_features)
 
 
-class LinearClassifier(nn.Module):
+class LinearClassifier(CaseLevelTaskAdaptor):
     """
-    A simple linear classifier.
+    Case‑level adaptor that wraps the existing ``LinearClassifier``—a stack of
+    *linear* layers followed by ReLU (*non‑linear*) activations.  It trains on
+    the few‑shot set and returns probabilistic predictions for each test case.
     """
 
-    def __init__(self, input_dim: int, output_dim: int):
-        super().__init__()
-        self.fc = nn.Linear(input_dim, output_dim)
+    def __init__(
+        self,
+        shot_features: np.ndarray,
+        shot_labels: np.ndarray,
+        test_features: np.ndarray,
+        *,
+        num_classes: int,
+        num_epochs: int = 100,
+        learning_rate: float = 1e-3,
+        batch_size: int = 32,
+        patience: int = 10,
+        shot_extra_labels: Optional[np.ndarray] = None,
+    ) -> None:
+        super().__init__(shot_features, shot_labels, test_features, shot_extra_labels)
+        self.num_classes = num_classes
+        self.num_epochs = num_epochs
+        self.learning_rate = learning_rate
+        self.batch_size = batch_size
+        self.patience = patience
+        self._probs: Optional[np.ndarray] = None  # set in ``fit``
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.fc(x)
+    @staticmethod
+    def lc_train(
+        train_data: np.ndarray,
+        train_labels: np.ndarray,
+        test_data: np.ndarray,
+        input_dim: int,
+        num_classes: int,
+        num_epochs: int,
+        learning_rate: float,
+        batch_size: int,
+        patience: int,
+    ) -> np.ndarray:
+        """Train ``LinearClassifier`` on few‑shot data and return test probabilities."""
+
+
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+
+        X = torch.tensor(train_data, dtype=torch.float32)
+        y = torch.tensor(
+            train_labels, dtype=torch.long if num_classes > 1 else torch.float32
+        )
+        Xt = torch.tensor(test_data, dtype=torch.float32).to(device)
+
+        dl = DataLoader(TensorDataset(X, y), batch_size=batch_size, shuffle=True)
+
+        model = LinearClassifier(input_dim, 256, num_classes, 10).to(device)
+        crit = nn.CrossEntropyLoss() if num_classes > 1 else nn.BCEWithLogitsLoss()
+        opt = optim.Adam(model.parameters(), lr=learning_rate)
+
+        best_loss, patience_ctr, best_state = float("inf"), 0, None
+        for _ in range(num_epochs):
+            model.train()
+            epoch_loss = 0.0
+            for xb, yb in dl:
+                xb, yb = xb.to(device), yb.to(device)
+                opt.zero_grad()
+                loss = crit(model(xb), yb)
+                loss.backward()
+                opt.step()
+                epoch_loss += loss.item()
+            epoch_loss /= len(dl)
+
+            if epoch_loss < best_loss:
+                best_loss, patience_ctr, best_state = epoch_loss, 0, model.state_dict()
+            else:
+                patience_ctr += 1
+                if patience_ctr >= patience:
+                    break
+
+        model.load_state_dict(best_state)
+        model.eval()
+        with torch.no_grad():
+            logits = model(Xt).cpu()
+
+        if num_classes > 1:            # multi‑class: probability of class‑1
+            probs = logits.softmax(-1)[:, 1]
+        else:                          # binary: sigmoid
+            probs = logits.sigmoid().squeeze()
+
+        return probs.numpy()
+
+
+    def fit(self) -> None:
+        """Train the internal linear–non‑linear classifier on the few‑shot data."""
+        self._probs = self.lc_train(                 
+            self.shot_features,
+            self.shot_labels,
+            self.test_features,
+            input_dim=self.shot_features.shape[-1],
+            num_classes=self.num_classes,
+            num_epochs=self.num_epochs,
+            learning_rate=self.learning_rate,
+            batch_size=self.batch_size,
+            patience=self.patience,
+        )
+
+    def predict(self) -> np.ndarray:
+        """
+        Returns
+        -------
+        np.ndarray
+            Probability for the positive class (binary) or for class 1
+            (multi‑class). Call :py:meth:`fit` first.
+        """
+        if self._probs is None:
+            raise RuntimeError("You must call `fit()` before `predict()`.")
+        return self._probs
 
 
 class LinearProbing(CaseLevelTaskAdaptor):

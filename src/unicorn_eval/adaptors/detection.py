@@ -20,7 +20,7 @@ import torch.optim as optim
 from scipy.ndimage import filters, gaussian_filter
 from torch.utils.data import DataLoader, Dataset
 from torch.utils.data._utils.collate import default_collate
-
+from typing import Sequence, List, Optional, Dict
 from unicorn_eval.adaptors.base import PatchLevelTaskAdaptor
 
 
@@ -357,3 +357,239 @@ class DensityMap(PatchLevelTaskAdaptor):
         )
 
         return predicted_points
+    
+class MLPRegressor(nn.Module, PatchLevelTaskAdaptor):
+    """
+    Patch-level adaptor **and** neural network for nodule detection.
+    Predicts [dx, dy, dz, logit_p] per patch, then reconstructs
+    world‑space nodule centres.
+
+    Change from original
+    --------------------
+    `predict()` now returns only those detections whose probability p > 0.9.
+    """
+
+    # ------------------------------- network ------------------------------- #
+    class _Net(nn.Module):
+        """Pure MLP used for offline training."""
+        def __init__(self, input_dim: int, hidden_dim: int = 64) -> None:
+            super().__init__()
+            self.fc1  = nn.Linear(input_dim, hidden_dim)
+            self.relu = nn.ReLU()
+            self.fc2  = nn.Linear(hidden_dim, 4)  # dx, dy, dz, logit_p
+        def forward(self, x: torch.Tensor) -> torch.Tensor:
+            return self.fc2(self.relu(self.fc1(x)))  # [N,4]
+
+    # ---------------------------- helper utilities ------------------------- #
+    @staticmethod
+    def compute_patch_center_3d(
+        patch_idx: Sequence[float],
+        patch_size: Sequence[float],
+        spacing: Sequence[float],
+        origin: Sequence[float],
+        direction: Sequence[float],
+    ) -> np.ndarray:
+        """World-space centre of a patch given its grid index + image meta."""
+        v = (np.array(patch_idx) + 0.5) * np.array(patch_size) * np.array(spacing)
+        R = np.array(direction).reshape(3, 3)
+        return np.array(origin) + R.dot(v)
+
+    @staticmethod
+    def train_from_patches(
+        patches: List[dict],
+        *,
+        hidden_dim: int = 64,
+        num_epochs: int = 50,
+        lr: float = 1e-3,
+    ) -> "_Net":
+        """
+        Train a small MLP on a flat list of patch dicts:
+          each dict has feature, patch_idx, image_origin, image_spacing,
+          image_direction, patch_size, patch_nodules.
+        Returns a standalone _Net.
+        """
+        patch_size = np.array(patches[0]["patch_size"])
+        feats = np.stack([p["feature"]   for p in patches])  # [N, D]
+        idxs  = np.stack([p["patch_idx"] for p in patches])  # [N, 3]
+        nods  = [p["patch_nodules"]      for p in patches]   # List of lists
+        offsets, cls_labels = [], []
+        for p, idx, nod_list in zip(patches, idxs, nods):
+            origin    = np.array(p["image_origin"])
+            spacing   = np.array(p["image_spacing"])
+            direction = np.array(p["image_direction"]).reshape(3, 3)
+            pc = MLPRegressor.compute_patch_center_3d(
+                idx, patch_size, spacing, origin, direction
+            )
+            if nod_list:
+                coords  = np.array(nod_list)
+                nearest = coords[np.argmin(np.linalg.norm(coords - pc, axis=1))]
+                delta   = nearest - pc
+                label   = 1.0
+            else:
+                delta = np.zeros(3, dtype=float)
+                label = 0.0
+            offsets.append(delta)
+            cls_labels.append(label)
+        device   = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        x        = torch.tensor(feats,     dtype=torch.float32, device=device)
+        y_off    = torch.tensor(offsets,   dtype=torch.float32, device=device)
+        y_cls    = torch.tensor(cls_labels,dtype=torch.float32, device=device)
+        model    = MLPRegressor._Net(input_dim=x.shape[1], hidden_dim=hidden_dim).to(device)
+        optimizer= optim.Adam(model.parameters(), lr=lr)
+        box_loss = nn.MSELoss()
+        cls_loss = nn.BCEWithLogitsLoss()
+        for _ in range(num_epochs):
+            optimizer.zero_grad()
+            out   = model(x)                          # [N,4]
+            loss  = box_loss(out[:, :3], y_off) + cls_loss(out[:, 3], y_cls)
+            loss.backward()
+            optimizer.step()
+        return model
+
+    @staticmethod
+    @torch.no_grad()
+    def infer_from_patches(model: "_Net", patches: List[dict]) -> np.ndarray:
+        """
+        Run the trained network on patch dicts and return [x,y,z,p] per row.
+        """
+        device = next(model.parameters()).device
+        feats  = np.stack([p["feature"] for p in patches])
+        x      = torch.tensor(feats, dtype=torch.float32, device=device)
+        out    = model(x).cpu().numpy()             # [N,4]
+        delta, logits = out[:, :3], out[:, 3]
+        centers = np.stack([
+            MLPRegressor.compute_patch_center_3d(
+                p["patch_idx"], p["patch_size"],
+                p["image_spacing"], p["image_origin"],
+                p["image_direction"]
+            )
+            for p in patches
+        ], axis=0)
+        world_centres = centers + delta
+        probs         = 1 / (1 + np.exp(-logits))
+        return np.concatenate([world_centres, probs[:, None]], axis=1)
+
+    # ------------------------------ constructor --------------------------- #
+    def __init__(
+        self,
+        shot_features:           List[np.ndarray],
+        shot_labels:             List[List[Sequence[float]]],
+        shot_coordinates:        List[np.ndarray],
+        shot_ids:                List[str],
+        test_features:           List[np.ndarray],
+        test_coordinates:        List[np.ndarray],
+        test_ids:                List[str],
+        *,
+        patch_size:             Sequence[int],
+        train_image_origins:     Dict[str, Sequence[float]],
+        train_image_spacings:    Dict[str, Sequence[float]],
+        train_image_directions:  Dict[str, Sequence[float]],
+        test_image_origins:      Dict[str, Sequence[float]],
+        test_image_spacings:     Dict[str, Sequence[float]],
+        test_image_directions:   Dict[str, Sequence[float]],
+        hidden_dim:             int = 64,
+        num_epochs:             int = 50,
+        lr:                     float = 1e-3,
+        shot_extra_labels:      Optional[np.ndarray] = None,
+    ) -> None:
+        # — initialize both bases —
+        nn.Module.__init__(self)
+        PatchLevelTaskAdaptor.__init__(
+            self,
+            shot_features, shot_labels, shot_coordinates,
+            test_features,  test_coordinates,
+            shot_extra_labels,
+        )
+        self.shot_ids               = shot_ids
+        self.test_ids               = test_ids
+        self.patch_size             = patch_size
+        self.train_image_origins    = train_image_origins
+        self.train_image_spacings   = train_image_spacings
+        self.train_image_directions = train_image_directions
+        self.test_image_origins     = test_image_origins
+        self.test_image_spacings    = test_image_spacings
+        self.test_image_directions  = test_image_directions
+        self.hidden_dim = hidden_dim
+        self.num_epochs = num_epochs
+        self.lr         = lr
+        input_dim = shot_features[0].shape[1]
+        self.fc1   = nn.Linear(input_dim, hidden_dim)
+        self.relu  = nn.ReLU()
+        self.fc2   = nn.Linear(hidden_dim, 4)
+        self._model = None
+        self._preds = None
+
+    # --------------------------------- NN ---------------------------------- #
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.fc2(self.relu(self.fc1(x)))
+
+    # -------------------------------- fit ---------------------------------- #
+    def fit(self) -> "MLPRegressor":
+        # build a *flat* list of per-patch dicts for training
+        patch_dicts: List[dict] = []
+        for feats_case, idxs_case, nods_case, case_id in zip(
+            self.shot_features,
+            self.shot_coordinates,
+            self.shot_labels,
+            self.shot_ids,
+        ):
+            origin    = self.train_image_origins[case_id]
+            spacing   = self.train_image_spacings[case_id]
+            direction = self.train_image_directions[case_id]
+            for feat, idx in zip(feats_case, idxs_case):
+                patch_dicts.append({
+                    "feature":        feat,
+                    "patch_idx":      idx,
+                    "image_origin":   origin,
+                    "image_spacing":  spacing,
+                    "image_direction":direction,
+                    "patch_size":     self.patch_size,
+                    "patch_nodules":  nods_case,
+                })
+        self._model = MLPRegressor.train_from_patches(
+            patch_dicts,
+            hidden_dim=self.hidden_dim,
+            num_epochs=self.num_epochs,
+            lr=self.lr,
+        )
+        self._preds = None
+        return self
+
+    # ------------------------------- predict ------------------------------- #
+    def predict(self) -> np.ndarray:
+        if self._model is None:
+            raise RuntimeError("must call fit() before predict()")
+        test_dicts: List[dict] = []
+        for feats_case, idxs_case, case_id in zip(
+            self.test_features,
+            self.test_coordinates,
+            self.test_ids,
+        ):
+            origin    = self.test_image_origins[case_id]
+            spacing   = self.test_image_spacings[case_id]
+            direction = self.test_image_directions[case_id]
+            for feat, idx in zip(feats_case, idxs_case):
+                test_dicts.append({
+                    "feature":        feat,
+                    "patch_idx":      idx,
+                    "image_origin":   origin,
+                    "image_spacing":  spacing,
+                    "image_direction":direction,
+                    "patch_size":     self.patch_size,
+                    "patch_nodules":  [],  # no GT here
+                })
+
+        # raw predictions [x,y,z,p] for every patch
+        raw_preds = MLPRegressor.infer_from_patches(self._model, test_dicts)
+        probs     = raw_preds[:, 3]
+
+        # ------- ONLY KEEP p > 0.9 -------- #
+        mask      = probs > 0.9
+        self._preds = raw_preds[mask]
+
+        # info printout
+        n_kept = int(mask.sum())
+        print(f"[MLPRegressor] Returning {n_kept} nodules (p > 0.9) "
+              f"out of {len(mask)} patches")
+
+        return self._preds
