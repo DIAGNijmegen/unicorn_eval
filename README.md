@@ -64,7 +64,7 @@ Have a better idea for how to turn features into predictions?
 - 🚨 Important: Pre-trained adaptors are not allowed! Be original — you can use the few-shots, for example, for fitting or training your adaptor, but don’t rely on pre-trained solutions
 
 ### Dependencies
-- Each method must be able to run in the [provided isolated environment](https://github.com/DIAGNijmegen/unicorn_eval/blob/main/Dockerfile)
+- Each method must be able to run in the [provided isolated environment](Dockerfile)
 - Additional dependencies can be requested, but:
   - Approval of new dependencies is not guaranteed, dependencies will be evaluated based on compatibility with other packages
   - Organizers reserve the right to modify the list of dependencies over time, though we aim to maintain compatibility with existing adaptors
