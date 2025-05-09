@@ -1,133 +1,333 @@
+#  Copyright 2025 Diagnostic Image Analysis Group, Radboudumc, Nijmegen, The Netherlands
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+
+"""
+LUNA16 CPM calculator — in‑memory inputs, **prediction row = [caseId,x,y,z,p]**
+
+"""
+from __future__ import annotations
+import math, os, tempfile, csv
+from pathlib import Path
+from typing import Dict, List, Sequence, Tuple
+
 import numpy as np
-from sklearn.metrics import roc_curve
+import sklearn.metrics as skl_metrics
 
-class NoduleEvaluator:
-    def __init__(self, predictions_list, ground_truth_list, diameter_list):
-        """
-        predictions_list:   list of np.ndarray [M_i,4] per scan (x,y,z,p)
-        ground_truth_list:  list of lists of (x,y,z) per scan
-        diameter_list:      any of:
-                              - flat list/array of floats
-                              - dict {"diameter": array_of_floats}
-                              - structured array with dtype=[('diameter','O')]
-                                where each record is a 1-tuple of a dict
-                                {'points': [{'name':..., 'diameter':...}, ...]}
-        """
-        self.predictions_list  = predictions_list
-        self.ground_truth_list = ground_truth_list
-        self.fixedFPs          = [0.125, 0.25, 0.5, 1, 2, 4, 8]
 
-        if isinstance(diameter_list, dict) and "diameter" in diameter_list:
-            self.diameter_list = np.asarray(diameter_list["diameter"], dtype=float)
 
-        elif isinstance(diameter_list, np.ndarray) and diameter_list.dtype.names and "diameter" in diameter_list.dtype.names:
-            flat_diams = []
-            for rec in diameter_list:
-                cell = rec["diameter"]
-                # If it's a 1-tuple of a dict, unpack it:
-                info = cell[0] if isinstance(cell, tuple) else cell
-                # Expecting info = {'points': [ {name,diameter}, … ]}
-                for p in info.get("points", []):
-                    flat_diams.append(float(p["diameter"]))
-            self.diameter_list = np.array(flat_diams, dtype=float)
+def read_csv(filename: str) -> List[List[str]]:
+    rows: List[List[str]] = []
+    with open(filename, newline="", encoding="utf-8-sig") as f:
+        rows.extend(csv.reader(f, delimiter=","))
+    return rows
 
-        else:
-            self.diameter_list = np.asarray(diameter_list, dtype=float)
 
-    def computeFROC(self, FROCGTList, FROCProbList, totalNumberOfImages, excludeList):
-        # keep only non-excluded
-        gt_loc, prob_loc = [], []
-        for gt, prob, exc in zip(FROCGTList, FROCProbList, excludeList):
-            if not exc:
-                gt_loc.append(gt)
-                prob_loc.append(prob)
+class NoduleFinding:
+    def __init__(
+        self,
+        noduleid: int | None = None,
+        coordX: float | None = None,
+        coordY: float | None = None,
+        coordZ: float | None = None,
+        coordType: str = "World",
+        CADprobability: float | None = None,
+        noduleType: str | None = None,
+        diameter: float | None = None,
+        state: str | None = None,
+        seriesInstanceUID: str | None = None,
+    ):
+        self.id = noduleid
+        self.coordX = coordX
+        self.coordY = coordY
+        self.coordZ = coordZ
+        self.coordType = coordType
+        self.CADprobability = CADprobability
+        self.noduleType = noduleType
+        self.diameter_mm = diameter
+        self.state = state
+        self.candidateID: int | None = None
+        self.seriesuid = seriesInstanceUID
 
-        ndet = sum(gt_loc)
-        ntot = sum(FROCGTList)
-        ncand = len(prob_loc)
 
-        fpr, tpr, thresholds = roc_curve(gt_loc, prob_loc, pos_label=1)
-        if ntot == len(FROCGTList):
-            print("WARNING, this system has no false positives..")
-            fps = np.zeros(len(fpr))
-        else:
-            fps = fpr * (ncand - ndet) / totalNumberOfImages
-        sens = tpr * ndet / ntot
-        return fps, sens, thresholds
+seriesuid_label      = "seriesuid"
+coordX_label         = "coordX"
+coordY_label         = "coordY"
+coordZ_label         = "coordZ"
+diameter_mm_label    = "diameter_mm"
+CADProbability_label = "probability"
+fixedFPs             = [0.125, 0.25, 0.5, 1, 2, 4, 8]
 
-    def getCPM(self, fps, sens):
-        """
-        For each target FP/scan in self.fixedFPs, find the sens whose
-        fps is closest, then return (meanSens, [sens_at_each_target]).
-        """
-        fixedSens = [0.0] * len(self.fixedFPs)
-        for i, target in enumerate(self.fixedFPs):
-            diffPrior = max(fps)
-            for j, f in enumerate(fps):
-                diffCurr = abs(f - target)
-                if diffCurr < diffPrior:
-                    fixedSens[i] = sens[j]
-                    diffPrior    = diffCurr
-        meanSens = np.mean(fixedSens)
-        return meanSens, fixedSens
 
-    def compute_cpm(self):
-        FROCGTList, FROCProbList, excludeList = [], [], []
-        total_images = len(self.predictions_list)
-        pointer = 0
+def getCPM(
+    fps: Sequence[float], sens: Sequence[float], fixedFPs_: Sequence[float]
+) -> Tuple[float, List[float]]:
+    fixedSens = [0.0] * len(fixedFPs_)
+    for i, fixedFP in enumerate(fixedFPs_):
+        diffPrior = max(fps)
+        for j, fp in enumerate(fps):
+            diffCurr = abs(fp - fixedFP)
+            if diffCurr < diffPrior:
+                fixedSens[i] = sens[j]
+                diffPrior = diffCurr
+    return np.mean(fixedSens), fixedSens
 
-        for case_idx, (preds, gts) in enumerate(zip(self.predictions_list, self.ground_truth_list)):
-            # <<< ADDED: ensure preds is always 2D with shape (n_preds, 4)
-            preds = np.asarray(preds).reshape(-1, 4)
 
-            n_gts = len(gts)
-            diams_case = self.diameter_list[pointer : pointer + n_gts]
-            print(f"[Case {case_idx}] #GTs={n_gts},  GT coords={gts},  diameters={diams_case}")
-            pointer += n_gts
+def computeFROC(
+    FROCGTList: Sequence[int | float],
+    FROCProbList: Sequence[float],
+    totalNumberOfImages: int,
+    excludeList: Sequence[bool],
+):
+    FROCGTList_local, FROCProbList_local = [], []
+    for i in range(len(excludeList)):
+        if not excludeList[i]:
+            FROCGTList_local.append(FROCGTList[i])
+            FROCProbList_local.append(FROCProbList[i])
 
-            matched = np.zeros(len(preds), dtype=bool)
+    numberOfDetectedLesions = sum(FROCGTList_local)
+    totalNumberOfLesions    = sum(FROCGTList)
+    totalNumberOfCandidates = len(FROCProbList_local)
 
-            # match each GT
-            for j, gt in enumerate(gts):
-                radius_sq = (diams_case[j] / 2.0) ** 2
-                d2   = np.sum((preds[:, :3] - gt) ** 2, axis=1)
-                idxs = np.where(d2 < radius_sq)[0]
-                if idxs.size:
-                    best = idxs[np.argmax(preds[idxs, 3])]
-                    FROCGTList.append(1.0)
-                    FROCProbList.append(float(preds[best, 3]))
-                    excludeList.append(False)
-                    matched[best] = True
-                else:
-                    FROCGTList.append(0.0)
-                    FROCProbList.append(0.0)
-                    excludeList.append(True)
+    # ------------------------------------------------------------------ #
+    # Guard: if *no* positives survive the filter, return zeros so the
+    # CPM becomes 0 
+    # ------------------------------------------------------------------ #
+    if numberOfDetectedLesions == 0:
+        return np.array([0.0]), np.array([0.0]), np.array([0.0])
+    # ------------------------------------------------------------------ #
 
-            # false positives
-            for k in range(len(preds)):
-                if not matched[k]:
-                    FROCGTList.append(0.0)
-                    FROCProbList.append(float(preds[k, 3]))
-                    excludeList.append(False)
+    fpr, tpr, thresholds = skl_metrics.roc_curve(
+        FROCGTList_local, FROCProbList_local
+    )
 
-        fps, sens, _ = self.computeFROC(
-            FROCGTList, FROCProbList, total_images, excludeList
+    if sum(FROCGTList) == len(FROCGTList):
+        fps = np.zeros(len(fpr))
+    else:
+        fps = (
+            fpr
+            * (totalNumberOfCandidates - numberOfDetectedLesions)
+            / float(totalNumberOfImages)
         )
-        cpm_val, fixedSens = self.getCPM(fps, sens)
+    sens = (tpr * numberOfDetectedLesions) / float(totalNumberOfLesions)
+    return fps, sens, thresholds
 
-        print("\n[CPM] Sensitivities at fixed FP/scan rates:")
-        for fp, s in zip(self.fixedFPs, fixedSens):
-            print(f"  {fp:.3f} FP/scan → sensitivity {s:.4f}")
-        print(f"[CPM] = {cpm_val:.4f}\n")
-        return cpm_val
 
-def compute_cpm(predictions_list, ground_truth_list, diameter_list):
+def getNodule(annotation: List[str], header: List[str], state: str = ""):
+    n = NoduleFinding()
+    n.coordX = annotation[header.index(coordX_label)]
+    n.coordY = annotation[header.index(coordY_label)]
+    n.coordZ = annotation[header.index(coordZ_label)]
+    if diameter_mm_label in header:
+        n.diameter_mm = annotation[header.index(diameter_mm_label)]
+    if CADProbability_label in header:
+        n.CADprobability = annotation[header.index(CADProbability_label)]
+    if state:
+        n.state = state
+    return n
+
+
+def collectNoduleAnnotations(
+    annotations: List[List[str]],
+    seriesUIDs: Sequence[str],
+):
+    allNodules: Dict[str, List[NoduleFinding]] = {}
+    for seriesuid in seriesUIDs:
+        nodules: List[NoduleFinding] = []
+        header = annotations[0]
+        for row in annotations[1:]:
+            if row[header.index(seriesuid_label)] == seriesuid:
+                nodules.append(getNodule(row, header, state="Included"))
+        allNodules[seriesuid] = nodules
+    return allNodules
+
+
+def collect(
+    annotations_filename: str,
+    seriesuids_filename: str,
+):
+    annotations  = read_csv(annotations_filename)
+    seriesUIDs   = [row[0] for row in read_csv(seriesuids_filename)]
+    allNodules   = collectNoduleAnnotations(annotations, seriesUIDs)
+    return allNodules, seriesUIDs
+
+
+def evaluateCAD_for_cpm(
+    seriesUIDs: Sequence[str],
+    results_filename: str,
+    allNodules: Dict[str, List[NoduleFinding]],
+    maxNumberOfCADMarks: int = -1,
+) -> float:
+    results = read_csv(results_filename)
+    header  = results[0]
+
+    allCandsCAD: Dict[str, Dict[int, NoduleFinding]] = {}
+    for seriesuid in seriesUIDs:
+        nodules: Dict[int, NoduleFinding] = {}
+        i = 0
+        for res in results[1:]:
+            if res[header.index(seriesuid_label)] != seriesuid:
+                continue
+            n = getNodule(res, header)
+            n.candidateID = i
+            nodules[n.candidateID] = n
+            i += 1
+        if 0 < maxNumberOfCADMarks < len(nodules):
+            probs = sorted(
+                (float(n.CADprobability) for n in nodules.values()),
+                reverse=True,
+            )
+            probThreshold = probs[maxNumberOfCADMarks]
+            nodules = {
+                k: n
+                for k, n in nodules.items()
+                if float(n.CADprobability) > probThreshold
+            }
+        allCandsCAD[seriesuid] = nodules
+
+    candTPs = candFPs = candFNs = 0
+    minProbValue = -1e9
+
+    FROCGTList: List[float] = []
+    FROCProbList: List[float] = []
+    FPDivisorList: List[str] = []
+    excludeList: List[bool] = []
+
+    for seriesuid in seriesUIDs:
+        candidates    = allCandsCAD.get(seriesuid, {})
+        remaining     = candidates.copy()
+        noduleAnnots  = allNodules.get(seriesuid, [])
+
+        for na in noduleAnnots:
+            x, y, z = map(float, (na.coordX, na.coordY, na.coordZ))
+            diam    = float(na.diameter_mm)
+            diam    = diam if diam >= 0.0 else 10.0
+            rad2    = (diam / 2.0) ** 2
+            matches: List[NoduleFinding] = []
+            for key, cand in list(candidates.items()):
+                dx = x - float(cand.coordX)
+                dy = y - float(cand.coordY)
+                dz = z - float(cand.coordZ)
+                if dx*dx + dy*dy + dz*dz < rad2:
+                    matches.append(cand)
+                    remaining.pop(key, None)
+
+            if matches:
+                best = max(float(c.CADprobability) for c in matches)
+                FROCGTList.append(1.0)
+                FROCProbList.append(best)
+                FPDivisorList.append(seriesuid)
+                excludeList.append(False)
+                candTPs += 1
+            else:
+                candFNs += 1
+                FROCGTList.append(1.0)
+                FROCProbList.append(minProbValue)
+                FPDivisorList.append(seriesuid)
+                excludeList.append(True)
+
+        for cand in remaining.values():          # false positives
+            candFPs += 1
+            FROCGTList.append(0.0)
+            FROCProbList.append(float(cand.CADprobability))
+            FPDivisorList.append(seriesuid)
+            excludeList.append(False)
+
+    fps, sens, _ = computeFROC(
+        FROCGTList, FROCProbList, len(seriesUIDs), excludeList
+    )
+    meanSens, _ = getCPM(fps, sens, fixedFPs)
+    return meanSens
+
+
+def noduleCADEvaluation_for_cpm(
+    annotations_filename: str,
+    seriesuids_filename: str,
+    results_filename: str,
+    max_number_cad_marks: int = -1,
+) -> float:
+    allNodules, seriesUIDs = collect(
+        annotations_filename, seriesuids_filename
+    )
+    return evaluateCAD_for_cpm(
+        seriesUIDs,
+        results_filename,
+        allNodules,
+        maxNumberOfCADMarks=max_number_cad_marks,
+    )
+
+# ------------------------------------------------------------------ #
+#  ----- helper for temporary CSV creation ------------------------- #
+# ------------------------------------------------------------------ #
+def _dump(rows: List[List[str]], dir_: Path, fname: str) -> str:
+    path = dir_ / fname
+    with path.open("w", newline="") as f:
+        csv.writer(f).writerows(rows)
+    return str(path)
+
+
+def compute_cpm(
+    case_ids: Sequence[str],
+    test_predictions,                 # iterable of [test_id,x,y,z,p]
+    test_labels: Sequence[Sequence[Tuple[float, float, float]]],
+    test_extra_labels,
+) -> float:
     """
-    predictions_list:   list of np.ndarray [M_i,4]
-    ground_truth_list:  list of lists of (x,y,z)
-    diameter_list:      as above (flat, dict, or structured array)
+    Convert run‑time tensors/lists to the CSVs required by the unchanged
+    CPM evaluator and return the metric value.
     """
-    evaluator = NoduleEvaluator(predictions_list,
-                                ground_truth_list,
-                                diameter_list)
-    return evaluator.compute_cpm()
+    with tempfile.TemporaryDirectory() as tmp_dir_str:
+        tmp_dir = Path(tmp_dir_str)
+
+        # ---- seriesuids.csv ------------------------------------------------
+        series_csv = _dump([[cid] for cid in case_ids], tmp_dir,
+                           "seriesuids.csv")
+        print("DEBUG  seriesuids    :", case_ids)
+        # ---- annotations.csv ----------------------------------------------
+        ann_rows = [[seriesuid_label,
+                     coordX_label, coordY_label, coordZ_label,
+                     diameter_mm_label]]
+        for cid, coords_case, diam_struct in zip(
+            case_ids, test_labels, test_extra_labels
+        ):
+            diam_list = diam_struct[0]["points"]
+            for (x, y, z), diam_rec in zip(coords_case, diam_list):
+                ann_rows.append([
+                    cid, f"{x}", f"{y}", f"{z}",
+                    f"{float(diam_rec['diameter'])}"
+                ])
+        ann_csv = _dump(ann_rows, tmp_dir, "annotations.csv")
+        print("DEBUG  ann_rows (GT) :", len(ann_rows) - 1, "rows")
+        print("       first 3 rows  :", ann_rows[:4])
+        # ---- candidates.csv -----------------------------------------------
+
+        cand_rows = [[seriesuid_label,
+                      coordX_label, coordY_label, coordZ_label,
+                      CADProbability_label]]
+        for row in test_predictions:
+            test_id, x, y, z, p = row
+            if test_id in case_ids:          # ignore stray predictions
+                cand_rows.append([
+                    test_id, f"{x}", f"{y}", f"{z}", f"{p}"
+                ])
+        cand_csv = _dump(cand_rows, tmp_dir, "candidates.csv")
+        print("DEBUG  cand_rows (CAD):", len(cand_rows) - 1, "rows")
+        print("       first 3 rows  :", cand_rows[:4])
+        # ---- run evaluator -------------------------------------------------
+
+        return noduleCADEvaluation_for_cpm(
+            annotations_filename=ann_csv,
+            seriesuids_filename=series_csv,
+            results_filename=cand_csv,
+            max_number_cad_marks=-1,
+        )

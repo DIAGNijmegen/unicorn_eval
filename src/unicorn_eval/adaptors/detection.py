@@ -364,9 +364,6 @@ class MLPRegressor(nn.Module, PatchLevelTaskAdaptor):
     Predicts [dx, dy, dz, logit_p] per patch, then reconstructs
     world‑space nodule centres.
 
-    Change from original
-    --------------------
-    `predict()` now returns only those detections whose probability p > 0.9.
     """
 
     # ------------------------------- network ------------------------------- #
@@ -382,18 +379,15 @@ class MLPRegressor(nn.Module, PatchLevelTaskAdaptor):
 
     # ---------------------------- helper utilities ------------------------- #
     @staticmethod
-    def compute_patch_center_3d(
-        patch_idx: Sequence[float],
-        patch_size: Sequence[float],
-        spacing: Sequence[float],
-        origin: Sequence[float],
-        direction: Sequence[float],
-    ) -> np.ndarray:
-        """World-space centre of a patch given its grid index + image meta."""
-        v = (np.array(patch_idx) + 0.5) * np.array(patch_size) * np.array(spacing)
-        R = np.array(direction).reshape(3, 3)
-        return np.array(origin) + R.dot(v)
-
+    def compute_patch_center_3d(patch_idx, spacing, origin, direction):
+        """
+        Convert *voxel* index of the patch centre to patient‑space millimetres.
+        
+        """
+        v_mm = (np.array(patch_idx) + 0.5) * np.array(spacing)   # mm
+        R    = np.array(direction).reshape(3, 3)
+        return np.array(origin) + R.dot(v_mm)
+    
     @staticmethod
     def train_from_patches(
         patches: List[dict],
@@ -408,7 +402,7 @@ class MLPRegressor(nn.Module, PatchLevelTaskAdaptor):
           image_direction, patch_size, patch_nodules.
         Returns a standalone _Net.
         """
-        patch_size = np.array(patches[0]["patch_size"])
+        
         feats = np.stack([p["feature"]   for p in patches])  # [N, D]
         idxs  = np.stack([p["patch_idx"] for p in patches])  # [N, 3]
         nods  = [p["patch_nodules"]      for p in patches]   # List of lists
@@ -418,7 +412,7 @@ class MLPRegressor(nn.Module, PatchLevelTaskAdaptor):
             spacing   = np.array(p["image_spacing"])
             direction = np.array(p["image_direction"]).reshape(3, 3)
             pc = MLPRegressor.compute_patch_center_3d(
-                idx, patch_size, spacing, origin, direction
+                idx, spacing, origin, direction
             )
             if nod_list:
                 coords  = np.array(nod_list)
@@ -459,7 +453,7 @@ class MLPRegressor(nn.Module, PatchLevelTaskAdaptor):
         delta, logits = out[:, :3], out[:, 3]
         centers = np.stack([
             MLPRegressor.compute_patch_center_3d(
-                p["patch_idx"], p["patch_size"],
+                p["patch_idx"],
                 p["image_spacing"], p["image_origin"],
                 p["image_direction"]
             )
@@ -480,7 +474,6 @@ class MLPRegressor(nn.Module, PatchLevelTaskAdaptor):
         test_coordinates:        List[np.ndarray],
         test_ids:                List[str],
         *,
-        patch_size:             Sequence[int],
         train_image_origins:     Dict[str, Sequence[float]],
         train_image_spacings:    Dict[str, Sequence[float]],
         train_image_directions:  Dict[str, Sequence[float]],
@@ -502,7 +495,6 @@ class MLPRegressor(nn.Module, PatchLevelTaskAdaptor):
         )
         self.shot_ids               = shot_ids
         self.test_ids               = test_ids
-        self.patch_size             = patch_size
         self.train_image_origins    = train_image_origins
         self.train_image_spacings   = train_image_spacings
         self.train_image_directions = train_image_directions
@@ -543,7 +535,6 @@ class MLPRegressor(nn.Module, PatchLevelTaskAdaptor):
                     "image_origin":   origin,
                     "image_spacing":  spacing,
                     "image_direction":direction,
-                    "patch_size":     self.patch_size,
                     "patch_nodules":  nods_case,
                 })
         self._model = MLPRegressor.train_from_patches(
@@ -559,7 +550,10 @@ class MLPRegressor(nn.Module, PatchLevelTaskAdaptor):
     def predict(self) -> np.ndarray:
         if self._model is None:
             raise RuntimeError("must call fit() before predict()")
+
         test_dicts: List[dict] = []
+        case_ids:   List[str]  = []          # NEW – parallel list of IDs
+
         for feats_case, idxs_case, case_id in zip(
             self.test_features,
             self.test_coordinates,
@@ -575,17 +569,22 @@ class MLPRegressor(nn.Module, PatchLevelTaskAdaptor):
                     "image_origin":   origin,
                     "image_spacing":  spacing,
                     "image_direction":direction,
-                    "patch_size":     self.patch_size,
                     "patch_nodules":  [],  # no GT here
                 })
+                case_ids.append(case_id)     # keep alignment with test_dicts
 
         # raw predictions [x,y,z,p] for every patch
         raw_preds = MLPRegressor.infer_from_patches(self._model, test_dicts)
         probs     = raw_preds[:, 3]
 
         # ------- ONLY KEEP p > 0.9 -------- #
-        mask      = probs > 0.9
-        self._preds = raw_preds[mask]
+        mask        = probs > 0.9
+        raw_preds   = raw_preds[mask]
+        case_ids    = np.array(case_ids, dtype=object)[mask]
+
+        # prepend test_id to each prediction row
+        rows = [[cid, *pred] for cid, pred in zip(case_ids, raw_preds)]
+        self._preds = np.array(rows, dtype=object)
 
         # info printout
         n_kept = int(mask.sum())

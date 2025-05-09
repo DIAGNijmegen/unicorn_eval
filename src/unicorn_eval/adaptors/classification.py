@@ -222,13 +222,36 @@ class LogisticRegression(CaseLevelTaskAdaptor):
     def predict(self) -> np.ndarray:
         return self.model.predict(self.test_features)
 
+    
+class LinearClassifierAdaptor(CaseLevelTaskAdaptor):
+    """
+    Case‑level adaptor that learns a simple MLP on a few‑shot training set
+    and predicts class probabilities for a test set.
+    """
 
-class LinearClassifier(CaseLevelTaskAdaptor):
-    """
-    Case‑level adaptor that wraps the existing ``LinearClassifier``—a stack of
-    *linear* layers followed by ReLU (*non‑linear*) activations.  It trains on
-    the few‑shot set and returns probabilistic predictions for each test case.
-    """
+    class LinearClassifier(nn.Module):
+        def __init__(
+            self,
+            input_dim: int,
+            hidden_dim: int,
+            output_dim: int,
+            num_layers: int = 3,
+        ) -> None:
+            super().__init__()
+            assert num_layers >= 2, "num_layers must be at least 2"
+
+            layers = [nn.Linear(input_dim, hidden_dim)]
+            for _ in range(num_layers - 2):
+                layers += [
+                    nn.ReLU(inplace=True),
+                    nn.Linear(hidden_dim, hidden_dim),
+                ]
+            layers += [nn.ReLU(inplace=True), nn.Linear(hidden_dim, output_dim)]
+            self.net = nn.Sequential(*layers)
+
+        def forward(self, x: torch.Tensor) -> torch.Tensor: 
+            return self.net(x)
+
 
     def __init__(
         self,
@@ -236,109 +259,131 @@ class LinearClassifier(CaseLevelTaskAdaptor):
         shot_labels: np.ndarray,
         test_features: np.ndarray,
         *,
+        caseids: np.ndarray | list | None,
+        input_dim: int,
         num_classes: int,
         num_epochs: int = 100,
         learning_rate: float = 1e-3,
         batch_size: int = 32,
-        patience: int = 10,
-        shot_extra_labels: Optional[np.ndarray] = None,
+        patience: int = 5,
+        hidden_dim: int = 256,
+        num_layers: int = 10,
+        device: str | None = None,
     ) -> None:
-        super().__init__(shot_features, shot_labels, test_features, shot_extra_labels)
+        super().__init__(shot_features, shot_labels, test_features)
+        self.caseids = np.asarray(caseids) if caseids is not None else None
+
+        self.input_dim = input_dim
         self.num_classes = num_classes
         self.num_epochs = num_epochs
         self.learning_rate = learning_rate
         self.batch_size = batch_size
         self.patience = patience
-        self._probs: Optional[np.ndarray] = None  # set in ``fit``
+        self.hidden_dim = hidden_dim
+        self.num_layers = num_layers
+        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
 
-    @staticmethod
-    def lc_train(
-        train_data: np.ndarray,
-        train_labels: np.ndarray,
-        test_data: np.ndarray,
-        input_dim: int,
-        num_classes: int,
-        num_epochs: int,
-        learning_rate: float,
-        batch_size: int,
-        patience: int,
-    ) -> np.ndarray:
-        """Train ``LinearClassifier`` on few‑shot data and return test probabilities."""
+        # instantiate the *inner* network
+        self.model = self.LinearClassifier(
+            input_dim, hidden_dim, num_classes, num_layers
+        ).to(self.device)
 
-
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-
-        X = torch.tensor(train_data, dtype=torch.float32)
-        y = torch.tensor(
-            train_labels, dtype=torch.long if num_classes > 1 else torch.float32
+        self.crit = (
+            nn.CrossEntropyLoss() if num_classes > 1 else nn.BCEWithLogitsLoss()
         )
-        Xt = torch.tensor(test_data, dtype=torch.float32).to(device)
+        self.opt = optim.Adam(self.model.parameters(), lr=self.learning_rate)
+        self._is_fitted = False
 
-        dl = DataLoader(TensorDataset(X, y), batch_size=batch_size, shuffle=True)
-
-        model = LinearClassifier(input_dim, 256, num_classes, 10).to(device)
-        crit = nn.CrossEntropyLoss() if num_classes > 1 else nn.BCEWithLogitsLoss()
-        opt = optim.Adam(model.parameters(), lr=learning_rate)
+    def fit(self) -> None:
+        """Train the wrapped MLP on the few‑shot set."""
+        X = torch.tensor(self.shot_features, dtype=torch.float32)
+        y = torch.tensor(
+            self.shot_labels,
+            dtype=torch.long if self.num_classes > 1 else torch.float32,
+        )
+        dl = DataLoader(
+            TensorDataset(X, y), batch_size=self.batch_size, shuffle=True
+        )
 
         best_loss, patience_ctr, best_state = float("inf"), 0, None
-        for _ in range(num_epochs):
-            model.train()
+
+        for _ in range(self.num_epochs):
+            self.model.train()
             epoch_loss = 0.0
             for xb, yb in dl:
-                xb, yb = xb.to(device), yb.to(device)
-                opt.zero_grad()
-                loss = crit(model(xb), yb)
+                xb, yb = xb.to(self.device), yb.to(self.device)
+                self.opt.zero_grad()
+                loss = self.crit(self.model(xb), yb)
                 loss.backward()
-                opt.step()
+                self.opt.step()
                 epoch_loss += loss.item()
             epoch_loss /= len(dl)
 
             if epoch_loss < best_loss:
-                best_loss, patience_ctr, best_state = epoch_loss, 0, model.state_dict()
+                best_loss, patience_ctr = epoch_loss, 0
+                best_state = self.model.state_dict()
             else:
                 patience_ctr += 1
-                if patience_ctr >= patience:
+                if patience_ctr >= self.patience:
                     break
 
-        model.load_state_dict(best_state)
-        model.eval()
-        with torch.no_grad():
-            logits = model(Xt).cpu()
-
-        if num_classes > 1:            # multi‑class: probability of class‑1
-            probs = logits.softmax(-1)[:, 1]
-        else:                          # binary: sigmoid
-            probs = logits.sigmoid().squeeze()
-
-        return probs.numpy()
-
-
-    def fit(self) -> None:
-        """Train the internal linear–non‑linear classifier on the few‑shot data."""
-        self._probs = self.lc_train(                 
-            self.shot_features,
-            self.shot_labels,
-            self.test_features,
-            input_dim=self.shot_features.shape[-1],
-            num_classes=self.num_classes,
-            num_epochs=self.num_epochs,
-            learning_rate=self.learning_rate,
-            batch_size=self.batch_size,
-            patience=self.patience,
-        )
+        # Restore the best weights
+        self.model.load_state_dict(best_state)
+        self._is_fitted = True
 
     def predict(self) -> np.ndarray:
         """
-        Returns
-        -------
-        np.ndarray
-            Probability for the positive class (binary) or for class 1
-            (multi‑class). Call :py:meth:`fit` first.
-        """
-        if self._probs is None:
-            raise RuntimeError("You must call `fit()` before `predict()`.")
-        return self._probs
+        Return the *malignant* probability (class 1) for each test case.
 
+        * If ``caseids`` is ``None`` → a plain 1‑D ``np.ndarray`` of shape
+          ``(N_test,)``.
+        * Otherwise → a structured array with fields
+            - ``caseid``      (dtype matches the supplied IDs)
+            - ``prediction``  (scalar malignancy risk)
+        """
+        if not self._is_fitted:
+            raise RuntimeError("Call `.fit()` before `.predict()`.")
+
+        Xt = torch.tensor(
+            self.test_features, dtype=torch.float32, device=self.device
+        )
+
+        self.model.eval()
+        with torch.no_grad():
+            logits = self.model(Xt).cpu()
+
+        # --- logits → probability of malignancy ------------------------
+        if self.num_classes > 1:                     # softmax case (C = 2)
+            probs_np = logits.softmax(-1)[:, 1].numpy()   # keep class‑1 col
+        else:                                        # single‑logit sigmoid
+            probs_np = logits.sigmoid().squeeze(-1).numpy()
+        # ----------------------------------------------------------------
+
+        # No case ids → just return the 1‑D array
+        if self.caseids is None:
+            return probs_np
+
+        # Build a structured array: prediction is now *scalar*, so pred_shape=()
+        out = np.zeros(
+            len(probs_np),
+            dtype=[("caseid", self.caseids.dtype),
+                   ("prediction", probs_np.dtype)],
+        )
+        out["caseid"] = self.caseids
+        out["prediction"] = probs_np
+        return out
+    
+class LinearClassifier(nn.Module):
+    """
+    A simple linear classifier.
+    """
+
+    def __init__(self, input_dim: int, output_dim: int):
+        super().__init__()
+        self.fc = nn.Linear(input_dim, output_dim)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.fc(x)
 
 class LinearProbing(CaseLevelTaskAdaptor):
     """

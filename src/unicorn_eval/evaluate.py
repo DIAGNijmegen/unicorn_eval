@@ -32,9 +32,9 @@ from unicorn_eval.utils import (
 )
 
 #INPUT_DIRECTORY = Path("/input")
-INPUT_DIRECTORY = Path("/data/temporary/unicorn/debugging/evaluation/vision/task-7")
+INPUT_DIRECTORY = Path("/data/temporary/unicorn/debugging/evaluation/vision/task-2")
 #OUTPUT_DIRECTORY = Path("/output")
-OUTPUT_DIRECTORY = Path("/data/temporary/unicorn/debugging/evaluation/vision/task-7/output")
+OUTPUT_DIRECTORY = Path("/data/temporary/unicorn/debugging/evaluation/vision/task-2/output")
 #GROUNDTRUTH_DIRECTORY = Path("/opt/ml/input/data/ground_truth")
 GROUNDTRUTH_DIRECTORY = Path("/data/temporary/unicorn/debugging/groundtruth/")
 
@@ -116,6 +116,10 @@ EXTRA_LABEL_SLUG_DICT = {
 
 def process(job):
     """Processes a single algorithm job, looking at the outputs"""
+
+    image_origin, image_direction = None, None
+    embeddings = coordinates = spacing = patch_size = None
+    image_size = image_spacing = prediction = None
     report = "Processing:\n"
     report += pformat(job)
     report += "\n"

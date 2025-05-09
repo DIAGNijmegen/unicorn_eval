@@ -18,6 +18,7 @@ from unicorn_eval.adaptors.classification import (
     LogisticRegression,
     LinearProbing,
     TwoLayerPerceptron,
+    LinearClassifierAdaptor
 )
 from unicorn_eval.adaptors.regression import (
     KNNRegressor,
@@ -40,5 +41,6 @@ __all__ = [
     "TwoLayerPerceptronRegressor",
     "DensityMap",
     "SegmentationUpsampling",
-    "MLPRegressor"
+    "MLPRegressor",
+    "LinearClassifierAdaptor"
 ]

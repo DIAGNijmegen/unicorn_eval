@@ -31,18 +31,25 @@ from unicorn_eval.adaptors import (
     SegmentationUpsampling,
     WeightedKNN,
     WeightedKNNRegressor,
-    MLPRegressor
+    MLPRegressor,
+    LinearClassifierAdaptor
 )
 from unicorn_eval.metrics.dice import compute_dice_score
 from unicorn_eval.metrics.f1_score import compute_f1
 from unicorn_eval.metrics.vision_language import compute_average_language_metric
 from unicorn_eval.metrics.sensitivity import compute_cpm
+from unicorn_eval.metrics.auc import compute_roc_auc
 
 METRIC_DICT = {
     "Task01_classifying_he_prostate_biopsies_into_isup_scores": {
         "name": "cohen-kappa-quadratic",
         "fn": partial(cohen_kappa_score, weights="quadratic"),
         "range": (-1, 1),
+    },
+    "Task02_classifying_lung_nodule_malignancy_in_ct": {
+        "name": "auc",
+        "fn": compute_roc_auc,
+        "range": (0, 1),
     },
     "Task03_predicting_the_time_to_biochemical_recurrence_in_he_prostatectomies": {
         "name": "c-index",
@@ -171,6 +178,22 @@ def adapt_features(
                 num_epochs=100,
                 learning_rate=0.001,
             )
+
+    elif adaptor_name == "linear-classifier":
+        num_classes = len(np.unique(shot_labels))
+        adaptor = LinearClassifierAdaptor(
+            shot_features=shot_features,
+            shot_labels=shot_labels,
+            test_features=test_features,  
+            caseids=test_names,    
+            input_dim=shot_features.shape[1],
+            num_classes=num_classes,
+            num_epochs=100,
+            learning_rate=1e-3,
+            batch_size=32,
+            patience=5,
+        )
+
     elif "mlp" in adaptor_name:
         if task_type == "classification":
             adaptor = TwoLayerPerceptron(
@@ -196,6 +219,7 @@ def adapt_features(
                 num_epochs=100,
                 learning_rate=0.001,
             )
+
         elif task_type == "detection":
             adaptor = MLPRegressor(
             shot_features=shot_features,
@@ -205,7 +229,6 @@ def adapt_features(
             test_features=test_features,
             test_coordinates=test_coordinates,
             test_ids=test_names,
-            patch_size=patch_size,
             test_image_origins= test_image_origins, 
             test_image_spacings= test_image_spacing,
             test_image_directions= test_image_directions,
@@ -215,7 +238,6 @@ def adapt_features(
             hidden_dim=64,
             num_epochs=50,
             lr=1e-3,
-            #shot_extra_labels=shot_extra_labels,
         )
 
     elif adaptor_name == "density-map":
@@ -272,28 +294,44 @@ def evaluate_predictions(task_name, case_ids, test_predictions, test_labels, tes
 
     metrics = {
         "predictions": [],  # list to store individual case results
-        "metrics": {}, # dictionary to store main metric
+        "metrics": {},      # dictionary to store main metric
         "additional_metrics": {},  # dictionary to store additional metrics
     }
 
-    for case_id, prediction, ground_truth in zip(case_ids, test_predictions, test_labels):
-        ground_truth = convert_numpy_types(ground_truth)
-        prediction = convert_numpy_types(prediction)
-
+    # To get all nodule predictions for Task 7
+    if task_name == "Task07_detecting_lung_nodules_in_thoracic_ct":
+        # One entry containing the full arrays
         metrics["predictions"].append(
             {
-                "case_id": case_id,
-                "ground_truth": ground_truth,
-                "prediction": prediction,
+                "case_id":      convert_numpy_types(case_ids),
+                "ground_truth": convert_numpy_types(test_labels),
+                "prediction":   convert_numpy_types(test_predictions),
             }
         )
+    else:
+        iterable = zip(case_ids, test_predictions, test_labels)
 
-    # handle metric computation based on task_name
+        for case_id, prediction, ground_truth in iterable:
+            ground_truth = convert_numpy_types(ground_truth)
+            prediction   = convert_numpy_types(prediction)
+
+            metrics["predictions"].append(
+                {
+                    "case_id":      case_id,
+                    "ground_truth": ground_truth,
+                    "prediction":   prediction,
+                }
+            )
+
+    # ── metric computation ───────────────────────────────────────────────
     metric_name = METRIC_DICT[task_name]["name"]
     metric_fn = METRIC_DICT[task_name]["fn"]
     metric_dict = {}
     additional_metric_dict = {}
     if task_name == "Task01_classifying_he_prostate_biopsies_into_isup_scores":
+        metric_value = metric_fn(test_labels, test_predictions)
+        metric_dict[metric_name] = metric_value
+    elif task_name == "Task02_classifying_lung_nodule_malignancy_in_ct":
         metric_value = metric_fn(test_labels, test_predictions)
         metric_dict[metric_name] = metric_value
     elif task_name == "Task03_predicting_the_time_to_biochemical_recurrence_in_he_prostatectomies":
@@ -307,11 +345,10 @@ def evaluate_predictions(task_name, case_ids, test_predictions, test_labels, tes
         metric_value = metric_fn(test_labels, test_predictions, 8)
         metric_dict[metric_name] = metric_value
     elif task_name == "Task07_detecting_lung_nodules_in_thoracic_ct":
-        predictions_list    = test_predictions
-        ground_truth_list   = test_labels
         metric_value = metric_fn(
-            predictions_list,
-            ground_truth_list,
+            case_ids,
+            test_predictions,
+            test_labels,
             test_extra_labels
         )
         metric_dict[metric_name] = metric_value
@@ -322,7 +359,7 @@ def evaluate_predictions(task_name, case_ids, test_predictions, test_labels, tes
         metric_value = metric_fn(test_labels, test_predictions)
         metric_dict[metric_name] = metric_value
     elif task_name == "Task20_generating_caption_from_wsi":
-        language_metric_dict = metric_fn(test_labels, test_predictions) # a dictionnary
+        language_metric_dict = metric_fn(test_labels, test_predictions)  # a dictionary
         metric_dict[metric_name] = language_metric_dict.pop(metric_name)
         additional_metric_dict.update(language_metric_dict)
     else:
@@ -332,6 +369,7 @@ def evaluate_predictions(task_name, case_ids, test_predictions, test_labels, tes
     metrics["additional_metrics"] = additional_metric_dict
 
     return metrics
+
 
 
 def process_image_representation(data):
