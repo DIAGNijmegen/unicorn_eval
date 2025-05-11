@@ -286,12 +286,6 @@ def convert_numpy_types(obj):
 
 def evaluate_predictions(task_name, case_ids, test_predictions, test_labels, test_extra_labels=None):
 
-    # ── sanity-check ─────────────────────────────
-    print("\n[EVAL]", task_name)
-    print("  test_labels      :", test_labels)
-    print("  test_predictions :", test_predictions)
-    # ─────────────────────────────────────────────
-
     metrics = {
         "predictions": [],  # list to store individual case results
         "metrics": {},      # dictionary to store main metric
@@ -323,7 +317,7 @@ def evaluate_predictions(task_name, case_ids, test_predictions, test_labels, tes
                 }
             )
 
-    # ── metric computation ───────────────────────────────────────────────
+    # handle metric computation based on task_name
     metric_name = METRIC_DICT[task_name]["name"]
     metric_fn = METRIC_DICT[task_name]["fn"]
     metric_dict = {}
@@ -345,12 +339,7 @@ def evaluate_predictions(task_name, case_ids, test_predictions, test_labels, tes
         metric_value = metric_fn(test_labels, test_predictions, 8)
         metric_dict[metric_name] = metric_value
     elif task_name == "Task07_detecting_lung_nodules_in_thoracic_ct":
-        metric_value = metric_fn(
-            case_ids,
-            test_predictions,
-            test_labels,
-            test_extra_labels
-        )
+        metric_value = metric_fn(case_ids, test_predictions, test_labels, test_extra_labels)
         metric_dict[metric_name] = metric_value
     elif task_name == "Task08_detecting_mitotic_figures_in_breast_cancer_wsis":
         metric_value = metric_fn(test_labels, test_predictions, 16)
@@ -400,7 +389,6 @@ def process_detection(data, task_name: str | None = None):
         * Keeps the first three coordinates when available.
         * Falls back to the first two coordinates for 2‑D points.
 
-
         Returns
         -------
         list[list[tuple]]
@@ -417,13 +405,9 @@ def process_detection(data, task_name: str | None = None):
             pts_all.append(case_pts)
         return pts_all
 
-    # ---------------------------------------------------------------------
-    # 1. points
     data["shot_labels"] = extract_points(data["shot_labels"])
     data["case_labels"] = extract_points(data["case_labels"])
 
-    # ---------------------------------------------------------------------
-    # 2. extra labels
     extra_list = data.get("case_extra_labels")
     if not extra_list or extra_list[0] is None:
         data["case_extra_labels"] = None
@@ -445,7 +429,7 @@ def process_detection(data, task_name: str | None = None):
                             "name": p.get("name", f"case{case_id}_pt{idx}"),
                         }
                     )
-
+                    
             elif isinstance(case_extra, (list, np.ndarray)):
                 for idx, d in enumerate(case_extra):
                     diameter_records.append(
@@ -466,9 +450,6 @@ def process_detection(data, task_name: str | None = None):
         data["case_extra_labels"] = np.concatenate(extra_list, axis=0)
 
     return data
-
-
-
 
 def extract_embeddings_and_labels(processed_results):
     tasks = {}

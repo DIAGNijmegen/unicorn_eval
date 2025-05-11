@@ -21,7 +21,6 @@ from torch.utils.data import DataLoader, TensorDataset
 import sklearn
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics.pairwise import cosine_similarity, euclidean_distances
-from typing import Optional
 from unicorn_eval.adaptors.base import CaseLevelTaskAdaptor
 
 
@@ -225,8 +224,11 @@ class LogisticRegression(CaseLevelTaskAdaptor):
     
 class LinearClassifierAdaptor(CaseLevelTaskAdaptor):
     """
-    Case‑level adaptor that learns a simple MLP on a few‑shot training set
-    and predicts class probabilities for a test set.
+    This is a slightly more advanced linear classifier: 3 linear layers, it stacks multiple
+    hidden layers with 2 ReLU activations between them, allowing the model to capture non‑linear relationships
+    in the feature space. Hyperparameters such as the number of layers, hidden dimension, learning rate,
+    batch size, and early stopping patience can be configured to fine‑tune performance on small data.
+
     """
 
     class LinearClassifier(nn.Module):

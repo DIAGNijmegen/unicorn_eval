@@ -31,12 +31,9 @@ from unicorn_eval.utils import (
     write_json_file,
 )
 
-#INPUT_DIRECTORY = Path("/input")
-INPUT_DIRECTORY = Path("/data/temporary/unicorn/debugging/evaluation/vision/task-2")
-#OUTPUT_DIRECTORY = Path("/output")
-OUTPUT_DIRECTORY = Path("/data/temporary/unicorn/debugging/evaluation/vision/task-2/output")
-#GROUNDTRUTH_DIRECTORY = Path("/opt/ml/input/data/ground_truth")
-GROUNDTRUTH_DIRECTORY = Path("/data/temporary/unicorn/debugging/groundtruth/")
+INPUT_DIRECTORY = Path("/input")
+OUTPUT_DIRECTORY = Path("/output")
+GROUNDTRUTH_DIRECTORY = Path("/opt/ml/input/data/ground_truth")
 
 
 ADAPTOR_SLUGS_DICT = {
@@ -239,20 +236,6 @@ def process(job):
 
 
 def get_cases_extra_labels_detection(cases_image_sizes, cases_image_spacings):
-    """
-    Compute a scalar “extra label” for detection tasks:
-      - For 2D images: total pixel area in mm².
-      - For 3D volumes: total slice area (XY) in mm² (ignores depth).
-
-    Args:
-        cases_image_sizes: dict mapping case_id → tuple of ints
-            (width, height) for 2D, or (width, height, depth) for 3D.
-        cases_image_spacings: dict mapping case_id → tuple of floats
-            (spacing_x_um, spacing_y_um) for 2D, or (sx_um, sy_um, sz_um).
-
-    Returns:
-        case_extra_labels: dict mapping case_id → float area_mm2.
-    """
     case_extra_labels = {}
     for case_id, image_size in cases_image_sizes.items():
         # Pick X/Y dims whether 2D or 3D:
@@ -260,13 +243,9 @@ def get_cases_extra_labels_detection(cases_image_sizes, cases_image_spacings):
 
         # Pick X/Y spacings (in µm) whether 2D or 3D:
         spacing_x_um, spacing_y_um = cases_image_spacings[case_id][0], cases_image_spacings[case_id][1]
-
-        # Convert to mm and compute per‐pixel area:
         spacing_x_mm = spacing_x_um / 1000.0
         spacing_y_mm = spacing_y_um / 1000.0
         pixel_area_mm2 = spacing_x_mm * spacing_y_mm
-
-        # Total image area in mm²:
         image_area_mm2 = width * height * pixel_area_mm2
 
         case_extra_labels[case_id] = image_area_mm2
@@ -439,7 +418,7 @@ def main():
 
             elif task_type == "detection":
                 if task_name == "Task07_detecting_lung_nodules_in_thoracic_ct":
-                    # already a list of per‐case diameter arrays
+                    # to later extract the diameter
                     case_extra_labels = results["case_extra_labels"]
                 else:
                     # compute image‐area extra‐labels for other detection tasks

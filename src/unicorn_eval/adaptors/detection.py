@@ -360,9 +360,21 @@ class DensityMap(PatchLevelTaskAdaptor):
     
 class MLPRegressor(nn.Module, PatchLevelTaskAdaptor):
     """
-    Patch-level adaptor **and** neural network for nodule detection.
-    Predicts [dx, dy, dz, logit_p] per patch, then reconstructs
-    world‑space nodule centres.
+    This class implements a lightweight MLP regression head that, for each patch:
+      1. Predicts a 4-vector: [dx, dy, dz, logit_p], where (dx, dy, dz) are the predicted
+         offsets from the patch center to the true nodule center in patient-space millimetres,
+         and logit_p is the raw classification score.
+      3. Converts patch indices to world-space coordinates via
+         `compute_patch_center_3d`, then reconstructs final nodule centers by adding
+         the predicted offsets to the patch center:
+      3. Applies a sigmoid to logit_p to obtain a detection probability per patch.
+
+    During inference, `infer_from_patches`:
+      - Computes each patch’s world-space center.
+      - Runs the MLP to get `[dx, dy, dz, logit_p]`.
+      - Adds the offsets to the patch centers to get nodule coordinates.
+      - Filters by a probability threshold (e.g., p > 0.9) and outputs an array of
+        [x, y, z, p].
 
     """
 
@@ -396,6 +408,7 @@ class MLPRegressor(nn.Module, PatchLevelTaskAdaptor):
         num_epochs: int = 50,
         lr: float = 1e-3,
     ) -> "_Net":
+        
         """
         Train a small MLP on a flat list of patch dicts:
           each dict has feature, patch_idx, image_origin, image_spacing,
@@ -552,7 +565,7 @@ class MLPRegressor(nn.Module, PatchLevelTaskAdaptor):
             raise RuntimeError("must call fit() before predict()")
 
         test_dicts: List[dict] = []
-        case_ids:   List[str]  = []          # NEW – parallel list of IDs
+        case_ids:   List[str]  = []      
 
         for feats_case, idxs_case, case_id in zip(
             self.test_features,
@@ -586,7 +599,7 @@ class MLPRegressor(nn.Module, PatchLevelTaskAdaptor):
         rows = [[cid, *pred] for cid, pred in zip(case_ids, raw_preds)]
         self._preds = np.array(rows, dtype=object)
 
-        # info printout
+        # Nodule count printout
         n_kept = int(mask.sum())
         print(f"[MLPRegressor] Returning {n_kept} nodules (p > 0.9) "
               f"out of {len(mask)} patches")

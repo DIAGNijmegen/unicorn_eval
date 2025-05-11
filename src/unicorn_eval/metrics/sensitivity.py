@@ -13,11 +13,15 @@
 #  limitations under the License.
 
 """
-LUNA16 CPM calculator — in‑memory inputs, **prediction row = [caseId,x,y,z,p]**
+LUNA16 CPM calculator — expected input: [caseId,x,y,z,p], this calculator mimics
+as closely as possible the original evaluation scripts used in the LUNA16 challenge with the CPM calculate included,
+this is the metric displayed on the leaderboard. 
+LUNA16 Evaluation: 
+https://www.dropbox.com/s/wue67fg9bk5xdxt/evaluationScript.zip?dl=0
 
 """
 from __future__ import annotations
-import math, os, tempfile, csv
+import tempfile, csv
 from pathlib import Path
 from typing import Dict, List, Sequence, Tuple
 

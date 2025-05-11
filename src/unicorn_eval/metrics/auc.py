@@ -18,7 +18,7 @@ from sklearn.metrics import roc_auc_score
 
 class RocAuc:
     """
-    Compute ROC‑AUC from two 1‑D arrays: *y_pred* (scores) and *y_true* (0/1).
+    Compute ROC‑AUC from two 1‑D arrays: y_pred (predictions) and y_true (ground truth).
 
     """
 
@@ -79,14 +79,6 @@ class RocAuc:
 
 
 def compute_roc_auc(ground_truths, predictions):
-    """
-    Convenience wrapper so existing external code can remain unchanged.
-
-    Returns
-    -------
-    float
-        ROC‑AUC score printed to stdout and returned.
-    """
     auc = RocAuc(ground_truths, predictions).compute_auc()
     print(f"AUC: {auc:.4f}")
     return auc
