@@ -17,10 +17,10 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from torch.utils.data import DataLoader, TensorDataset
 import sklearn
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics.pairwise import cosine_similarity, euclidean_distances
-
 from unicorn_eval.adaptors.base import CaseLevelTaskAdaptor
 
 
@@ -221,7 +221,160 @@ class LogisticRegression(CaseLevelTaskAdaptor):
     def predict(self) -> np.ndarray:
         return self.model.predict(self.test_features)
 
+    
+class LinearClassifierAdaptor(CaseLevelTaskAdaptor):
+    """
+    This is a slightly more advanced linear classifier: 3 linear layers, it stacks multiple
+    hidden layers with 2 ReLU activations between them, allowing the model to capture non‑linear relationships
+    in the feature space. Hyperparameters such as the number of layers, hidden dimension, learning rate,
+    batch size, and early stopping patience can be configured to fine‑tune performance on small data.
 
+    """
+
+    class LinearClassifier(nn.Module):
+        def __init__(
+            self,
+            input_dim: int,
+            hidden_dim: int,
+            output_dim: int,
+            num_layers: int = 3,
+        ) -> None:
+            super().__init__()
+            assert num_layers >= 2, "num_layers must be at least 2"
+
+            layers = [nn.Linear(input_dim, hidden_dim)]
+            for _ in range(num_layers - 2):
+                layers += [
+                    nn.ReLU(inplace=True),
+                    nn.Linear(hidden_dim, hidden_dim),
+                ]
+            layers += [nn.ReLU(inplace=True), nn.Linear(hidden_dim, output_dim)]
+            self.net = nn.Sequential(*layers)
+
+        def forward(self, x: torch.Tensor) -> torch.Tensor: 
+            return self.net(x)
+
+
+    def __init__(
+        self,
+        shot_features: np.ndarray,
+        shot_labels: np.ndarray,
+        test_features: np.ndarray,
+        *,
+        caseids: np.ndarray | list | None,
+        input_dim: int,
+        num_classes: int,
+        num_epochs: int = 100,
+        learning_rate: float = 1e-3,
+        batch_size: int = 32,
+        patience: int = 5,
+        hidden_dim: int = 256,
+        num_layers: int = 10,
+        device: str | None = None,
+    ) -> None:
+        super().__init__(shot_features, shot_labels, test_features)
+        self.caseids = np.asarray(caseids) if caseids is not None else None
+
+        self.input_dim = input_dim
+        self.num_classes = num_classes
+        self.num_epochs = num_epochs
+        self.learning_rate = learning_rate
+        self.batch_size = batch_size
+        self.patience = patience
+        self.hidden_dim = hidden_dim
+        self.num_layers = num_layers
+        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+
+        # instantiate the *inner* network
+        self.model = self.LinearClassifier(
+            input_dim, hidden_dim, num_classes, num_layers
+        ).to(self.device)
+
+        self.crit = (
+            nn.CrossEntropyLoss() if num_classes > 1 else nn.BCEWithLogitsLoss()
+        )
+        self.opt = optim.Adam(self.model.parameters(), lr=self.learning_rate)
+        self._is_fitted = False
+
+    def fit(self) -> None:
+        """Train the wrapped MLP on the few‑shot set."""
+        X = torch.tensor(self.shot_features, dtype=torch.float32)
+        y = torch.tensor(
+            self.shot_labels,
+            dtype=torch.long if self.num_classes > 1 else torch.float32,
+        )
+        dl = DataLoader(
+            TensorDataset(X, y), batch_size=self.batch_size, shuffle=True
+        )
+
+        best_loss, patience_ctr, best_state = float("inf"), 0, None
+
+        for _ in range(self.num_epochs):
+            self.model.train()
+            epoch_loss = 0.0
+            for xb, yb in dl:
+                xb, yb = xb.to(self.device), yb.to(self.device)
+                self.opt.zero_grad()
+                loss = self.crit(self.model(xb), yb)
+                loss.backward()
+                self.opt.step()
+                epoch_loss += loss.item()
+            epoch_loss /= len(dl)
+
+            if epoch_loss < best_loss:
+                best_loss, patience_ctr = epoch_loss, 0
+                best_state = self.model.state_dict()
+            else:
+                patience_ctr += 1
+                if patience_ctr >= self.patience:
+                    break
+
+        # Restore the best weights
+        self.model.load_state_dict(best_state)
+        self._is_fitted = True
+
+    def predict(self) -> np.ndarray:
+        """
+        Return the *malignant* probability (class 1) for each test case.
+
+        * If ``caseids`` is ``None`` → a plain 1‑D ``np.ndarray`` of shape
+          ``(N_test,)``.
+        * Otherwise → a structured array with fields
+            - ``caseid``      (dtype matches the supplied IDs)
+            - ``prediction``  (scalar malignancy risk)
+        """
+        if not self._is_fitted:
+            raise RuntimeError("Call `.fit()` before `.predict()`.")
+
+        Xt = torch.tensor(
+            self.test_features, dtype=torch.float32, device=self.device
+        )
+
+        self.model.eval()
+        with torch.no_grad():
+            logits = self.model(Xt).cpu()
+
+        # --- logits → probability of malignancy ------------------------
+        if self.num_classes > 1:                     # softmax case (C = 2)
+            probs_np = logits.softmax(-1)[:, 1].numpy()   # keep class‑1 col
+        else:                                        # single‑logit sigmoid
+            probs_np = logits.sigmoid().squeeze(-1).numpy()
+        # ----------------------------------------------------------------
+
+        # No case ids → just return the 1‑D array
+        if self.caseids is None:
+            return probs_np
+
+        # Build a structured array: prediction is now *scalar*, so pred_shape=()
+        out = np.zeros(
+            len(probs_np),
+            dtype=[("caseid", self.caseids.dtype),
+                   ("prediction", probs_np.dtype)],
+        )
+        out["caseid"] = self.caseids
+        out["prediction"] = probs_np
+        return out
+    
 class LinearClassifier(nn.Module):
     """
     A simple linear classifier.
@@ -233,7 +386,6 @@ class LinearClassifier(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.fc(x)
-
 
 class LinearProbing(CaseLevelTaskAdaptor):
     """

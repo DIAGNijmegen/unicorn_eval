@@ -12,3 +12,4 @@ evalutils==0.3.1
 openslide-python
 openslide-bin
 pycm
+typing
