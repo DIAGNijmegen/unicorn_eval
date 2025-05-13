@@ -12,3 +12,4 @@ evalutils==0.3.1
 openslide-python
 openslide-bin
 pycm
+dragon_eval==0.2.10
