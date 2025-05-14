@@ -343,11 +343,12 @@ def write_combined_metrics(*, metric_dict: dict[dict]) -> None:
     predictions = {"predictions": []}
 
     for task_name, task_metrics in metric_dict.items():
-        case_prediction = [
-            p.tolist() if isinstance(p, np.ndarray) else p
-            for p in task_metrics["predictions"]
-        ]
-        predictions["predictions"].extend(case_prediction)
+        if "segmenting" not in task_name:
+            case_prediction = [
+                p.tolist() if isinstance(p, np.ndarray) else p
+                for p in task_metrics["predictions"]
+            ]
+            predictions["predictions"].extend(case_prediction)
 
         for metric_name, metric_value in task_metrics["metrics"].items():
             task_identifier = task_name.split("_")[0]
