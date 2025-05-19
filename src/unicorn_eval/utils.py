@@ -359,7 +359,6 @@ def evaluate_predictions(task_name, case_ids, test_predictions, test_labels, tes
     return metrics
 
 
-
 def process_image_representation(data):
     # stack embeddings
     data["shot_embeddings"] = np.vstack(data["shot_embeddings"])
@@ -376,7 +375,6 @@ def process_image_representation(data):
     else:
         data["case_extra_labels"] = None
     return data
-
 
 
 def process_detection(data, task_name: str | None = None):
@@ -449,6 +447,7 @@ def process_detection(data, task_name: str | None = None):
         data["case_extra_labels"] = np.concatenate(extra_list, axis=0)
 
     return data
+
 
 def extract_embeddings_and_labels(processed_results):
     tasks = {}
