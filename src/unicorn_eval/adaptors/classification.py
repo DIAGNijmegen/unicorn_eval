@@ -318,7 +318,7 @@ class MultiLayerPerceptron(CaseLevelTaskAdaptor):
         num_layers (int): Number of hidden layers in the MLP. Default is 3.
         num_epochs (int): Number of training epochs. Default is 100.
         learning_rate (float): Learning rate for the optimizer. Default is 0.001.
-        patience (int): Number of epochs with no improvement after which training will be stopped. Default is None.
+        patience (int): Number of epochs with no improvement after which training will be stopped. Default is 10.
         shot_extra_labels (np.ndarray): Optional additional labels for training, used in survival analysis.
     Methods:
         fit():
@@ -326,7 +326,7 @@ class MultiLayerPerceptron(CaseLevelTaskAdaptor):
         predict() -> np.ndarray:
             Generates predictions for the test data using the fitted model.
     """
-    def __init__(self, shot_features, shot_labels, test_features, hidden_dim=256, num_layers=3, num_epochs=100, learning_rate=0.001, patience=None, shot_extra_labels=None):
+    def __init__(self, shot_features, shot_labels, test_features, hidden_dim=256, num_layers=3, num_epochs=100, learning_rate=0.001, patience=10, shot_extra_labels=None):
         super().__init__(shot_features, shot_labels, test_features, shot_extra_labels)
         self.hidden_dim = hidden_dim
         self.num_layers = num_layers
@@ -366,7 +366,7 @@ class MultiLayerPerceptron(CaseLevelTaskAdaptor):
                 best_loss = epoch_loss
                 best_epoch = epoch
                 best_state = self.model.state_dict()
-            elif self.patience is not None and epoch - best_epoch > self.patience:
+            elif epoch - best_epoch > self.patience:
                 tqdm.tqdm.write(f"Early stopping at epoch {epoch+1}")
                 break
             tqdm.tqdm.write(f"Epoch {epoch+1}/{self.num_epochs} - Loss: {epoch_loss:.4f}")
