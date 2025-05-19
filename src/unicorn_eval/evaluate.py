@@ -114,9 +114,10 @@ EXTRA_LABEL_SLUG_DICT = {
 def process(job):
     """Processes a single algorithm job, looking at the outputs"""
 
-    image_origin, image_direction = None, None
     embeddings = coordinates = spacing = patch_size = None
     image_size = image_spacing = prediction = None
+    image_origin = image_direction = None
+
     report = "Processing:\n"
     report += pformat(job)
     report += "\n"
@@ -174,10 +175,6 @@ def process(job):
     elif modality == "vision-language":
 
         model_output_slug = MODEL_OUTPUT_SLUG_DICT[task_name]
-
-        embeddings = None
-        coordinates = None
-        spacing, patch_size, image_size, image_spacing = None, None, None, None
 
         # find the location of the results
         location_prediction = get_file_location(
