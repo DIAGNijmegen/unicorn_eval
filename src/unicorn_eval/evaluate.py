@@ -235,18 +235,16 @@ def process(job):
 def get_cases_extra_labels_detection(cases_image_sizes, cases_image_spacings):
     case_extra_labels = {}
     for case_id, image_size in cases_image_sizes.items():
-        # Pick X/Y dims whether 2D or 3D:
+        # grab image dimensions along first two axes  (works for both 2D and 3D images)
         width, height = image_size[0], image_size[1]
-
-        # Pick X/Y spacings (in µm) whether 2D or 3D:
-        spacing_x_um, spacing_y_um = cases_image_spacings[case_id][0], cases_image_spacings[case_id][1]
+        # grab image spacings (in µm) along first two axes (works for both 2D and 3D images)
+        spacing = cases_image_spacings[case_id]
+        spacing_x_um, spacing_y_um = spacing[0], spacing[1]
         spacing_x_mm = spacing_x_um / 1000.0
         spacing_y_mm = spacing_y_um / 1000.0
         pixel_area_mm2 = spacing_x_mm * spacing_y_mm
         image_area_mm2 = width * height * pixel_area_mm2
-
         case_extra_labels[case_id] = image_area_mm2
-
     return case_extra_labels
 
 
