@@ -314,8 +314,8 @@ class MultiLayerPerceptron(CaseLevelTaskAdaptor):
         shot_features (np.ndarray): Few-shot feature matrix of shape (n_shots, n_features).
         shot_labels (np.ndarray): Few-shot labels.
         test_features (np.ndarray): Test feature matrix of shape (n_test_samples, n_features).
-        num_layers (int): Number of hidden layers in the MLP. Default is 2.
         hidden_dim (int): Number of hidden units in the model. Default is 256.
+        num_layers (int): Number of hidden layers in the MLP. Default is 3.
         num_epochs (int): Number of training epochs. Default is 100.
         learning_rate (float): Learning rate for the optimizer. Default is 0.001.
         patience (int): Number of epochs with no improvement after which training will be stopped. Default is None.
@@ -371,9 +371,8 @@ class MultiLayerPerceptron(CaseLevelTaskAdaptor):
                 break
             tqdm.tqdm.write(f"Epoch {epoch+1}/{self.num_epochs} - Loss: {epoch_loss:.4f}")
 
-        if best_state is not None:
-            self.model.load_state_dict(best_state)
-            tqdm.tqdm.write(f"Restored best model from epoch {best_epoch+1} with loss {best_loss:.4f}")
+        self.model.load_state_dict(best_state)
+        tqdm.tqdm.write(f"Restored best model from epoch {best_epoch+1} with loss {best_loss:.4f}")
 
     def predict(self) -> np.ndarray:
         self.model.eval()
