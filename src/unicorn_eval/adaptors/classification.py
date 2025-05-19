@@ -171,12 +171,7 @@ class WeightedKNN(CaseLevelTaskAdaptor):
             class_probabilities = class_weights / (np.sum(class_weights) + 1e-8)
             test_probabilities.append(class_probabilities)
 
-            if self.task_type == "ordinal-classification":
-                expected_value = np.dot(class_probabilities, self.unique_classes)
-                predicted_class = int(np.round(expected_value))
-            else:
-                predicted_class = self.unique_classes[np.argmax(class_probabilities)]
-
+            predicted_class = self.unique_classes[np.argmax(class_probabilities)]
             test_predictions.append(predicted_class)
 
         test_predictions = np.array(test_predictions)
