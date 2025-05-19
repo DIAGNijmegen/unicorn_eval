@@ -110,7 +110,6 @@ def adapt_features(
     train_image_origins=None,
     train_image_directions=None
 ):
-    adaptor = None 
     num_shots = len(shot_features)
     if "-nn" in adaptor_name:
         k = int(adaptor_name.split("-")[0])
@@ -184,8 +183,8 @@ def adapt_features(
         adaptor = LinearClassifierAdaptor(
             shot_features=shot_features,
             shot_labels=shot_labels,
-            test_features=test_features,  
-            caseids=test_names,    
+            test_features=test_features,
+            caseids=test_names,
             input_dim=shot_features.shape[1],
             num_classes=num_classes,
             num_epochs=100,
@@ -229,7 +228,7 @@ def adapt_features(
             test_features=test_features,
             test_coordinates=test_coordinates,
             test_ids=test_names,
-            test_image_origins= test_image_origins, 
+            test_image_origins= test_image_origins,
             test_image_spacings= test_image_spacing,
             test_image_directions= test_image_directions,
             train_image_spacings= train_image_spacing,
@@ -287,9 +286,9 @@ def convert_numpy_types(obj):
 def evaluate_predictions(task_name, case_ids, test_predictions, test_labels, test_extra_labels=None):
 
     metrics = {
-        "predictions": [],  # list to store individual case results
-        "metrics": {},      # dictionary to store main metric
-        "additional_metrics": {},  # dictionary to store additional metrics
+        "predictions": [],          # list to store individual case results
+        "metrics": {},              # dictionary to store main metric
+        "additional_metrics": {},   # dictionary to store additional metrics
     }
 
     # To get all nodule predictions for Task 7
@@ -297,9 +296,9 @@ def evaluate_predictions(task_name, case_ids, test_predictions, test_labels, tes
         # One entry containing the full arrays
         metrics["predictions"].append(
             {
-                "case_id":      convert_numpy_types(case_ids),
+                "case_id": convert_numpy_types(case_ids),
                 "ground_truth": convert_numpy_types(test_labels),
-                "prediction":   convert_numpy_types(test_predictions),
+                "prediction": convert_numpy_types(test_predictions),
             }
         )
     else:
@@ -307,13 +306,13 @@ def evaluate_predictions(task_name, case_ids, test_predictions, test_labels, tes
 
         for case_id, prediction, ground_truth in iterable:
             ground_truth = convert_numpy_types(ground_truth)
-            prediction   = convert_numpy_types(prediction)
+            prediction = convert_numpy_types(prediction)
 
             metrics["predictions"].append(
                 {
-                    "case_id":      case_id,
+                    "case_id": case_id,
                     "ground_truth": ground_truth,
-                    "prediction":   prediction,
+                    "prediction": prediction,
                 }
             )
 
@@ -429,7 +428,7 @@ def process_detection(data, task_name: str | None = None):
                             "name": p.get("name", f"case{case_id}_pt{idx}"),
                         }
                     )
-                    
+
             elif isinstance(case_extra, (list, np.ndarray)):
                 for idx, d in enumerate(case_extra):
                     diameter_records.append(
@@ -529,7 +528,6 @@ def extract_data(patch_neural_representation):
     # now grab origin & direction directly from the meta block:
     image_origin    = patch_neural_representation["meta"]["image-origin"]
     image_direction = patch_neural_representation["meta"]["image-direction"]
-    
 
     # Extract patches
     patches = patch_neural_representation["patches"]
