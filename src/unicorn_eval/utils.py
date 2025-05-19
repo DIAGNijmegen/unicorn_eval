@@ -505,7 +505,7 @@ def extract_embeddings_and_labels(processed_results):
             tasks[task_name]["cases_image_spacings"][case_id] = result["image_spacing"]
             tasks[task_name]["cases_image_sizes"][case_id] = image_size
             tasks[task_name]["cases_image_origins"][case_id] = result["image_origin"]
-            tasks[task_name]["cases_image_directions"][case_id] =  result["image_direction"]
+            tasks[task_name]["cases_image_directions"][case_id] = result["image_direction"]
 
     # now post-process each task
     for task_name, data in tasks.items():
@@ -524,8 +524,7 @@ def extract_data(patch_neural_representation):
     patch_size = patch_neural_representation["meta"]["patch-size"]
     image_size = patch_neural_representation["meta"]["image-size"]
     image_spacing = patch_neural_representation["meta"]["image-spacing"]
-    # now grab origin & direction directly from the meta block:
-    image_origin    = patch_neural_representation["meta"]["image-origin"]
+    image_origin = patch_neural_representation["meta"]["image-origin"]
     image_direction = patch_neural_representation["meta"]["image-direction"]
 
     # Extract patches
