@@ -189,6 +189,7 @@ class LinearProbingRegressor(CaseLevelTaskAdaptor):
         survival (bool): Whether the task is survival analysis. Default is False.
         num_epochs (int): The number of epochs for training the linear model. Default is 100.
         learning_rate (float): The learning rate for the optimizer. Default is 0.001.
+        patience (int): Number of epochs with no improvement after which training will be stopped. Default is 10.
         shot_extra_labels (np.ndarray): Optional additional labels for training, used in survival analysis.
     Methods:
         fit():
@@ -196,11 +197,12 @@ class LinearProbingRegressor(CaseLevelTaskAdaptor):
         predict() -> np.ndarray:
             Predicts the labels for the test features using the trained model.
     """
-    def __init__(self, shot_features, shot_labels, test_features, survival=False, num_epochs=100, learning_rate=0.001, shot_extra_labels=None):
+    def __init__(self, shot_features, shot_labels, test_features, survival=False, num_epochs=100, learning_rate=0.001, patience=10, shot_extra_labels=None):
         super().__init__(shot_features, shot_labels, test_features, shot_extra_labels)
         self.survival = survival
         self.num_epochs = num_epochs
         self.learning_rate = learning_rate
+        self.patience = patience
 
     def fit(self):
         input_dim = self.shot_features.shape[1]
@@ -242,6 +244,9 @@ class LinearProbingRegressor(CaseLevelTaskAdaptor):
         print(f"🚀 Starting training on {self.device} with {total_params:,} trainable parameters.")
         print(self.model)
 
+        best_loss = float("inf")
+        best_epoch = 0
+        best_state = self.model.state_dict()
         for epoch in tqdm.tqdm(range(self.num_epochs), desc="Training", unit="epoch", leave=True):
             self.model.train()
             self.optimizer.zero_grad()
@@ -254,7 +259,18 @@ class LinearProbingRegressor(CaseLevelTaskAdaptor):
                 loss = self.criterion(logits, self.shot_labels)
             loss.backward()
             self.optimizer.step()
+            epoch_loss = loss.item()
+            if epoch_loss < best_loss:
+                best_loss = epoch_loss
+                best_epoch = epoch
+                best_state = self.model.state_dict()
+            elif epoch - best_epoch > self.patience:
+                tqdm.tqdm.write(f"Early stopping at epoch {epoch+1}")
+                break
             tqdm.tqdm.write(f"Epoch {epoch+1}/{self.num_epochs} - Loss: {loss.item():.4f}")
+
+        self.model.load_state_dict(best_state)
+        tqdm.tqdm.write(f"Restored best model from epoch {best_epoch+1} with loss {best_loss:.4f}")
 
     def predict(self) -> np.ndarray:
         self.model.eval()
