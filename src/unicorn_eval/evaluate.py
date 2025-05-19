@@ -387,6 +387,8 @@ def main():
 
             adaptor_name = adaptors[task_name]
 
+            patch_size = results["patch_size"]
+
             shot_embeddings = results["shot_embeddings"]
             shot_labels = results["shot_labels"]
             shot_extra_labels = results["shot_extra_labels"]
@@ -394,10 +396,9 @@ def main():
             shot_image_spacings = results["shot_image_spacings"]
             shot_image_origins = results["shot_image_origins"]
             shot_image_directions = results["shot_image_directions"]
-            case_embeddings = results["case_embeddings"]
 
+            case_embeddings = results["case_embeddings"]
             case_extra_labels = results["case_extra_labels"]
-            patch_size = results["patch_size"]
             case_image_size = results["cases_image_sizes"]
             case_image_spacings = results["cases_image_spacings"]
             case_image_origins = results["cases_image_origins"]
@@ -436,10 +437,10 @@ def main():
                 test_image_sizes=case_image_size,
                 shot_extra_labels=shot_extra_labels,
                 test_image_spacing=case_image_spacings,
-                test_image_origins=case_image_origins, 
+                test_image_origins=case_image_origins,
                 test_image_directions=case_image_directions,
                 train_image_spacing=shot_image_spacings,
-                train_image_origins=shot_image_origins, 
+                train_image_origins=shot_image_origins,
                 train_image_directions=shot_image_directions,
             )
 
