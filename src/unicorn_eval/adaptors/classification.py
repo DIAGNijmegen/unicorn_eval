@@ -241,6 +241,7 @@ class LinearProbing(CaseLevelTaskAdaptor):
         test_features (np.ndarray): Test feature matrix of shape (n_test_samples, n_features).
         num_epochs (int): The number of epochs for training the linear model. Default is 100.
         learning_rate (float): The learning rate for the optimizer. Default is 0.001.
+        patience (int): Number of epochs with no improvement after which training will be stopped. Default is 10.
         shot_extra_labels (np.ndarray): Optional additional labels for training, used in survival analysis.
     Methods:
         fit():
@@ -248,10 +249,11 @@ class LinearProbing(CaseLevelTaskAdaptor):
         predict() -> np.ndarray:
             Predicts the labels for the test features using the trained model.
     """
-    def __init__(self, shot_features, shot_labels, test_features, num_epochs=100, learning_rate=0.001, shot_extra_labels=None):
+    def __init__(self, shot_features, shot_labels, test_features, num_epochs=100, learning_rate=0.001, patience=10, shot_extra_labels=None):
         super().__init__(shot_features, shot_labels, test_features, shot_extra_labels)
         self.num_epochs = num_epochs
         self.learning_rate = learning_rate
+        self.patience = patience
 
     def fit(self):
         input_dim = self.shot_features.shape[1]
@@ -270,6 +272,9 @@ class LinearProbing(CaseLevelTaskAdaptor):
         print(f"🚀 Starting training on {self.device} with {total_params:,} trainable parameters.")
         print(self.model)
 
+        best_loss = float("inf")
+        best_epoch = 0
+        best_state = self.model.state_dict()
         for epoch in tqdm.tqdm(range(self.num_epochs), desc="Training", unit="epoch", leave=True):
             self.model.train()
             self.optimizer.zero_grad()
@@ -277,7 +282,18 @@ class LinearProbing(CaseLevelTaskAdaptor):
             loss = self.criterion(logits, self.shot_labels)
             loss.backward()
             self.optimizer.step()
+            epoch_loss = loss.item()
+            if epoch_loss < best_loss:
+                best_loss = epoch_loss
+                best_epoch = epoch
+                best_state = self.model.state_dict()
+            elif epoch - best_epoch > self.patience:
+                tqdm.tqdm.write(f"Early stopping at epoch {epoch+1}")
+                break
             tqdm.tqdm.write(f"Epoch {epoch+1}/{self.num_epochs} - Loss: {loss.item():.4f}")
+
+        self.model.load_state_dict(best_state)
+        tqdm.tqdm.write(f"Restored best model from epoch {best_epoch+1} with loss {best_loss:.4f}")
 
     def predict(self) -> np.ndarray:
         self.model.eval()
@@ -287,32 +303,38 @@ class LinearProbing(CaseLevelTaskAdaptor):
         return test_predictions.cpu().numpy()
 
 
-class TwoLayerPerceptronClassifier(nn.Module):
+class MLPClassifier(nn.Module):
     """
-    A simple MLP classifier with one hidden layer.
+    A simple MLP classifier with a tunable number of hidden layers.
     """
 
-    def __init__(self, input_dim: int, hidden_dim: int, output_dim: int):
+    def __init__(self, input_dim: int, hidden_dim: int, output_dim: int, num_layers: int):
         super().__init__()
-        self.fc1 = nn.Linear(input_dim, hidden_dim)
-        self.relu = nn.ReLU()
-        self.fc2 = nn.Linear(hidden_dim, output_dim)
+        layers = []
+        layers.append(nn.Linear(input_dim, hidden_dim))
+        layers.append(nn.ReLU())
+        for _ in range(num_layers - 2):
+            layers.append(nn.Linear(hidden_dim, hidden_dim))
+            layers.append(nn.ReLU())
+        layers.append(nn.Linear(hidden_dim, output_dim))
+        self.mlp = nn.Sequential(*layers)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.relu(self.fc1(x))
-        return self.fc2(x)
+        return self.mlp(x)
 
 
-class TwoLayerPerceptron(CaseLevelTaskAdaptor):
+class MultiLayerPerceptron(CaseLevelTaskAdaptor):
     """
-    A PyTorch-based 2-Layer Perceptron adaptor for classification tasks.
+    A PyTorch-based MLP adaptor for classification tasks.
     Attributes:
         shot_features (np.ndarray): Few-shot feature matrix of shape (n_shots, n_features).
         shot_labels (np.ndarray): Few-shot labels.
         test_features (np.ndarray): Test feature matrix of shape (n_test_samples, n_features).
         hidden_dim (int): Number of hidden units in the model. Default is 256.
+        num_layers (int): Number of hidden layers in the MLP. Default is 3.
         num_epochs (int): Number of training epochs. Default is 100.
         learning_rate (float): Learning rate for the optimizer. Default is 0.001.
+        patience (int): Number of epochs with no improvement after which training will be stopped. Default is 10.
         shot_extra_labels (np.ndarray): Optional additional labels for training, used in survival analysis.
     Methods:
         fit():
@@ -320,11 +342,13 @@ class TwoLayerPerceptron(CaseLevelTaskAdaptor):
         predict() -> np.ndarray:
             Generates predictions for the test data using the fitted model.
     """
-    def __init__(self, shot_features, shot_labels, test_features, hidden_dim=256, num_epochs=100, learning_rate=0.001, shot_extra_labels=None):
+    def __init__(self, shot_features, shot_labels, test_features, hidden_dim=256, num_layers=3, num_epochs=100, learning_rate=0.001, patience=10, shot_extra_labels=None):
         super().__init__(shot_features, shot_labels, test_features, shot_extra_labels)
         self.hidden_dim = hidden_dim
+        self.num_layers = num_layers
         self.num_epochs = num_epochs
         self.learning_rate = learning_rate
+        self.patience = patience
 
     def fit(self):
         input_dim = self.shot_features.shape[1]
@@ -336,13 +360,16 @@ class TwoLayerPerceptron(CaseLevelTaskAdaptor):
         self.shot_labels = torch.tensor(self.shot_labels, dtype=torch.long).to(self.device)
         self.test_features = torch.tensor(self.test_features, dtype=torch.float32).to(self.device)
 
-        self.model = TwoLayerPerceptronClassifier(input_dim, self.hidden_dim, self.num_classes).to(self.device)
+        self.model = MLPClassifier(input_dim, self.hidden_dim, self.num_classes, self.num_layers).to(self.device)
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
 
         total_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
         print(f"🚀 Starting training on {self.device} with {total_params:,} trainable parameters.")
         print(self.model)
 
+        best_loss = float("inf")
+        best_epoch = 0
+        best_state = self.model.state_dict()
         for epoch in tqdm.tqdm(range(self.num_epochs), desc="Training", unit="epoch", leave=True):
             self.model.train()
             self.optimizer.zero_grad()
@@ -350,7 +377,18 @@ class TwoLayerPerceptron(CaseLevelTaskAdaptor):
             loss = self.criterion(logits, self.shot_labels)
             loss.backward()
             self.optimizer.step()
-            tqdm.tqdm.write(f"Epoch {epoch+1}/{self.num_epochs} - Loss: {loss.item():.4f}")
+            epoch_loss = loss.item()
+            if epoch_loss < best_loss:
+                best_loss = epoch_loss
+                best_epoch = epoch
+                best_state = self.model.state_dict()
+            elif epoch - best_epoch > self.patience:
+                tqdm.tqdm.write(f"Early stopping at epoch {epoch+1}")
+                break
+            tqdm.tqdm.write(f"Epoch {epoch+1}/{self.num_epochs} - Loss: {epoch_loss:.4f}")
+
+        self.model.load_state_dict(best_state)
+        tqdm.tqdm.write(f"Restored best model from epoch {best_epoch+1} with loss {best_loss:.4f}")
 
     def predict(self) -> np.ndarray:
         self.model.eval()

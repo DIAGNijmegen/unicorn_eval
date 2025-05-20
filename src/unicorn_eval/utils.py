@@ -22,8 +22,8 @@ from sksurv.metrics import concordance_index_censored
 from unicorn_eval.adaptors import (
     KNN,
     KNNRegressor,
-    TwoLayerPerceptron,
-    TwoLayerPerceptronRegressor,
+    MultiLayerPerceptron,
+    MultiLayerPerceptronRegressor,
     DensityMap,
     LinearProbing,
     LinearProbingRegressor,
@@ -159,7 +159,7 @@ def adapt_features(
             )
     elif "mlp" in adaptor_name:
         if task_type == "classification":
-            adaptor = TwoLayerPerceptron(
+            adaptor = MultiLayerPerceptron(
                 shot_features=shot_features,
                 shot_labels=shot_labels,
                 shot_extra_labels=shot_extra_labels,
@@ -172,7 +172,7 @@ def adapt_features(
             survival = False
             if "survival" in adaptor_name:
                 survival = True
-            adaptor = TwoLayerPerceptronRegressor(
+            adaptor = MultiLayerPerceptronRegressor(
                 shot_features=shot_features,
                 shot_labels=shot_labels,
                 shot_extra_labels=shot_extra_labels,
