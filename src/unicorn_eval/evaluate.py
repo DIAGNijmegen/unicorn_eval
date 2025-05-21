@@ -39,6 +39,7 @@ GROUNDTRUTH_DIRECTORY = Path("/opt/ml/input/data/ground_truth")
 
 ADAPTOR_SLUGS_DICT = {
     "Task01_classifying_he_prostate_biopsies_into_isup_scores": "adaptor-pathology-classification",
+    "Task02_classifying_lung_nodule_malignancy_in_ct": "adaptor-radiology-classification",
     "Task03_predicting_the_time_to_biochemical_recurrence_in_he_prostatectomies": "adaptor-pathology-regression",
     "Task04_predicting_slide_level_tumor_proportion_score_in_ihc_stained_wsi": "adaptor-pathology-classification",
     "Task05_detecting_signet_ring_cells_in_he_stained_wsi_of_gastric_cancer": "adaptor-pathology-detection",
@@ -46,9 +47,22 @@ ADAPTOR_SLUGS_DICT = {
     "Task09_segmenting_rois_in_breast_cancer_wsis": "adaptor-pathology-segmentation",
 }
 
+REQUIRES_PROBABILITIES_DICT = {
+    "Task01_classifying_he_prostate_biopsies_into_isup_scores": False,
+    "Task02_classifying_lung_nodule_malignancy_in_ct": False,
+    "Task03_predicting_the_time_to_biochemical_recurrence_in_he_prostatectomies": False,
+    "Task04_predicting_slide_level_tumor_proportion_score_in_ihc_stained_wsi": False,
+    "Task05_detecting_signet_ring_cells_in_he_stained_wsi_of_gastric_cancer": False,
+    "Task08_detecting_mitotic_figures_in_breast_cancer_wsis": False,
+    "Task09_segmenting_rois_in_breast_cancer_wsis": False,
+}
+
 INPUT_SLUGS_DICT = {
     "Task01_classifying_he_prostate_biopsies_into_isup_scores": [
         "prostate-tissue-biopsy-whole-slide-image"
+    ],
+    "Task02_classifying_lung_nodule_malignancy_in_ct": [
+        "chest-ct-region-of-interest-cropout"
     ],
     "Task03_predicting_the_time_to_biochemical_recurrence_in_he_prostatectomies": [
         "prostatectomy-tissue-whole-slide-image"
@@ -70,6 +84,7 @@ INPUT_SLUGS_DICT = {
 
 MODEL_OUTPUT_SLUG_DICT = {
     "Task01_classifying_he_prostate_biopsies_into_isup_scores": "image-neural-representation",
+    "Task02_classifying_lung_nodule_malignancy_in_ct": "image-neural-representation",
     "Task03_predicting_the_time_to_biochemical_recurrence_in_he_prostatectomies": "image-neural-representation",
     "Task04_predicting_slide_level_tumor_proportion_score_in_ihc_stained_wsi": "image-neural-representation",
     "Task05_detecting_signet_ring_cells_in_he_stained_wsi_of_gastric_cancer": "patch-neural-representation",
@@ -80,6 +95,7 @@ MODEL_OUTPUT_SLUG_DICT = {
 
 LABEL_SLUG_DICT = {
     "Task01_classifying_he_prostate_biopsies_into_isup_scores": "isup-grade.json",
+    "Task02_classifying_lung_nodule_malignancy_in_ct": "lung-nodule-malignancy-risk.json",
     "Task03_predicting_the_time_to_biochemical_recurrence_in_he_prostatectomies": "overall-survival-years.json",
     "Task04_predicting_slide_level_tumor_proportion_score_in_ihc_stained_wsi": "pd-l1-tps-binned.json",
     "Task05_detecting_signet_ring_cells_in_he_stained_wsi_of_gastric_cancer": "cell-classification.json",
@@ -534,6 +550,7 @@ def main():
                 patch_size=patch_size,
                 test_image_sizes=case_image_size,
                 shot_extra_labels=shot_extra_labels,
+                return_probabilities=return_probabilities,
             )
 
         elif modality == "vision-language":

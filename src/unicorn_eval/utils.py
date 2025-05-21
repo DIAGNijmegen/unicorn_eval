@@ -17,7 +17,7 @@ from functools import partial
 
 import numpy as np
 from sklearn.metrics import cohen_kappa_score
-from sksurv.metrics import concordance_index_censored
+from sksurv.metrics import concordance_index_censored, roc_auc_score
 
 from unicorn_eval.adaptors import (
     KNN,
@@ -41,6 +41,11 @@ METRIC_DICT = {
         "name": "cohen-kappa-quadratic",
         "fn": partial(cohen_kappa_score, weights="quadratic"),
         "range": (-1, 1),
+    },
+    "Task02_classifying_lung_nodule_malignancy_in_ct": {
+        "name": "auc",
+        "fn": roc_auc_score,
+        "range": (0, 1),
     },
     "Task03_predicting_the_time_to_biochemical_recurrence_in_he_prostatectomies": {
         "name": "c-index",
@@ -249,6 +254,9 @@ def evaluate_predictions(task_name, case_ids, test_predictions, test_labels, tes
     metric_dict = {}
     additional_metric_dict = {}
     if task_name == "Task01_classifying_he_prostate_biopsies_into_isup_scores":
+        metric_value = metric_fn(test_labels, test_predictions)
+        metric_dict[metric_name] = metric_value
+    if task_name == "Task02_classifying_lung_nodule_malignancy_in_ct":
         metric_value = metric_fn(test_labels, test_predictions)
         metric_dict[metric_name] = metric_value
     elif task_name == "Task03_predicting_the_time_to_biochemical_recurrence_in_he_prostatectomies":
