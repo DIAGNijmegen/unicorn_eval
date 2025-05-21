@@ -220,7 +220,11 @@ def process(job):
         for extra_slug_label in extra_slug_labels:
             slug_name = Path(extra_slug_label).stem
             extra_label_path = case_specific_ground_truth_dir / extra_slug_label
-            extra_labels[slug_name] = load_json_file(location=extra_label_path)
+            if extra_label_path.exists():
+                extra_labels[slug_name] = load_json_file(location=extra_label_path)
+            else:
+                print(f"WARNING: extra label file not found: {extra_label_path}")
+                extra_labels[slug_name] = None
 
         # convert extra_labels dictionary to a structured numpy array
         dtype = [(key, type(value)) for key, value in extra_labels.items()]

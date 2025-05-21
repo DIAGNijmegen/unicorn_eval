@@ -47,9 +47,6 @@ Below are the approved adaptors for each task type.
 
 ### 🧩 Adaptor Radiology Classification
 
-- `1-nn`
-- `5-nn`
-- `20-nn`
 - `1-nn-weighted`
 - `5-nn-weighted`
 - `20-nn-weighted`
@@ -67,7 +64,7 @@ Below are the approved adaptors for each task type.
 
 ### 🧩 Adaptor Radiology Detection Points
 
-- _Not available yet_
+- `patch-nodule-regressor`
 
 ---
 

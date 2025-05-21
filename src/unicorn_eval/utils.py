@@ -31,7 +31,7 @@ from unicorn_eval.adaptors import (
     SegmentationUpsampling,
     WeightedKNN,
     WeightedKNNRegressor,
-    MLPRegressor,
+    PatchNoduleRegressor,
 )
 from unicorn_eval.metrics.dice import compute_dice_score
 from unicorn_eval.metrics.f1_score import compute_f1
@@ -208,24 +208,24 @@ def adapt_features(
             )
 
         elif task_type == "detection":
-            adaptor = MLPRegressor(
-            shot_features=shot_features,
-            shot_labels=shot_labels,
-            shot_coordinates=shot_coordinates,
-            shot_ids=shot_names,
-            test_features=test_features,
-            test_coordinates=test_coordinates,
-            test_ids=test_names,
-            test_image_origins= test_image_origins,
-            test_image_spacings= test_image_spacing,
-            test_image_directions= test_image_directions,
-            train_image_spacings= train_image_spacing,
-            train_image_origins= train_image_origins,
-            train_image_directions= train_image_directions,
-            hidden_dim=64,
-            num_epochs=50,
-            lr=1e-3,
-        )
+            adaptor = PatchNoduleRegressor(
+                shot_features=shot_features,
+                shot_labels=shot_labels,
+                shot_coordinates=shot_coordinates,
+                shot_ids=shot_names,
+                test_features=test_features,
+                test_coordinates=test_coordinates,
+                test_ids=test_names,
+                test_image_origins=test_image_origins,
+                test_image_spacings=test_image_spacing,
+                test_image_directions=test_image_directions,
+                train_image_spacings=train_image_spacing,
+                train_image_origins=train_image_origins,
+                train_image_directions=train_image_directions,
+                hidden_dim=64,
+                num_epochs=50,
+                lr=1e-3,
+            )
 
     elif adaptor_name == "density-map":
         adaptor = DensityMap(
@@ -365,7 +365,7 @@ def process_image_representation(data):
     return data
 
 
-def process_detection(data, task_name: str | None = None):
+def process_detection(data, task_name: str):
 
     def extract_points(labels):
         """
@@ -501,7 +501,7 @@ def extract_embeddings_and_labels(processed_results):
         if tt in ["classification", "regression"]:
             tasks[task_name] = process_image_representation(data)
         elif tt == "detection":
-            tasks[task_name] = process_detection(data)
+            tasks[task_name] = process_detection(data, task_name)
 
     return tasks
 
