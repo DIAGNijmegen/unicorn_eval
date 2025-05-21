@@ -5,8 +5,8 @@ This repository provides:
 - The official UNICORN Challenge evaluation code
 - A growing library of **adaptors** used to turn frozen features into predictions in **vision tasks**.
 
-[![PyPI version](https://img.shields.io/pypi/v/unicorn-eval)](https://pypi.org/project/unicorn-eval/)
-
+[![PyPI version](https://img.shields.io/pypi/v/unicorn-eval?label=pypi&logo=pypi&color=3776AB)](https://pypi.org/project/unicorn-eval/)
+[![Docker Version](https://img.shields.io/docker/v/waticlems/unicorn_eval?sort=semver&label=docker&logo=docker&color=2496ED)](https://hub.docker.com/r/waticlems/unicorn_eval)
 
 ## 🚀 Challenge Overview
 
@@ -18,7 +18,6 @@ The UNICORN Challenge evaluates how well foundation models generalize across mul
 We provide a few built-in adaptors, but you're highly encouraged to propose your own!<br>
 We maintain the full list of adaptors available on the [Supported Adaptors](src/unicorn_eval/adaptors/README.md) page.
 
-
 ## 📦 Adaptors vs. Algorithms: What's the Difference?
 
 In **vision tasks**, submissions consist of:
@@ -29,13 +28,6 @@ You can experiment with different adaptors **on top of the same algorithm** with
 Want to try a different adaptor? Email us using the provided template (see below) — we’ll run it for you on existing features.
 
 In **language** and **vision-language** tasks, the algorithm outputs predictions directly, so no adaptor is needed.
-
-| **Modality**         | **What You Submit**                        | **Are Adaptors Used?** | **Submission Limit Applies To** |
-|-----------------------|--------------------------------------------|-------------------------|-----------------------------------|
-| 👁️ **Vision**            | Algorithm (feature extractor) + Adaptor   | ✅ Yes                  | Algorithm only                   |
-| 🧠 **Language**          | Algorithm (predictive)                    | ❌ No                   | Algorithm                        |
-| 🧠 **Vision-Language**   | Algorithm (predictive)                    | ❌ No                   | Algorithm                        |
-
 
 ## 🧩 Contributing a Custom Adaptor 
 
@@ -60,6 +52,7 @@ Have a better idea for how to turn features into predictions?
 ### Implementation requirements for contributing a new adaptor
 - Your adaptor method must be implemented as a standalone function, following the baseline template [`base.py`](src/unicorn_eval/adaptors/base.py)
 - It must complete within the allowed time limit of 1h
+- It must run on CPU
 - Submissions will be evaluated for correctness, efficiency, and compliance with the [challenge policies](https://unicorn.grand-challenge.org/requirements-and-guidelines/)
 - 🚨 Important: Pre-trained adaptors are not allowed! Be original — you can use the few-shots, for example, for fitting or training your adaptor, but don’t rely on pre-trained solutions
 
@@ -98,3 +91,11 @@ Adaptors:
 
 [Repeat for other submissions if needed]
 ```
+
+## Summary
+
+| **Modality**         | **What You Submit**                        | **Are Adaptors Used?** | **Submission Limit Applies To** |
+|-----------------------|--------------------------------------------|-------------------------|-----------------------------------|
+| 👁️ **Vision**            | Algorithm (feature extractor) + Adaptor   | ✅ Yes                  | Algorithm only                   |
+| 🧠 **Language**          | Algorithm (predictive)                    | ❌ No                   | Algorithm                        |
+| 🧠 **Vision-Language**   | Algorithm (predictive)                    | ❌ No                   | Algorithm                        |
