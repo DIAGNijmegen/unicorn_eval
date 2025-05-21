@@ -192,17 +192,19 @@ class LogisticRegression(CaseLevelTaskAdaptor):
         max_iterations (int): The maximum number of iterations for the solver to converge. Default is 1000.
         C (float): Inverse of regularization strength; smaller values specify stronger regularization. Default is 1.0.
         solver (str): The algorithm to use in the optimization problem. Default is "lbfgs".
+        return_probabilities (bool): Whether to return class probabilities instead of predictions.
     Methods:
         fit():
             Trains the logistic regression model using the few-shot features and labels.
         predict() -> np.ndarray:
             Predicts the labels for the test features using the trained model.
     """
-    def __init__(self, shot_features, shot_labels, test_features, max_iterations=1000, C=1.0, solver="lbfgs"):
+    def __init__(self, shot_features, shot_labels, test_features, max_iterations=1000, C=1.0, solver="lbfgs", return_probabilities=False):
         super().__init__(shot_features, shot_labels, test_features)
         self.max_iterations = max_iterations
         self.C = C
         self.solver = solver
+        self.return_probabilities = return_probabilities
 
     def fit(self):
         self.model = sklearn.linear_model.LogisticRegression(
@@ -214,6 +216,8 @@ class LogisticRegression(CaseLevelTaskAdaptor):
         self.model.fit(self.shot_features, self.shot_labels)
 
     def predict(self) -> np.ndarray:
+        if self.return_probabilities:
+            return self.model.predict_proba(self.test_features)
         return self.model.predict(self.test_features)
 
 
@@ -243,17 +247,19 @@ class LinearProbing(CaseLevelTaskAdaptor):
         learning_rate (float): The learning rate for the optimizer. Default is 0.001.
         patience (int): Number of epochs with no improvement after which training will be stopped. Default is 10.
         shot_extra_labels (np.ndarray): Optional additional labels for training, used in survival analysis.
+        return_probabilities (bool): Whether to return class probabilities instead of predictions.
     Methods:
         fit():
             Trains a linear model on the few-shot features and labels using the specified task type.
         predict() -> np.ndarray:
             Predicts the labels for the test features using the trained model.
     """
-    def __init__(self, shot_features, shot_labels, test_features, num_epochs=100, learning_rate=0.001, patience=10, shot_extra_labels=None):
+    def __init__(self, shot_features, shot_labels, test_features, num_epochs=100, learning_rate=0.001, patience=10, shot_extra_labels=None, return_probabilities=False):
         super().__init__(shot_features, shot_labels, test_features, shot_extra_labels)
         self.num_epochs = num_epochs
         self.learning_rate = learning_rate
         self.patience = patience
+        self.return_probabilities = return_probabilities
 
     def fit(self):
         input_dim = self.shot_features.shape[1]
@@ -299,8 +305,12 @@ class LinearProbing(CaseLevelTaskAdaptor):
         self.model.eval()
         with torch.no_grad():
             logits = self.model(self.test_features)
-            _, test_predictions = torch.max(logits, 1)
-        return test_predictions.cpu().numpy()
+            if self.return_probabilities:
+                probabilities = torch.softmax(logits, dim=1)
+                return probabilities.cpu().numpy()
+            else:
+                _, test_predictions = torch.max(logits, 1)
+                return test_predictions.cpu().numpy()
 
 
 class MLPClassifier(nn.Module):
@@ -336,19 +346,21 @@ class MultiLayerPerceptron(CaseLevelTaskAdaptor):
         learning_rate (float): Learning rate for the optimizer. Default is 0.001.
         patience (int): Number of epochs with no improvement after which training will be stopped. Default is 10.
         shot_extra_labels (np.ndarray): Optional additional labels for training, used in survival analysis.
+        return_probabilities (bool): Whether to return class probabilities instead of predictions.
     Methods:
         fit():
             Fits the model using the provided few-shot data.
         predict() -> np.ndarray:
             Generates predictions for the test data using the fitted model.
     """
-    def __init__(self, shot_features, shot_labels, test_features, hidden_dim=256, num_layers=3, num_epochs=100, learning_rate=0.001, patience=10, shot_extra_labels=None):
+    def __init__(self, shot_features, shot_labels, test_features, hidden_dim=256, num_layers=3, num_epochs=100, learning_rate=0.001, patience=10, shot_extra_labels=None, return_probabilities=False):
         super().__init__(shot_features, shot_labels, test_features, shot_extra_labels)
         self.hidden_dim = hidden_dim
         self.num_layers = num_layers
         self.num_epochs = num_epochs
         self.learning_rate = learning_rate
         self.patience = patience
+        self.return_probabilities = return_probabilities
 
     def fit(self):
         input_dim = self.shot_features.shape[1]
@@ -394,5 +406,10 @@ class MultiLayerPerceptron(CaseLevelTaskAdaptor):
         self.model.eval()
         with torch.no_grad():
             logits = self.model(self.test_features)
-            _, test_predictions = torch.max(logits, 1)
+            if self.return_probabilities:
+                probabilities = torch.softmax(logits, dim=1)
+                return probabilities.cpu().numpy()
+            else:
+                _, test_predictions = torch.max(logits, 1)
+                return test_predictions.cpu().numpy()
         return test_predictions.cpu().numpy()
