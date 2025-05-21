@@ -17,10 +17,10 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import DataLoader, TensorDataset
 import sklearn
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics.pairwise import cosine_similarity, euclidean_distances
+
 from unicorn_eval.adaptors.base import CaseLevelTaskAdaptor
 
 
@@ -171,12 +171,7 @@ class WeightedKNN(CaseLevelTaskAdaptor):
             class_probabilities = class_weights / (np.sum(class_weights) + 1e-8)
             test_probabilities.append(class_probabilities)
 
-            if self.task_type == "ordinal-classification":
-                expected_value = np.dot(class_probabilities, self.unique_classes)
-                predicted_class = int(np.round(expected_value))
-            else:
-                predicted_class = self.unique_classes[np.argmax(class_probabilities)]
-
+            predicted_class = self.unique_classes[np.argmax(class_probabilities)]
             test_predictions.append(predicted_class)
 
         test_predictions = np.array(test_predictions)
@@ -197,17 +192,19 @@ class LogisticRegression(CaseLevelTaskAdaptor):
         max_iterations (int): The maximum number of iterations for the solver to converge. Default is 1000.
         C (float): Inverse of regularization strength; smaller values specify stronger regularization. Default is 1.0.
         solver (str): The algorithm to use in the optimization problem. Default is "lbfgs".
+        return_probabilities (bool): Whether to return class probabilities instead of predictions.
     Methods:
         fit():
             Trains the logistic regression model using the few-shot features and labels.
         predict() -> np.ndarray:
             Predicts the labels for the test features using the trained model.
     """
-    def __init__(self, shot_features, shot_labels, test_features, max_iterations=1000, C=1.0, solver="lbfgs"):
+    def __init__(self, shot_features, shot_labels, test_features, max_iterations=1000, C=1.0, solver="lbfgs", return_probabilities=False):
         super().__init__(shot_features, shot_labels, test_features)
         self.max_iterations = max_iterations
         self.C = C
         self.solver = solver
+        self.return_probabilities = return_probabilities
 
     def fit(self):
         self.model = sklearn.linear_model.LogisticRegression(
@@ -219,162 +216,11 @@ class LogisticRegression(CaseLevelTaskAdaptor):
         self.model.fit(self.shot_features, self.shot_labels)
 
     def predict(self) -> np.ndarray:
+        if self.return_probabilities:
+            return self.model.predict_proba(self.test_features)
         return self.model.predict(self.test_features)
 
-    
-class LinearClassifierAdaptor(CaseLevelTaskAdaptor):
-    """
-    This is a slightly more advanced linear classifier: 3 linear layers, it stacks multiple
-    hidden layers with 2 ReLU activations between them, allowing the model to capture non‑linear relationships
-    in the feature space. Hyperparameters such as the number of layers, hidden dimension, learning rate,
-    batch size, and early stopping patience can be configured to fine‑tune performance on small data.
 
-    """
-
-    class LinearClassifier(nn.Module):
-        def __init__(
-            self,
-            input_dim: int,
-            hidden_dim: int,
-            output_dim: int,
-            num_layers: int = 3,
-        ) -> None:
-            super().__init__()
-            assert num_layers >= 2, "num_layers must be at least 2"
-
-            layers = [nn.Linear(input_dim, hidden_dim)]
-            for _ in range(num_layers - 2):
-                layers += [
-                    nn.ReLU(inplace=True),
-                    nn.Linear(hidden_dim, hidden_dim),
-                ]
-            layers += [nn.ReLU(inplace=True), nn.Linear(hidden_dim, output_dim)]
-            self.net = nn.Sequential(*layers)
-
-        def forward(self, x: torch.Tensor) -> torch.Tensor: 
-            return self.net(x)
-
-
-    def __init__(
-        self,
-        shot_features: np.ndarray,
-        shot_labels: np.ndarray,
-        test_features: np.ndarray,
-        *,
-        caseids: np.ndarray | list | None,
-        input_dim: int,
-        num_classes: int,
-        num_epochs: int = 100,
-        learning_rate: float = 1e-3,
-        batch_size: int = 32,
-        patience: int = 5,
-        hidden_dim: int = 256,
-        num_layers: int = 10,
-        device: str | None = None,
-    ) -> None:
-        super().__init__(shot_features, shot_labels, test_features)
-        self.caseids = np.asarray(caseids) if caseids is not None else None
-
-        self.input_dim = input_dim
-        self.num_classes = num_classes
-        self.num_epochs = num_epochs
-        self.learning_rate = learning_rate
-        self.batch_size = batch_size
-        self.patience = patience
-        self.hidden_dim = hidden_dim
-        self.num_layers = num_layers
-        self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
-
-        # instantiate the *inner* network
-        self.model = self.LinearClassifier(
-            input_dim, hidden_dim, num_classes, num_layers
-        ).to(self.device)
-
-        self.crit = (
-            nn.CrossEntropyLoss() if num_classes > 1 else nn.BCEWithLogitsLoss()
-        )
-        self.opt = optim.Adam(self.model.parameters(), lr=self.learning_rate)
-        self._is_fitted = False
-
-    def fit(self) -> None:
-        """Train the wrapped MLP on the few‑shot set."""
-        X = torch.tensor(self.shot_features, dtype=torch.float32)
-        y = torch.tensor(
-            self.shot_labels,
-            dtype=torch.long if self.num_classes > 1 else torch.float32,
-        )
-        dl = DataLoader(
-            TensorDataset(X, y), batch_size=self.batch_size, shuffle=True
-        )
-
-        best_loss, patience_ctr, best_state = float("inf"), 0, None
-
-        for _ in range(self.num_epochs):
-            self.model.train()
-            epoch_loss = 0.0
-            for xb, yb in dl:
-                xb, yb = xb.to(self.device), yb.to(self.device)
-                self.opt.zero_grad()
-                loss = self.crit(self.model(xb), yb)
-                loss.backward()
-                self.opt.step()
-                epoch_loss += loss.item()
-            epoch_loss /= len(dl)
-
-            if epoch_loss < best_loss:
-                best_loss, patience_ctr = epoch_loss, 0
-                best_state = self.model.state_dict()
-            else:
-                patience_ctr += 1
-                if patience_ctr >= self.patience:
-                    break
-
-        # Restore the best weights
-        self.model.load_state_dict(best_state)
-        self._is_fitted = True
-
-    def predict(self) -> np.ndarray:
-        """
-        Return the *malignant* probability (class 1) for each test case.
-
-        * If ``caseids`` is ``None`` → a plain 1‑D ``np.ndarray`` of shape
-          ``(N_test,)``.
-        * Otherwise → a structured array with fields
-            - ``caseid``      (dtype matches the supplied IDs)
-            - ``prediction``  (scalar malignancy risk)
-        """
-        if not self._is_fitted:
-            raise RuntimeError("Call `.fit()` before `.predict()`.")
-
-        Xt = torch.tensor(
-            self.test_features, dtype=torch.float32, device=self.device
-        )
-
-        self.model.eval()
-        with torch.no_grad():
-            logits = self.model(Xt).cpu()
-
-        # --- logits → probability of malignancy ------------------------
-        if self.num_classes > 1:                     # softmax case (C = 2)
-            probs_np = logits.softmax(-1)[:, 1].numpy()   # keep class‑1 col
-        else:                                        # single‑logit sigmoid
-            probs_np = logits.sigmoid().squeeze(-1).numpy()
-        # ----------------------------------------------------------------
-
-        # No case ids → just return the 1‑D array
-        if self.caseids is None:
-            return probs_np
-
-        # Build a structured array: prediction is now *scalar*, so pred_shape=()
-        out = np.zeros(
-            len(probs_np),
-            dtype=[("caseid", self.caseids.dtype),
-                   ("prediction", probs_np.dtype)],
-        )
-        out["caseid"] = self.caseids
-        out["prediction"] = probs_np
-        return out
-    
 class LinearClassifier(nn.Module):
     """
     A simple linear classifier.
@@ -387,6 +233,7 @@ class LinearClassifier(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.fc(x)
 
+
 class LinearProbing(CaseLevelTaskAdaptor):
     """
     A class for performing linear probing on features for classification tasks.
@@ -398,17 +245,21 @@ class LinearProbing(CaseLevelTaskAdaptor):
         test_features (np.ndarray): Test feature matrix of shape (n_test_samples, n_features).
         num_epochs (int): The number of epochs for training the linear model. Default is 100.
         learning_rate (float): The learning rate for the optimizer. Default is 0.001.
+        patience (int): Number of epochs with no improvement after which training will be stopped. Default is 10.
         shot_extra_labels (np.ndarray): Optional additional labels for training, used in survival analysis.
+        return_probabilities (bool): Whether to return class probabilities instead of predictions.
     Methods:
         fit():
             Trains a linear model on the few-shot features and labels using the specified task type.
         predict() -> np.ndarray:
             Predicts the labels for the test features using the trained model.
     """
-    def __init__(self, shot_features, shot_labels, test_features, num_epochs=100, learning_rate=0.001, shot_extra_labels=None):
+    def __init__(self, shot_features, shot_labels, test_features, num_epochs=100, learning_rate=0.001, patience=10, shot_extra_labels=None, return_probabilities=False):
         super().__init__(shot_features, shot_labels, test_features, shot_extra_labels)
         self.num_epochs = num_epochs
         self.learning_rate = learning_rate
+        self.patience = patience
+        self.return_probabilities = return_probabilities
 
     def fit(self):
         input_dim = self.shot_features.shape[1]
@@ -427,6 +278,9 @@ class LinearProbing(CaseLevelTaskAdaptor):
         print(f"🚀 Starting training on {self.device} with {total_params:,} trainable parameters.")
         print(self.model)
 
+        best_loss = float("inf")
+        best_epoch = 0
+        best_state = self.model.state_dict()
         for epoch in tqdm.tqdm(range(self.num_epochs), desc="Training", unit="epoch", leave=True):
             self.model.train()
             self.optimizer.zero_grad()
@@ -434,54 +288,79 @@ class LinearProbing(CaseLevelTaskAdaptor):
             loss = self.criterion(logits, self.shot_labels)
             loss.backward()
             self.optimizer.step()
+            epoch_loss = loss.item()
+            if epoch_loss < best_loss:
+                best_loss = epoch_loss
+                best_epoch = epoch
+                best_state = self.model.state_dict()
+            elif epoch - best_epoch > self.patience:
+                tqdm.tqdm.write(f"Early stopping at epoch {epoch+1}")
+                break
             tqdm.tqdm.write(f"Epoch {epoch+1}/{self.num_epochs} - Loss: {loss.item():.4f}")
+
+        self.model.load_state_dict(best_state)
+        tqdm.tqdm.write(f"Restored best model from epoch {best_epoch+1} with loss {best_loss:.4f}")
 
     def predict(self) -> np.ndarray:
         self.model.eval()
         with torch.no_grad():
             logits = self.model(self.test_features)
-            _, test_predictions = torch.max(logits, 1)
-        return test_predictions.cpu().numpy()
+            if self.return_probabilities:
+                probabilities = torch.softmax(logits, dim=1)
+                return probabilities.cpu().numpy()
+            else:
+                _, test_predictions = torch.max(logits, 1)
+                return test_predictions.cpu().numpy()
 
 
-class TwoLayerPerceptronClassifier(nn.Module):
+class MLPClassifier(nn.Module):
     """
-    A simple MLP classifier with one hidden layer.
+    A simple MLP classifier with a tunable number of hidden layers.
     """
 
-    def __init__(self, input_dim: int, hidden_dim: int, output_dim: int):
+    def __init__(self, input_dim: int, hidden_dim: int, output_dim: int, num_layers: int):
         super().__init__()
-        self.fc1 = nn.Linear(input_dim, hidden_dim)
-        self.relu = nn.ReLU()
-        self.fc2 = nn.Linear(hidden_dim, output_dim)
+        layers = []
+        layers.append(nn.Linear(input_dim, hidden_dim))
+        layers.append(nn.ReLU())
+        for _ in range(num_layers - 2):
+            layers.append(nn.Linear(hidden_dim, hidden_dim))
+            layers.append(nn.ReLU())
+        layers.append(nn.Linear(hidden_dim, output_dim))
+        self.mlp = nn.Sequential(*layers)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.relu(self.fc1(x))
-        return self.fc2(x)
+        return self.mlp(x)
 
 
-class TwoLayerPerceptron(CaseLevelTaskAdaptor):
+class MultiLayerPerceptron(CaseLevelTaskAdaptor):
     """
-    A PyTorch-based 2-Layer Perceptron adaptor for classification tasks.
+    A PyTorch-based MLP adaptor for classification tasks.
     Attributes:
         shot_features (np.ndarray): Few-shot feature matrix of shape (n_shots, n_features).
         shot_labels (np.ndarray): Few-shot labels.
         test_features (np.ndarray): Test feature matrix of shape (n_test_samples, n_features).
         hidden_dim (int): Number of hidden units in the model. Default is 256.
+        num_layers (int): Number of hidden layers in the MLP. Default is 3.
         num_epochs (int): Number of training epochs. Default is 100.
         learning_rate (float): Learning rate for the optimizer. Default is 0.001.
+        patience (int): Number of epochs with no improvement after which training will be stopped. Default is 10.
         shot_extra_labels (np.ndarray): Optional additional labels for training, used in survival analysis.
+        return_probabilities (bool): Whether to return class probabilities instead of predictions.
     Methods:
         fit():
             Fits the model using the provided few-shot data.
         predict() -> np.ndarray:
             Generates predictions for the test data using the fitted model.
     """
-    def __init__(self, shot_features, shot_labels, test_features, hidden_dim=256, num_epochs=100, learning_rate=0.001, shot_extra_labels=None):
+    def __init__(self, shot_features, shot_labels, test_features, hidden_dim=256, num_layers=3, num_epochs=100, learning_rate=0.001, patience=10, shot_extra_labels=None, return_probabilities=False):
         super().__init__(shot_features, shot_labels, test_features, shot_extra_labels)
         self.hidden_dim = hidden_dim
+        self.num_layers = num_layers
         self.num_epochs = num_epochs
         self.learning_rate = learning_rate
+        self.patience = patience
+        self.return_probabilities = return_probabilities
 
     def fit(self):
         input_dim = self.shot_features.shape[1]
@@ -493,13 +372,16 @@ class TwoLayerPerceptron(CaseLevelTaskAdaptor):
         self.shot_labels = torch.tensor(self.shot_labels, dtype=torch.long).to(self.device)
         self.test_features = torch.tensor(self.test_features, dtype=torch.float32).to(self.device)
 
-        self.model = TwoLayerPerceptronClassifier(input_dim, self.hidden_dim, self.num_classes).to(self.device)
+        self.model = MLPClassifier(input_dim, self.hidden_dim, self.num_classes, self.num_layers).to(self.device)
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
 
         total_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
         print(f"🚀 Starting training on {self.device} with {total_params:,} trainable parameters.")
         print(self.model)
 
+        best_loss = float("inf")
+        best_epoch = 0
+        best_state = self.model.state_dict()
         for epoch in tqdm.tqdm(range(self.num_epochs), desc="Training", unit="epoch", leave=True):
             self.model.train()
             self.optimizer.zero_grad()
@@ -507,11 +389,27 @@ class TwoLayerPerceptron(CaseLevelTaskAdaptor):
             loss = self.criterion(logits, self.shot_labels)
             loss.backward()
             self.optimizer.step()
-            tqdm.tqdm.write(f"Epoch {epoch+1}/{self.num_epochs} - Loss: {loss.item():.4f}")
+            epoch_loss = loss.item()
+            if epoch_loss < best_loss:
+                best_loss = epoch_loss
+                best_epoch = epoch
+                best_state = self.model.state_dict()
+            elif epoch - best_epoch > self.patience:
+                tqdm.tqdm.write(f"Early stopping at epoch {epoch+1}")
+                break
+            tqdm.tqdm.write(f"Epoch {epoch+1}/{self.num_epochs} - Loss: {epoch_loss:.4f}")
+
+        self.model.load_state_dict(best_state)
+        tqdm.tqdm.write(f"Restored best model from epoch {best_epoch+1} with loss {best_loss:.4f}")
 
     def predict(self) -> np.ndarray:
         self.model.eval()
         with torch.no_grad():
             logits = self.model(self.test_features)
-            _, test_predictions = torch.max(logits, 1)
+            if self.return_probabilities:
+                probabilities = torch.softmax(logits, dim=1)
+                return probabilities.cpu().numpy()
+            else:
+                _, test_predictions = torch.max(logits, 1)
+                return test_predictions.cpu().numpy()
         return test_predictions.cpu().numpy()

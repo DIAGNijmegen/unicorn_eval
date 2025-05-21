@@ -17,14 +17,13 @@ from unicorn_eval.adaptors.classification import (
     WeightedKNN,
     LogisticRegression,
     LinearProbing,
-    TwoLayerPerceptron,
-    LinearClassifierAdaptor
+    MultiLayerPerceptron,
 )
 from unicorn_eval.adaptors.regression import (
     KNNRegressor,
     WeightedKNNRegressor,
     LinearProbingRegressor,
-    TwoLayerPerceptronRegressor,
+    MultiLayerPerceptronRegressor,
 )
 from unicorn_eval.adaptors.detection import DensityMap, MLPRegressor
 from unicorn_eval.adaptors.segmentation import SegmentationUpsampling
@@ -34,13 +33,12 @@ __all__ = [
     "WeightedKNN",
     "LogisticRegression",
     "LinearProbing",
-    "TwoLayerPerceptron",
+    "MultiLayerPerceptron",
     "KNNRegressor",
     "WeightedKNNRegressor",
     "LinearProbingRegressor",
-    "TwoLayerPerceptronRegressor",
+    "MultiLayerPerceptronRegressor",
     "DensityMap",
     "SegmentationUpsampling",
     "MLPRegressor",
-    "LinearClassifierAdaptor"
 ]

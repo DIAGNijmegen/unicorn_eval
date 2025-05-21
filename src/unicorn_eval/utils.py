@@ -17,13 +17,13 @@ from functools import partial
 
 import numpy as np
 from sklearn.metrics import cohen_kappa_score
-from sksurv.metrics import concordance_index_censored
+from sksurv.metrics import concordance_index_censored, roc_auc_score
 
 from unicorn_eval.adaptors import (
     KNN,
     KNNRegressor,
-    TwoLayerPerceptron,
-    TwoLayerPerceptronRegressor,
+    MultiLayerPerceptron,
+    MultiLayerPerceptronRegressor,
     DensityMap,
     LinearProbing,
     LinearProbingRegressor,
@@ -32,13 +32,12 @@ from unicorn_eval.adaptors import (
     WeightedKNN,
     WeightedKNNRegressor,
     MLPRegressor,
-    LinearClassifierAdaptor
 )
 from unicorn_eval.metrics.dice import compute_dice_score
 from unicorn_eval.metrics.f1_score import compute_f1
 from unicorn_eval.metrics.vision_language import compute_average_language_metric
 from unicorn_eval.metrics.sensitivity import compute_cpm
-from unicorn_eval.metrics.auc import compute_roc_auc
+
 
 METRIC_DICT = {
     "Task01_classifying_he_prostate_biopsies_into_isup_scores": {
@@ -48,7 +47,7 @@ METRIC_DICT = {
     },
     "Task02_classifying_lung_nodule_malignancy_in_ct": {
         "name": "auc",
-        "fn": compute_roc_auc,
+        "fn": roc_auc_score,
         "range": (0, 1),
     },
     "Task03_predicting_the_time_to_biochemical_recurrence_in_he_prostatectomies": {
@@ -108,7 +107,8 @@ def adapt_features(
     test_image_directions=None,
     train_image_spacing=None,
     train_image_origins=None,
-    train_image_directions=None
+    train_image_directions=None,
+    return_probabilities=False,
 ):
     num_shots = len(shot_features)
     if "-nn" in adaptor_name:
@@ -120,7 +120,8 @@ def adapt_features(
                     shot_features=shot_features,
                     shot_labels=shot_labels,
                     test_features=test_features,
-                    k=k
+                    k=k,
+                    return_probabilities=return_probabilities,
                 )
             elif task_type == "regression":
                 adaptor = WeightedKNNRegressor(
@@ -153,6 +154,7 @@ def adapt_features(
             max_iterations=1000,
             C=1.0,
             solver="lbfgs",
+            return_probabilities=return_probabilities,
         )
     elif "linear-probing" in adaptor_name:
         if task_type == "classification":
@@ -163,6 +165,7 @@ def adapt_features(
                 test_features=test_features,
                 num_epochs=100,
                 learning_rate=0.001,
+                return_probabilities=return_probabilities,
             )
         elif task_type == "regression":
             survival = False
@@ -177,25 +180,9 @@ def adapt_features(
                 num_epochs=100,
                 learning_rate=0.001,
             )
-
-    elif adaptor_name == "linear-classifier":
-        num_classes = len(np.unique(shot_labels))
-        adaptor = LinearClassifierAdaptor(
-            shot_features=shot_features,
-            shot_labels=shot_labels,
-            test_features=test_features,
-            caseids=test_names,
-            input_dim=shot_features.shape[1],
-            num_classes=num_classes,
-            num_epochs=100,
-            learning_rate=1e-3,
-            batch_size=32,
-            patience=5,
-        )
-
     elif "mlp" in adaptor_name:
         if task_type == "classification":
-            adaptor = TwoLayerPerceptron(
+            adaptor = MultiLayerPerceptron(
                 shot_features=shot_features,
                 shot_labels=shot_labels,
                 shot_extra_labels=shot_extra_labels,
@@ -203,12 +190,13 @@ def adapt_features(
                 hidden_dim=256,
                 num_epochs=100,
                 learning_rate=0.001,
+                return_probabilities=return_probabilities,
             )
         elif task_type == "regression":
             survival = False
             if "survival" in adaptor_name:
                 survival = True
-            adaptor = TwoLayerPerceptronRegressor(
+            adaptor = MultiLayerPerceptronRegressor(
                 shot_features=shot_features,
                 shot_labels=shot_labels,
                 shot_extra_labels=shot_extra_labels,

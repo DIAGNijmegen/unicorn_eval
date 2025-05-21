@@ -47,6 +47,16 @@ ADAPTOR_SLUGS_DICT = {
     "Task09_segmenting_rois_in_breast_cancer_wsis": "adaptor-pathology-segmentation",
 }
 
+REQUIRES_PROBABILITIES_DICT = {
+    "Task01_classifying_he_prostate_biopsies_into_isup_scores": False,
+    "Task02_classifying_lung_nodule_malignancy_in_ct": True,
+    "Task03_predicting_the_time_to_biochemical_recurrence_in_he_prostatectomies": False,
+    "Task04_predicting_slide_level_tumor_proportion_score_in_ihc_stained_wsi": False,
+    "Task05_detecting_signet_ring_cells_in_he_stained_wsi_of_gastric_cancer": False,
+    "Task08_detecting_mitotic_figures_in_breast_cancer_wsis": False,
+    "Task09_segmenting_rois_in_breast_cancer_wsis": False,
+}
+
 INPUT_SLUGS_DICT = {
     "Task01_classifying_he_prostate_biopsies_into_isup_scores": [
         "prostate-tissue-biopsy-whole-slide-image"
@@ -386,6 +396,7 @@ def main():
         if modality == "vision":
 
             adaptor_name = adaptors[task_name]
+            return_probabilities = REQUIRES_PROBABILITIES_DICT[task_name]
 
             patch_size = results["patch_size"]
 
@@ -442,6 +453,7 @@ def main():
                 train_image_spacing=shot_image_spacings,
                 train_image_origins=shot_image_origins,
                 train_image_directions=shot_image_directions,
+                return_probabilities=return_probabilities,
             )
 
         elif modality == "vision-language":
