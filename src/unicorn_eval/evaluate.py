@@ -176,7 +176,7 @@ def process(job):
 
         neural_representations = load_json_file(
             location=location_neural_representation,
-        )[0]
+        )
 
         features = []
         if slug_embedding == "image-neural-representation":
