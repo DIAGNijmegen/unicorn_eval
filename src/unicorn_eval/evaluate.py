@@ -150,6 +150,11 @@ def process(job):
     assert image_name is not None, "No image found in predictions.json"
     case_name = Path(image_name).stem
 
+    # remove suffixes '_adc', '_t2w', and '_hbv' from the case name if present
+    for suffix in ["_adc", "_t2w", "_hbv"]:
+        if case_name.endswith(suffix):
+            case_name = case_name[: -len(suffix)]
+
     case_info = mapping[mapping.case_id == case_name]
     task_name = case_info.task_name.values[0]
     modality = case_info.modality.values[0]
@@ -169,12 +174,17 @@ def process(job):
 
         # read the results
 
-        result_algorithm = load_json_file(
+        neural_representations = load_json_file(
             location=location_neural_representation,
-        )[0]
+        )
 
+        features = []
         if slug_embedding == "image-neural-representation":
-            embeddings = np.array(result_algorithm["features"]).astype(np.float32)
+            for neural_representation in neural_representations:
+                feature = neural_representation["features"]
+                feature = np.array(feature).astype(np.float32)
+                features.append(feature)
+            embeddings = np.concatenate(features)
             coordinates, spacing, patch_size, image_size, image_spacing = (
                 None,
                 None,
@@ -183,9 +193,23 @@ def process(job):
                 None,
             )
         elif slug_embedding == "patch-neural-representation":
-            embeddings, coordinates, spacing, patch_size, image_size, image_spacing = (
-                extract_data(result_algorithm)
-            )
+            # TODO: better handle the case when there are multiple encoded inputs for a case
+            # right now we concatenate the features
+            # and use the first coordinates, spacing, patch_size, image_size, and image_spacing
+            first = True
+            for neural_representation in neural_representations:
+                feature, curr_coordinates, curr_spacing, curr_patch_size, curr_image_size, curr_image_spacing = (
+                    extract_data(neural_representation)
+                )
+                features.append(feature)
+                if first:
+                    coordinates = curr_coordinates
+                    spacing = curr_spacing
+                    patch_size = curr_patch_size
+                    image_size = curr_image_size
+                    image_spacing = curr_image_spacing
+                    first = False
+            embeddings = np.concatenate(features)
 
     elif modality == "vision-language":
 
