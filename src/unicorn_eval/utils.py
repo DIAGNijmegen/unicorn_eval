@@ -321,16 +321,17 @@ def extract_embeddings_and_labels(processed_results):
             tasks[task_name] = {
                 "task_type": result["task_type"],
                 "modality": result["modality"],
-                "spacing": result["spacing"],
-                "patch_size": result["patch_size"],
+                "titles": result["titles"], # list of image titles
+                "spacing": result["spacing"], # list of spacings
+                "patch_size": result["patch_size"], # list of patch sizes
                 "prediction": [],
-                "shot_embeddings": [],
-                "shot_coordinates": [],
+                "shot_embeddings": {},
+                "shot_coordinates": {},
                 "shot_labels": [],
                 "shot_extra_labels": [],
                 "shot_ids": [],
-                "case_embeddings": [],
-                "cases_coordinates": [],
+                "case_embeddings": {},
+                "cases_coordinates": {},
                 "case_labels": [],
                 "case_extra_labels": [],
                 "case_ids": [],
@@ -339,18 +340,18 @@ def extract_embeddings_and_labels(processed_results):
             }
 
         if result["split"] == "shot":
-            tasks[task_name]["shot_embeddings"].append(result["embeddings"])
+            tasks[task_name]["shot_embeddings"].update({title: embedding for title, embedding in zip(result["titles"], result["embeddings"])})
             tasks[task_name]["shot_labels"].append(result["label"])
             tasks[task_name]["shot_extra_labels"].append(result["extra_labels"])
             tasks[task_name]["shot_ids"].append(result["case_id"])
-            tasks[task_name]["shot_coordinates"].append(result["coordinates"])
+            tasks[task_name]["shot_coordinates"].update({title: coordinate for title, coordinate in zip(result["titles"], result["coordinates"])})
         elif result["split"] == "case":
-            tasks[task_name]["case_embeddings"].append(result["embeddings"])
+            tasks[task_name]["case_embeddings"].update({title: embedding for title, embedding in zip(result["titles"], result["embeddings"])})
             tasks[task_name]["case_labels"].append(result["label"])
             tasks[task_name]["case_extra_labels"].append(result["extra_labels"])
             tasks[task_name]["prediction"].append(result["prediction"])
             tasks[task_name]["case_ids"].append(result["case_id"])
-            tasks[task_name]["cases_coordinates"].append(result["coordinates"])
+            tasks[task_name]["cases_coordinates"].update({title: coordinate for title, coordinate in zip(result["titles"], result["coordinates"])})
             case_id = result["case_id"]
             image_size = result["image_size"]
             tasks[task_name]["cases_image_spacings"][case_id] = result["image_spacing"]

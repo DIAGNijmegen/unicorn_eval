@@ -150,6 +150,11 @@ def process(job):
     assert image_name is not None, "No image found in predictions.json"
     case_name = Path(image_name).stem
 
+    # remove suffixes '_adc', '_t2w', and '_hbv' from the case name if present
+    for suffix in ["_adc", "_t2w", "_hbv"]:
+        if case_name.endswith(suffix):
+            case_name = case_name[: -len(suffix)]
+
     case_info = mapping[mapping.case_id == case_name]
     task_name = case_info.task_name.values[0]
     modality = case_info.modality.values[0]
@@ -169,31 +174,50 @@ def process(job):
 
         # read the results
 
-        result_algorithm = load_json_file(
+        neural_representations = load_json_file(
             location=location_neural_representation,
         )[0]
 
+        titles = []
+        embeddings = []
+        coordinates = []
+        spacings, patch_sizes, image_sizes, image_spacings = [], [], [], []
+
         if slug_embedding == "image-neural-representation":
-            embeddings = np.array(result_algorithm["features"]).astype(np.float32)
-            coordinates, spacing, patch_size, image_size, image_spacing = (
-                None,
-                None,
-                None,
-                None,
-                None,
-            )
+            for neural_representation in neural_representations:
+                title = neural_representation["title"]
+                titles.append(title)
+                features = neural_representation["features"]
+                embedding = np.array(features).astype(np.float32)
+                embeddings.append(embedding)
+                coordinates.append(None)
+                spacings.append(None)
+                patch_sizes.append(None)
+                image_sizes.append(None)
+                image_spacings.append(None)
+
         elif slug_embedding == "patch-neural-representation":
-            embeddings, coordinates, spacing, patch_size, image_size, image_spacing = (
-                extract_data(result_algorithm)
-            )
+            for neural_representation in neural_representations:
+                title = neural_representation["title"]
+                titles.append(title)
+                embedding, coordinate, spacing, patch_size, image_size, image_spacing = (
+                    extract_data(neural_representation)
+                )
+                embeddings.append(embedding)
+                coordinates.append(coordinate)
+                spacings.append(spacing)
+                patch_sizes.append(patch_size)
+                image_sizes.append(image_size)
+                image_spacings.append(image_spacing)
 
     elif modality == "vision-language":
 
         model_output_slug = MODEL_OUTPUT_SLUG_DICT[task_name]
 
-        embeddings = None
-        coordinates = None
-        spacing, patch_size, image_size, image_spacing = None, None, None, None
+        titles = []
+        embeddings = []
+        coordinates = []
+        spacings, patch_sizes, image_sizes, image_spacings = [], [], [], []
 
         # find the location of the results
         location_prediction = get_file_location(
@@ -235,15 +259,16 @@ def process(job):
         extra_labels = np.array([tuple(extra_labels.values())], dtype=dtype)
 
     case_info_dict = case_info.to_dict(orient="records")[0]
-    case_info_dict["embeddings"] = embeddings
-    case_info_dict["coordinates"] = coordinates
-    case_info_dict["spacing"] = spacing
-    case_info_dict["image_spacing"] = image_spacing
-    case_info_dict["image_size"] = image_size
-    case_info_dict["patch_size"] = patch_size
-    case_info_dict["prediction"] = prediction
-    case_info_dict["label"] = label
-    case_info_dict["extra_labels"] = extra_labels
+    case_info_dict["titles"] = titles # list of image titles
+    case_info_dict["embeddings"] = embeddings # list of image embeddings
+    case_info_dict["coordinates"] = coordinates # list of image coordinates
+    case_info_dict["spacing"] = spacings # list of spacings
+    case_info_dict["image_spacing"] = image_spacings # list of image spacings
+    case_info_dict["image_size"] = image_sizes # list of image sizes
+    case_info_dict["patch_size"] = patch_sizes # list of patch sizes
+    case_info_dict["prediction"] = prediction # single prediction
+    case_info_dict["label"] = label # single label
+    case_info_dict["extra_labels"] = extra_labels # array of extra labels
 
     return case_info_dict
 
