@@ -29,12 +29,16 @@ from unicorn_eval.adaptors import (
     LinearProbingRegressor,
     LogisticRegression,
     SegmentationUpsampling,
+    SegmentationUpsampling3D,
     WeightedKNN,
     WeightedKNNRegressor,
 )
 from unicorn_eval.metrics.dice import compute_dice_score
+from unicorn_eval.metrics.uls import compute_uls_score
+from unicorn_eval.metrics.spider import compute_spider_score
 from unicorn_eval.metrics.f1_score import compute_f1
 from unicorn_eval.metrics.vision_language import compute_average_language_metric
+from unicorn_eval.metrics.picai_score import compute_picai_score
 
 METRIC_DICT = {
     "Task01_classifying_he_prostate_biopsies_into_isup_scores": {
@@ -57,6 +61,11 @@ METRIC_DICT = {
         "fn": compute_f1,
         "range": (0, 1),
     },
+    "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams": {
+        "name": "picai", 
+        "fn": compute_picai_score,
+        "range": (0,1),
+    },
     "Task08_detecting_mitotic_figures_in_breast_cancer_wsis": {
         "name": "f1",
         "fn": compute_f1,
@@ -66,6 +75,16 @@ METRIC_DICT = {
         "name": "dice",
         "fn": compute_dice_score,
         "range": (0, 1),
+    },
+    "Task10_segmenting_lesions_within_vois_in_ct": {
+        "name": "uls_score",
+        "fn": compute_uls_score,
+        "range": (0, 1),
+    },
+    "Task11_segmenting_three_anatomical_structures_in_lumbar_spine_mri": {
+        "name": "spider_score", 
+        "fn": compute_spider_score, 
+        "range": (0,1),
     },
     "Task20_generating_caption_from_wsi": {
         "name": "average_language_metric",
@@ -88,6 +107,12 @@ def adapt_features(
     test_names=None,
     patch_size=224,
     test_image_sizes=None,
+    test_image_spacing=None,
+    test_image_origins=None,
+    test_image_directions=None,
+    shots_image_spacing=None,
+    shots_image_origins=None,
+    shots_image_directions=None,
     shot_extra_labels=None,
 ):
     num_shots = len(shot_features)
@@ -206,6 +231,43 @@ def adapt_features(
             test_image_sizes=test_image_sizes,
             patch_size=patch_size[0],
         )
+    elif adaptor_name == "segmentation-upsampling-3d":
+        adaptor = SegmentationUpsampling3D(
+            train_feats= shot_features,
+            train_coords= shot_coordinates,
+            train_cases= shot_names,
+            train_labels= shot_labels,
+            test_feats = test_features,
+            test_coords= test_coordinates,
+            test_cases= test_names, # try to remove this input
+            test_image_sizes= test_image_sizes,
+            test_image_origins= test_image_origins, 
+            test_image_spacings= test_image_spacing,
+            test_image_directions= test_image_directions,
+            patch_size= patch_size,
+            train_image_spacing= shots_image_spacing,
+            train_image_origins= shots_image_origins,
+            train_image_directions= shots_image_directions,
+        )
+    elif adaptor_name == "detection-by-segmentation-upsampling-3d":
+        adaptor = SegmentationUpsampling3D(
+            train_feats= shot_features,
+            train_coords= shot_coordinates,
+            train_cases= shot_names,
+            train_labels= shot_labels,
+            test_feats = test_features,
+            test_coords= test_coordinates,
+            test_cases= test_names, # try to remove this input
+            test_image_sizes= test_image_sizes,
+            test_image_origins= test_image_origins, 
+            test_image_spacings= test_image_spacing,
+            test_image_directions= test_image_directions,
+            patch_size= patch_size,
+            train_image_spacing= shots_image_spacing,
+            train_image_origins= shots_image_origins,
+            train_image_directions= shots_image_directions,
+            return_binary= False,
+        )
     else:
         raise ValueError(f"Unknown adaptor: {adaptor_name}")
     adaptor.fit()
@@ -223,7 +285,7 @@ def convert_numpy_types(obj):
         return obj
 
 
-def evaluate_predictions(task_name, case_ids, test_predictions, test_labels, test_extra_labels=None):
+def evaluate_predictions(task_name, case_ids, test_predictions, test_labels, test_extra_labels=None, test_image_spacing=None):
 
     metrics = {
         "predictions": [],  # list to store individual case results
@@ -261,11 +323,20 @@ def evaluate_predictions(task_name, case_ids, test_predictions, test_labels, tes
     elif task_name == "Task05_detecting_signet_ring_cells_in_he_stained_wsi_of_gastric_cancer":
         metric_value = metric_fn(test_labels, test_predictions, 8)
         metric_dict[metric_name] = metric_value
+    elif task_name == "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams":
+        metric_value = metric_fn(test_labels, test_predictions)
+        metric_dict[metric_name] = metric_value
     elif task_name == "Task08_detecting_mitotic_figures_in_breast_cancer_wsis":
         metric_value = metric_fn(test_labels, test_predictions, 16)
         metric_dict[metric_name] = metric_value
     elif task_name == "Task09_segmenting_rois_in_breast_cancer_wsis":
         metric_value = metric_fn(test_labels, test_predictions)
+        metric_dict[metric_name] = metric_value
+    elif task_name == "Task10_segmenting_lesions_within_vois_in_ct":
+        metric_value = metric_fn(test_labels, test_predictions)
+        metric_dict[metric_name] = metric_value
+    elif task_name == "Task11_segmenting_three_anatomical_structures_in_lumbar_spine_mri":
+        metric_value = metric_fn(test_labels, test_predictions, test_image_spacing, case_ids)
         metric_dict[metric_name] = metric_value
     elif task_name == "Task20_generating_caption_from_wsi":
         language_metric_dict = metric_fn(test_labels, test_predictions) # a dictionnary
@@ -326,6 +397,9 @@ def extract_embeddings_and_labels(processed_results):
                 "prediction": [],
                 "shot_embeddings": [],
                 "shot_coordinates": [],
+                "shot_image_spacings": {},
+                "shot_image_origins": {},
+                "shot_image_directions": {},
                 "shot_labels": [],
                 "shot_extra_labels": [],
                 "shot_ids": [],
@@ -336,6 +410,8 @@ def extract_embeddings_and_labels(processed_results):
                 "case_ids": [],
                 "cases_image_sizes": {},
                 "cases_image_spacings": {},
+                "cases_image_origins": {},
+                "cases_image_directions": {},
             }
 
         if result["split"] == "shot":
@@ -344,6 +420,10 @@ def extract_embeddings_and_labels(processed_results):
             tasks[task_name]["shot_extra_labels"].append(result["extra_labels"])
             tasks[task_name]["shot_ids"].append(result["case_id"])
             tasks[task_name]["shot_coordinates"].append(result["coordinates"])
+            shot_id = result["case_id"]
+            tasks[task_name]["shot_image_spacings"][shot_id] = result["image_spacing"]
+            tasks[task_name]["shot_image_origins"][shot_id] = result["image_origin"]
+            tasks[task_name]["shot_image_directions"][shot_id] =  result["image_direction"] 
         elif result["split"] == "case":
             tasks[task_name]["case_embeddings"].append(result["embeddings"])
             tasks[task_name]["case_labels"].append(result["label"])
@@ -355,13 +435,16 @@ def extract_embeddings_and_labels(processed_results):
             image_size = result["image_size"]
             tasks[task_name]["cases_image_spacings"][case_id] = result["image_spacing"]
             tasks[task_name]["cases_image_sizes"][case_id] = image_size
+            tasks[task_name]["cases_image_origins"][case_id] = result["image_origin"]
+            tasks[task_name]["cases_image_directions"][case_id] =  result["image_direction"] 
 
     for task_name, task_data in tasks.items():
         task_type = task_data["task_type"]
         if task_type in ["classification", "regression"]:
             tasks[task_name] = process_image_representation(task_data)
         elif task_type == "detection":
-            tasks[task_name] = process_detection(task_data)
+            if not task_name == "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams": 
+                tasks[task_name] = process_detection(task_data)
 
     return tasks
 
@@ -372,6 +455,8 @@ def extract_data(patch_neural_representation):
     patch_size = patch_neural_representation["meta"]["patch-size"]
     image_size = patch_neural_representation["meta"]["image-size"]
     image_spacing = patch_neural_representation["meta"]["image-spacing"]
+    image_origin = patch_neural_representation["meta"]["image-origin"]
+    image_direction = patch_neural_representation["meta"]["image-direction"]
 
     # Extract patches
     patches = patch_neural_representation["patches"]
@@ -380,7 +465,7 @@ def extract_data(patch_neural_representation):
     features = np.array([p["features"] for p in patches]).astype(np.float32)
     coordinates = np.array([p["coordinates"] for p in patches])
 
-    return features, coordinates, spacing, patch_size, image_size, image_spacing
+    return features, coordinates, spacing, patch_size, image_size, image_spacing, image_origin, image_direction
 
 
 def normalize_metric(task_name, metric_value):
