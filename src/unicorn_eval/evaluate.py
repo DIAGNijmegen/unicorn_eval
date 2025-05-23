@@ -21,12 +21,9 @@ from picai_prep.preprocessing import Sample, PreprocessingSettings
 import numpy as np
 import openslide
 import pandas as pd
-<<<<<<< Updated upstream
 from dragon_eval import DragonEval
 from dragon_eval.evaluation import REGRESSION_EPSILON, TASK_TYPE, EvalType
-=======
 import SimpleITK as sitk
->>>>>>> Stashed changes
 
 from unicorn_eval.helpers import get_max_workers
 from unicorn_eval.utils import (
@@ -77,9 +74,6 @@ INPUT_SLUGS_DICT = {
     "Task09_segmenting_rois_in_breast_cancer_wsis": [
         "histopathology-region-of-interest-cropout"
     ],
-<<<<<<< Updated upstream
-    "Task20_generating_caption_from_wsi": ["he-staining"],
-=======
     "Task10_segmenting_lesions_within_vois_in_ct": [
         "stacked-3d-ct-volumes-of-lesions"
     ],
@@ -89,7 +83,6 @@ INPUT_SLUGS_DICT = {
     "Task20_generating_caption_from_wsi": [
         "he-staining"
     ]
->>>>>>> Stashed changes
 }
 
 MODEL_OUTPUT_SLUG_DICT = {
@@ -222,28 +215,14 @@ def process(job):
                 feature = np.array(feature).astype(np.float32)
                 features.append(feature)
             embeddings = np.concatenate(features)
-<<<<<<< Updated upstream
-            coordinates, spacing, patch_size, image_size, image_spacing = (
-                None,
-                None,
-                None,
-                None,
-                None,
-            )
-=======
             coordinates, spacing, patch_size, image_size, image_spacing, image_origin, image_direction = None, None, None, None, None, None, None
->>>>>>> Stashed changes
         elif slug_embedding == "patch-neural-representation":
             # TODO: better handle the case when there are multiple encoded inputs for a case
             # right now we concatenate the features
             # and use the first coordinates, spacing, patch_size, image_size, and image_spacing
             first = True
             for neural_representation in neural_representations:
-<<<<<<< Updated upstream
-                feature, curr_coordinates, curr_spacing, curr_patch_size, curr_image_size, curr_image_spacing = (
-=======
                 feature, curr_coordinates, curr_spacing, curr_patch_size, curr_image_size, curr_image_spacing, curr_image_origin, curr_image_direction = (
->>>>>>> Stashed changes
                     extract_data(neural_representation)
                 )
                 features.append(feature)
@@ -253,16 +232,10 @@ def process(job):
                     patch_size = curr_patch_size
                     image_size = curr_image_size
                     image_spacing = curr_image_spacing
-<<<<<<< Updated upstream
-                    first = False
-            embeddings = np.concatenate(features)
-
-=======
                     image_origin = curr_image_origin
                     image_direction = curr_image_direction
                     first = False
             embeddings = np.concatenate(features)
->>>>>>> Stashed changes
     elif modality == "vision-language":
 
         model_output_slug = MODEL_OUTPUT_SLUG_DICT[task_name]
@@ -412,8 +385,6 @@ def load_tif_file(*, location):
     class_labels = level_0_np[:, :, 0]  # shape: (H, W)
     return class_labels
 
-<<<<<<< Updated upstream
-=======
 def load_mha_file(*, location):
     class_labels = sitk.ReadImage(location)
     if 'transverse-cspca-label' in str(location): 
@@ -425,7 +396,6 @@ def load_mha_file(*, location):
         class_labels = sitk.DICOMOrient(class_labels, desiredCoordinateOrientation='SPL')
     class_labels = sitk.GetArrayFromImage(class_labels)
     return class_labels
->>>>>>> Stashed changes
 
 def write_metrics(*, metrics):
     # write a json document used for ranking results on the leaderboard
@@ -438,7 +408,6 @@ def write_combined_metrics(*, metric_dict: dict[dict], json_only: bool = False) 
     predictions = {"predictions": []}
 
     for task_name, task_metrics in metric_dict.items():
-<<<<<<< Updated upstream
         if "segmenting" not in task_name:
             case_prediction = [
                 p.tolist() if isinstance(p, np.ndarray) else p
@@ -446,8 +415,6 @@ def write_combined_metrics(*, metric_dict: dict[dict], json_only: bool = False) 
             ]
             predictions["predictions"].extend(case_prediction)
 
-=======
->>>>>>> Stashed changes
         for metric_name, metric_value in task_metrics["metrics"].items():
             task_identifier = task_name.split("_")[0]
             metrics["metrics"][f"{task_identifier}_{metric_name}"] = metric_value
@@ -629,15 +596,8 @@ def main():
                     case_embeddings = case_embeddings.squeeze(1)
 
             elif task_type == "detection":
-<<<<<<< Updated upstream
-
-                case_extra_labels = get_cases_extra_labels_detection(
-                    results["cases_image_sizes"], results["cases_image_spacings"]
-                )
-=======
                 if not task_name == "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams":
                     case_extra_labels = get_cases_extra_labels_detection(results["cases_image_sizes"], results["cases_image_spacings"])
->>>>>>> Stashed changes
 
             predictions = adapt_features(
                 adaptor_name=adaptor_name,
