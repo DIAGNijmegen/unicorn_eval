@@ -36,9 +36,9 @@ from unicorn_eval.utils import (
 )
 
 
-INPUT_DIRECTORY = Path("/data/temporary/unicorn/debugging/evaluation/vision/task-10")
-OUTPUT_DIRECTORY = Path("/data/bodyct/experiments/lena_t10027/unicorn_internal_dev/")
-GROUNDTRUTH_DIRECTORY = Path("/data/temporary/unicorn/debugging/groundtruth/")
+INPUT_DIRECTORY = Path("/input")
+OUTPUT_DIRECTORY = Path("/output")
+GROUNDTRUTH_DIRECTORY = Path("/opt/ml/input/data/ground_truth")
 
 ADAPTOR_SLUGS_DICT = {
     "Task01_classifying_he_prostate_biopsies_into_isup_scores": "adaptor-pathology-classification",
