@@ -16,12 +16,17 @@ import json
 from multiprocessing import Pool
 from pathlib import Path
 from pprint import pformat
+from picai_prep.preprocessing import Sample, PreprocessingSettings
 
 import numpy as np
 import openslide
 import pandas as pd
+<<<<<<< Updated upstream
 from dragon_eval import DragonEval
 from dragon_eval.evaluation import REGRESSION_EPSILON, TASK_TYPE, EvalType
+=======
+import SimpleITK as sitk
+>>>>>>> Stashed changes
 
 from unicorn_eval.helpers import get_max_workers
 from unicorn_eval.utils import (
@@ -33,17 +38,21 @@ from unicorn_eval.utils import (
     write_json_file,
 )
 
-INPUT_DIRECTORY = Path("/input")
-OUTPUT_DIRECTORY = Path("/output")
-GROUNDTRUTH_DIRECTORY = Path("/opt/ml/input/data/ground_truth")
+
+INPUT_DIRECTORY = Path("/data/temporary/unicorn/debugging/evaluation/vision/task-10")
+OUTPUT_DIRECTORY = Path("/data/bodyct/experiments/lena_t10027/unicorn_internal_dev/")
+GROUNDTRUTH_DIRECTORY = Path("/data/temporary/unicorn/debugging/groundtruth/")
 
 ADAPTOR_SLUGS_DICT = {
     "Task01_classifying_he_prostate_biopsies_into_isup_scores": "adaptor-pathology-classification",
     "Task03_predicting_the_time_to_biochemical_recurrence_in_he_prostatectomies": "adaptor-pathology-regression",
     "Task04_predicting_slide_level_tumor_proportion_score_in_ihc_stained_wsi": "adaptor-pathology-classification",
     "Task05_detecting_signet_ring_cells_in_he_stained_wsi_of_gastric_cancer": "adaptor-pathology-detection",
+    "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams": "adaptor-radiology-detection-segmentation",
     "Task08_detecting_mitotic_figures_in_breast_cancer_wsis": "adaptor-pathology-detection",
     "Task09_segmenting_rois_in_breast_cancer_wsis": "adaptor-pathology-segmentation",
+    "Task10_segmenting_lesions_within_vois_in_ct": "adaptor-radiology-segmentation",
+    "Task11_segmenting_three_anatomical_structures_in_lumbar_spine_mri": "adaptor-radiology-segmentation",
 }
 
 INPUT_SLUGS_DICT = {
@@ -59,13 +68,28 @@ INPUT_SLUGS_DICT = {
     "Task05_detecting_signet_ring_cells_in_he_stained_wsi_of_gastric_cancer": [
         "histopathology-region-of-interest-cropout"
     ],
+    "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams": [
+        "transverse-t2-prostate-mri"
+    ],
     "Task08_detecting_mitotic_figures_in_breast_cancer_wsis": [
         "histopathology-region-of-interest-cropout"
     ],
     "Task09_segmenting_rois_in_breast_cancer_wsis": [
         "histopathology-region-of-interest-cropout"
     ],
+<<<<<<< Updated upstream
     "Task20_generating_caption_from_wsi": ["he-staining"],
+=======
+    "Task10_segmenting_lesions_within_vois_in_ct": [
+        "stacked-3d-ct-volumes-of-lesions"
+    ],
+    "Task11_segmenting_three_anatomical_structures_in_lumbar_spine_mri": [
+        "sagittal-spine-mri"
+    ],    
+    "Task20_generating_caption_from_wsi": [
+        "he-staining"
+    ]
+>>>>>>> Stashed changes
 }
 
 MODEL_OUTPUT_SLUG_DICT = {
@@ -73,8 +97,11 @@ MODEL_OUTPUT_SLUG_DICT = {
     "Task03_predicting_the_time_to_biochemical_recurrence_in_he_prostatectomies": "image-neural-representation",
     "Task04_predicting_slide_level_tumor_proportion_score_in_ihc_stained_wsi": "image-neural-representation",
     "Task05_detecting_signet_ring_cells_in_he_stained_wsi_of_gastric_cancer": "patch-neural-representation",
+    "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams": "patch-neural-representation",
     "Task08_detecting_mitotic_figures_in_breast_cancer_wsis": "patch-neural-representation",
     "Task09_segmenting_rois_in_breast_cancer_wsis": "patch-neural-representation",
+    "Task10_segmenting_lesions_within_vois_in_ct": "patch-neural-representation",
+    "Task11_segmenting_three_anatomical_structures_in_lumbar_spine_mri": "patch-neural-representation",    
     "Task20_generating_caption_from_wsi": "nlp-predictions-dataset",
 }
 
@@ -83,8 +110,12 @@ LABEL_SLUG_DICT = {
     "Task03_predicting_the_time_to_biochemical_recurrence_in_he_prostatectomies": "overall-survival-years.json",
     "Task04_predicting_slide_level_tumor_proportion_score_in_ihc_stained_wsi": "pd-l1-tps-binned.json",
     "Task05_detecting_signet_ring_cells_in_he_stained_wsi_of_gastric_cancer": "cell-classification.json",
+    "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams": "images/transverse-cspca-label/{case_id}.mha", 
+
     "Task08_detecting_mitotic_figures_in_breast_cancer_wsis": "mitotic-figures.json",
     "Task09_segmenting_rois_in_breast_cancer_wsis": "images/tumor-stroma-and-other/{case_id}.tif",
+    "Task10_segmenting_lesions_within_vois_in_ct": "images/ct-binary-uls/{case_id}.mha",
+    "Task11_segmenting_three_anatomical_structures_in_lumbar_spine_mri": "images/sagittal-spine-mr-segmentation/{case_id}.mha",
     "Task20_generating_caption_from_wsi": "nlp-predictions-dataset.json",
 }
 
@@ -149,6 +180,12 @@ def process(job):
 
     assert image_name is not None, "No image found in predictions.json"
     case_name = Path(image_name).stem
+    # remove suffixes '_adc', '_t2w', and '_hbv' from the case name if present
+    for suffix in ["_adc", "_t2w", "_hbv"]:
+        if case_name.endswith(suffix):
+            case_name = case_name[: -len(suffix)]
+
+
 
     # remove suffixes '_adc', '_t2w', and '_hbv' from the case name if present
     for suffix in ["_adc", "_t2w", "_hbv"]:
@@ -185,6 +222,7 @@ def process(job):
                 feature = np.array(feature).astype(np.float32)
                 features.append(feature)
             embeddings = np.concatenate(features)
+<<<<<<< Updated upstream
             coordinates, spacing, patch_size, image_size, image_spacing = (
                 None,
                 None,
@@ -192,13 +230,20 @@ def process(job):
                 None,
                 None,
             )
+=======
+            coordinates, spacing, patch_size, image_size, image_spacing, image_origin, image_direction = None, None, None, None, None, None, None
+>>>>>>> Stashed changes
         elif slug_embedding == "patch-neural-representation":
             # TODO: better handle the case when there are multiple encoded inputs for a case
             # right now we concatenate the features
             # and use the first coordinates, spacing, patch_size, image_size, and image_spacing
             first = True
             for neural_representation in neural_representations:
+<<<<<<< Updated upstream
                 feature, curr_coordinates, curr_spacing, curr_patch_size, curr_image_size, curr_image_spacing = (
+=======
+                feature, curr_coordinates, curr_spacing, curr_patch_size, curr_image_size, curr_image_spacing, curr_image_origin, curr_image_direction = (
+>>>>>>> Stashed changes
                     extract_data(neural_representation)
                 )
                 features.append(feature)
@@ -208,16 +253,23 @@ def process(job):
                     patch_size = curr_patch_size
                     image_size = curr_image_size
                     image_spacing = curr_image_spacing
+<<<<<<< Updated upstream
                     first = False
             embeddings = np.concatenate(features)
 
+=======
+                    image_origin = curr_image_origin
+                    image_direction = curr_image_direction
+                    first = False
+            embeddings = np.concatenate(features)
+>>>>>>> Stashed changes
     elif modality == "vision-language":
 
         model_output_slug = MODEL_OUTPUT_SLUG_DICT[task_name]
 
         embeddings = None
         coordinates = None
-        spacing, patch_size, image_size, image_spacing = None, None, None, None
+        spacing, patch_size, image_size, image_spacing, image_origin, image_direction = None, None, None, None, None, None
 
         # find the location of the results
         location_prediction = get_file_location(
@@ -241,6 +293,9 @@ def process(job):
     elif label_path.suffix == ".tif":
         label_path = Path(str(label_path).replace("{case_id}", case_name))
         label = load_tif_file(location=label_path)
+    elif label_path.suffix == ".mha":
+        label_path = Path(str(label_path).replace("{case_id}", case_name))
+        label = load_mha_file(location=label_path)
     else:
         raise ValueError(f"Unsupported file format: {label_path.suffix}")
 
@@ -264,6 +319,8 @@ def process(job):
     case_info_dict["spacing"] = spacing
     case_info_dict["image_spacing"] = image_spacing
     case_info_dict["image_size"] = image_size
+    case_info_dict["image_origin"] = image_origin
+    case_info_dict["image_direction"] = image_direction
     case_info_dict["patch_size"] = patch_size
     case_info_dict["prediction"] = prediction
     case_info_dict["label"] = label
@@ -355,6 +412,20 @@ def load_tif_file(*, location):
     class_labels = level_0_np[:, :, 0]  # shape: (H, W)
     return class_labels
 
+<<<<<<< Updated upstream
+=======
+def load_mha_file(*, location):
+    class_labels = sitk.ReadImage(location)
+    if 'transverse-cspca-label' in str(location): 
+        pat_case = Sample(scans=[class_labels], lbl = class_labels, settings=PreprocessingSettings(spacing=[1,1,1], matrix_size=[16,256,256]))
+        pat_case.preprocess()
+        class_labels = pat_case.lbl
+    image_orientation = sitk.DICOMOrientImageFilter_GetOrientationFromDirectionCosines(class_labels.GetDirection())
+    if image_orientation != 'SPL': 
+        class_labels = sitk.DICOMOrient(class_labels, desiredCoordinateOrientation='SPL')
+    class_labels = sitk.GetArrayFromImage(class_labels)
+    return class_labels
+>>>>>>> Stashed changes
 
 def write_metrics(*, metrics):
     # write a json document used for ranking results on the leaderboard
@@ -362,11 +433,12 @@ def write_metrics(*, metrics):
         f.write(json.dumps(metrics, indent=4))
 
 
-def write_combined_metrics(*, metric_dict: dict[dict]) -> None:
+def write_combined_metrics(*, metric_dict: dict[dict], json_only: bool = False) -> None:
     metrics = {"metrics": {}, "normalized_metrics": {}}
     predictions = {"predictions": []}
 
     for task_name, task_metrics in metric_dict.items():
+<<<<<<< Updated upstream
         if "segmenting" not in task_name:
             case_prediction = [
                 p.tolist() if isinstance(p, np.ndarray) else p
@@ -374,6 +446,8 @@ def write_combined_metrics(*, metric_dict: dict[dict]) -> None:
             ]
             predictions["predictions"].extend(case_prediction)
 
+=======
+>>>>>>> Stashed changes
         for metric_name, metric_value in task_metrics["metrics"].items():
             task_identifier = task_name.split("_")[0]
             metrics["metrics"][f"{task_identifier}_{metric_name}"] = metric_value
@@ -384,6 +458,13 @@ def write_combined_metrics(*, metric_dict: dict[dict]) -> None:
         for metric_name, metric_value in task_metrics["additional_metrics"].items():
             task_identifier = task_name.split("_")[0]
             metrics["metrics"][f"{task_identifier}_{metric_name}"] = metric_value
+        
+        if not json_only: 
+            case_prediction = [
+                p.tolist() if isinstance(p, np.ndarray) else p
+                for p in task_metrics["predictions"]
+            ]
+            predictions["predictions"].extend(case_prediction)
 
     # aggregate metrics when there are multiple tasks
     metrics["metrics"]["mean"] = np.mean(
@@ -395,10 +476,11 @@ def write_combined_metrics(*, metric_dict: dict[dict]) -> None:
         content=metrics,
     )
 
-    write_json_file(
-        location=OUTPUT_DIRECTORY / "predictions.json",
-        content=predictions,
-    )
+    if not json_only:
+        write_json_file(
+            location=OUTPUT_DIRECTORY / "predictions.json",
+            content=predictions,
+        )
 
 
 def prepare_predictions_language(input_dir: Path, output_dir: Path, gt_dir: Path):
@@ -525,11 +607,18 @@ def main():
             shot_labels = results["shot_labels"]
             shot_extra_labels = results["shot_extra_labels"]
             shot_ids = results["shot_ids"]
+            shot_image_spacings = results["shot_image_spacings"]
+            shot_image_origins = results["shot_image_origins"]
+            shot_image_directions = results["shot_image_directions"]
             case_embeddings = results["case_embeddings"]
 
             case_extra_labels = results["case_extra_labels"]
             patch_size = results["patch_size"]
             case_image_size = results["cases_image_sizes"]
+            case_image_spacings = results["cases_image_spacings"]
+            case_image_origins = results["cases_image_origins"]
+            case_image_directions = results["cases_image_directions"]
+
 
             if task_type in ["classification", "regression"]:
 
@@ -540,10 +629,15 @@ def main():
                     case_embeddings = case_embeddings.squeeze(1)
 
             elif task_type == "detection":
+<<<<<<< Updated upstream
 
                 case_extra_labels = get_cases_extra_labels_detection(
                     results["cases_image_sizes"], results["cases_image_spacings"]
                 )
+=======
+                if not task_name == "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams":
+                    case_extra_labels = get_cases_extra_labels_detection(results["cases_image_sizes"], results["cases_image_spacings"])
+>>>>>>> Stashed changes
 
             predictions = adapt_features(
                 adaptor_name=adaptor_name,
@@ -558,6 +652,12 @@ def main():
                 patch_size=patch_size,
                 test_image_sizes=case_image_size,
                 shot_extra_labels=shot_extra_labels,
+                test_image_spacing=case_image_spacings,
+                test_image_origins=case_image_origins, 
+                test_image_directions=case_image_directions,
+                shots_image_spacing=shot_image_spacings,
+                shots_image_origins=shot_image_origins, 
+                shots_image_directions=shot_image_directions
             )
 
         elif modality == "vision-language":
@@ -573,11 +673,14 @@ def main():
             test_predictions=predictions,
             test_labels=case_labels,
             test_extra_labels=case_extra_labels,
+            test_image_spacing=case_image_spacings,
         )
         task_metrics[task_name] = metrics
 
-    write_combined_metrics(metric_dict=task_metrics)
-
+    if task_type == 'segmentation': 
+        write_combined_metrics(metric_dict=task_metrics, json_only=True)
+    else: 
+        write_combined_metrics(metric_dict=task_metrics)
     return 0
 
 
