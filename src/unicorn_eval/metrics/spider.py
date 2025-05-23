@@ -123,7 +123,7 @@ class Spider:
         # build lookup table for all labels
         label_lut = OrderedDict()
         all_labels_manual = sorted(list(np.unique(mask_manual[mask_manual > 0])))
-        print(all_labels_manual)
+
         for label_manual in all_labels_manual:
             # Determine label in automatic mask with which this label overlaps the most
             overlap_automatic = mask_automatic[mask_manual == label_manual]
@@ -186,7 +186,6 @@ class Spider:
         else:
             dice_score_discs = 0.0  
 
-        print(all_dice_scores.values())
         scores = [v for vs in all_dice_scores.values() for v in vs]
         if scores:
             overall_dice_score = np.mean(scores)

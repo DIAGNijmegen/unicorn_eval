@@ -60,7 +60,6 @@ def extract_patches(
             out_spacing=spacing[::-1],
             interpolation=sitk.sitkLinear,
         )
-        print(f"Resampled image to spacing: {spacing}. Image size: {image.GetSize()}")
 
     # pad image to fit patch size
     image = pad_image(

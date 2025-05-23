@@ -86,7 +86,6 @@ def train_decoder(decoder, data_loader, device):
                 
             epoch_loss += loss.item()
             
-        print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {epoch_loss / len(data_loader)}")
     return decoder 
 
 def world_to_voxel(coord, origin, spacing, inv_direction):
@@ -255,7 +254,6 @@ def extract_patch_labels(
 
     patch_features = []
 
-    print(f"Extracting patches from image")
     patches, coordinates = extract_patches(
         image=image,
         patch_size=patch_size,
@@ -264,7 +262,6 @@ def extract_patch_labels(
     if patch_spacing is None:
         patch_spacing = image.GetSpacing()
 
-    print(f"Extracting features from patches")
     for patch, coordinates in tqdm(zip(patches, coordinates), total=len(patches), desc="Extracting features"):
         patch_array = sitk.GetArrayFromImage(patch)
         patch_features.append({
@@ -376,7 +373,6 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
                 "upsample_mode": "deconv",
             },
         ).to(self.device)
-        print("start training")
         self.decoder = train_decoder(self.decoder, train_loader, self.device)
 
     def predict(self) -> np.ndarray:
