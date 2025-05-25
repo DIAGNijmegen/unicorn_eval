@@ -36,9 +36,9 @@ from unicorn_eval.utils import (
 )
 
 
-INPUT_DIRECTORY = Path("/data/temporary/unicorn/debugging/evaluation/vision/task-6")
-OUTPUT_DIRECTORY = Path("/data/bodyct/experiments/lena_t10027/unicorn_internal_dev/")
-GROUNDTRUTH_DIRECTORY = Path("/data/temporary/unicorn/debugging/groundtruth/")
+INPUT_DIRECTORY = Path("/input")
+OUTPUT_DIRECTORY = Path("/output")
+GROUNDTRUTH_DIRECTORY = Path("/opt/ml/input/data/ground_truth")
 
 ADAPTOR_SLUGS_DICT = {
     "Task01_classifying_he_prostate_biopsies_into_isup_scores": "adaptor-pathology-classification",
@@ -66,7 +66,7 @@ INPUT_SLUGS_DICT = {
         "histopathology-region-of-interest-cropout"
     ],
     "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams": [
-        "transverse-t2-prostate-mri"
+        "transverse-t2-prostate-mri",
     ],
     "Task08_detecting_mitotic_figures_in_breast_cancer_wsis": [
         "histopathology-region-of-interest-cropout"
@@ -178,21 +178,12 @@ def process(job):
         if case_name.endswith(suffix):
             case_name = case_name[: -len(suffix)]
 
-
-
-    # remove suffixes '_adc', '_t2w', and '_hbv' from the case name if present
-    for suffix in ["_adc", "_t2w", "_hbv"]:
-        if case_name.endswith(suffix):
-            case_name = case_name[: -len(suffix)]
-
     case_info = mapping[mapping.case_id == case_name]
     task_name = case_info.task_name.values[0]
     modality = case_info.modality.values[0]
 
     if modality == "vision":
-
         prediction = None
-
         slug_embedding = MODEL_OUTPUT_SLUG_DICT[task_name]
 
         # find the location of the results
@@ -203,7 +194,6 @@ def process(job):
         )
 
         # read the results
-
         neural_representations = load_json_file(
             location=location_neural_representation,
         )
@@ -403,18 +393,11 @@ def write_metrics(*, metrics):
         f.write(json.dumps(metrics, indent=4))
 
 
-def write_combined_metrics(*, metric_dict: dict[dict], json_only: bool = False) -> None:
+def write_combined_metrics(*, metric_dict: dict[dict], save_predictions: bool = False) -> None:
     metrics = {"metrics": {}, "normalized_metrics": {}}
     predictions = {"predictions": []}
 
     for task_name, task_metrics in metric_dict.items():
-        if "segmenting" not in task_name:
-            case_prediction = [
-                p.tolist() if isinstance(p, np.ndarray) else p
-                for p in task_metrics["predictions"]
-            ]
-            predictions["predictions"].extend(case_prediction)
-
         for metric_name, metric_value in task_metrics["metrics"].items():
             task_identifier = task_name.split("_")[0]
             metrics["metrics"][f"{task_identifier}_{metric_name}"] = metric_value
@@ -426,7 +409,7 @@ def write_combined_metrics(*, metric_dict: dict[dict], json_only: bool = False) 
             task_identifier = task_name.split("_")[0]
             metrics["metrics"][f"{task_identifier}_{metric_name}"] = metric_value
         
-        if not json_only: 
+        if not save_predictions: 
             case_prediction = [
                 p.tolist() if isinstance(p, np.ndarray) else p
                 for p in task_metrics["predictions"]
@@ -443,7 +426,7 @@ def write_combined_metrics(*, metric_dict: dict[dict], json_only: bool = False) 
         content=metrics,
     )
 
-    if not json_only:
+    if not save_predictions:
         write_json_file(
             location=OUTPUT_DIRECTORY / "predictions.json",
             content=predictions,
@@ -596,6 +579,7 @@ def main():
                     case_embeddings = case_embeddings.squeeze(1)
 
             elif task_type == "detection":
+
                 if not task_name == "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams":
                     case_extra_labels = get_cases_extra_labels_detection(results["cases_image_sizes"], results["cases_image_spacings"])
 
@@ -638,7 +622,7 @@ def main():
         task_metrics[task_name] = metrics
 
     if task_type == 'segmentation': 
-        write_combined_metrics(metric_dict=task_metrics, json_only=True)
+        write_combined_metrics(metric_dict=task_metrics, save_predictions=True)
     else: 
         write_combined_metrics(metric_dict=task_metrics)
     return 0
