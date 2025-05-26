@@ -277,7 +277,9 @@ def construct_detection_labels(
                 cell_coordinates = None
                 heatmap = None
 
-            processed_data.append((patch_emb, heatmap, (x_patch, y_patch), f"{case_name}"))
+            processed_data.append(
+                (patch_emb, heatmap, (x_patch, y_patch), f"{case_name}")
+            )
 
     return processed_data
 
@@ -297,7 +299,13 @@ class DensityMap(PatchLevelTaskAdaptor):
         num_epochs=200,
         learning_rate=1e-5,
     ):
-        super().__init__(shot_features, shot_labels, shot_coordinates, test_features, test_coordinates)
+        super().__init__(
+            shot_features,
+            shot_labels,
+            shot_coordinates,
+            test_features,
+            test_coordinates,
+        )
         self.shot_names = shot_names
         self.test_names = test_names
         self.patch_size = patch_size
@@ -323,9 +331,9 @@ class DensityMap(PatchLevelTaskAdaptor):
             dataset, batch_size=32, shuffle=True, collate_fn=custom_collate
         )
 
-        self.decoder = DetectionDecoder(input_dim=input_dim, heatmap_size=self.heatmap_size).to(
-            torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        )
+        self.decoder = DetectionDecoder(
+            input_dim=input_dim, heatmap_size=self.heatmap_size
+        ).to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
 
         self.decoder = train_decoder(
             self.decoder,

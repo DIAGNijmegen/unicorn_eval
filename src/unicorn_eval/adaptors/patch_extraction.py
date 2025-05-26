@@ -69,10 +69,7 @@ def extract_patches(
 
     # generate patch coordinates (x, y, z)
     image_size = image.GetSize()
-    steps = [
-        range(0, image_size[dim], patch_size[dim])
-        for dim in range(3)
-    ]
+    steps = [range(0, image_size[dim], patch_size[dim]) for dim in range(3)]
 
     patches = []
     coordinates = []
@@ -85,10 +82,8 @@ def extract_patches(
             (x + patch_size[0], y + patch_size[1], z + patch_size[2]),
         )
         world_coordinates = tuple(
-            image.TransformIndexToPhysicalPoint(coord)
-            for coord in matrix_coordinates
+            image.TransformIndexToPhysicalPoint(coord) for coord in matrix_coordinates
         )
         coordinates.append(world_coordinates)
 
     return patches, coordinates
-
