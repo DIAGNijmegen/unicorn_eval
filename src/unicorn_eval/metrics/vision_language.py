@@ -129,6 +129,7 @@ def compute_meteor_score(reports_true, reports_pred):
 
     return meteor_score
 
+
 def compute_bert_score(reports_true, reports_pred):
     """
     Compute BERTScore (Precision, Recall, F1) for generated text using DeBERTa.
@@ -144,7 +145,9 @@ def compute_bert_score(reports_true, reports_pred):
 
     model_directory = "/opt/app/unicorn_eval/models/dragon-bert-base-mixed-domain"
     # ensure the model directory exists
-    assert Path(model_directory).exists(), f"Model directory {model_directory} does not exist."
+    assert Path(
+        model_directory
+    ).exists(), f"Model directory {model_directory} does not exist."
 
     scorer = BERTScorer(
         model_type=model_directory, num_layers=12, lang="nl", device="cpu"  # local path
@@ -160,6 +163,7 @@ def compute_bert_score(reports_true, reports_pred):
 
     average_f1 = f1_list.mean().item()
     return average_f1
+
 
 def compute_average_language_metric(reports_true, reports_pred):
     """

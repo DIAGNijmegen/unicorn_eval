@@ -32,11 +32,16 @@ from monai.data import Dataset as dataset_monai
 from monai.data import DataLoader as dataloader_monai
 from typing import Iterable
 
-from monai.networks.nets.segresnet_ds import SegResBlock, aniso_kernel, scales_for_resolution
+from monai.networks.nets.segresnet_ds import (
+    SegResBlock,
+    aniso_kernel,
+    scales_for_resolution,
+)
 
 from monai.networks.blocks.upsample import UpSample
 from monai.networks.layers.factories import Act, Conv, Norm, split_args
 from monai.utils import has_option
+
 
 def compute_num_upsample_layers(initial_size, target_size):
     if isinstance(target_size, (tuple, list)):
@@ -46,23 +51,41 @@ def compute_num_upsample_layers(initial_size, target_size):
 
 
 def build_deconv_layers(self, in_channels, num_layers):
-        layers = []
-        current_channels = in_channels
+    layers = []
+    current_channels = in_channels
 
-        for _ in range(num_layers - 1):
-            out_channels = min(128, current_channels * 2)
-            layers.extend([
-                nn.ConvTranspose2d(current_channels, out_channels, kernel_size=4, stride=2, padding=1, output_padding=1),
+    for _ in range(num_layers - 1):
+        out_channels = min(128, current_channels * 2)
+        layers.extend(
+            [
+                nn.ConvTranspose2d(
+                    current_channels,
+                    out_channels,
+                    kernel_size=4,
+                    stride=2,
+                    padding=1,
+                    output_padding=1,
+                ),
                 nn.BatchNorm2d(out_channels),
-                nn.ReLU()
-            ])
-            current_channels = min(128, current_channels * 2) # cap the number of channels at 128
-
-        layers.append(
-            nn.ConvTranspose2d(current_channels, self.num_classes, kernel_size=4, stride=2, padding=1, output_padding=1)
+                nn.ReLU(),
+            ]
         )
+        current_channels = min(
+            128, current_channels * 2
+        )  # cap the number of channels at 128
 
-        return nn.Sequential(*layers)
+    layers.append(
+        nn.ConvTranspose2d(
+            current_channels,
+            self.num_classes,
+            kernel_size=4,
+            stride=2,
+            padding=1,
+            output_padding=1,
+        )
+    )
+
+    return nn.Sequential(*layers)
 
 
 class SegmentationDecoder(nn.Module):
@@ -71,7 +94,9 @@ class SegmentationDecoder(nn.Module):
         self.spatial_dims = (32, 8, 8)
         self.output_size = (patch_size, patch_size)
         self.num_classes = num_classes
-        num_deconv_layers = compute_num_upsample_layers(self.spatial_dims[1], patch_size)
+        num_deconv_layers = compute_num_upsample_layers(
+            self.spatial_dims[1], patch_size
+        )
 
         self.fc = nn.Linear(input_dim, np.prod(self.spatial_dims))
 
@@ -95,7 +120,7 @@ class SegmentationDecoder(nn.Module):
 
     def forward(self, x):
         x = self.fc(x)  # Expand embedding
-        x = x.view(-1, *self.spatial_dims) # Reshape into spatial format.
+        x = x.view(-1, *self.spatial_dims)  # Reshape into spatial format.
         x = self.deconv_layers(x)  # Upsample to (256, 256)
         x = F.interpolate(
             x, size=self.output_size, mode="bilinear", align_corners=False
@@ -305,7 +330,13 @@ class SegmentationUpsampling(PatchLevelTaskAdaptor):
         num_epochs=20,
         learning_rate=1e-5,
     ):
-        super().__init__(shot_features, shot_labels, shot_coordinates, test_features, test_coordinates)
+        super().__init__(
+            shot_features,
+            shot_labels,
+            shot_coordinates,
+            test_features,
+            test_coordinates,
+        )
         self.shot_names = shot_names
         self.test_names = test_names
         self.test_image_sizes = test_image_sizes
@@ -316,9 +347,7 @@ class SegmentationUpsampling(PatchLevelTaskAdaptor):
 
     def fit(self):
         input_dim = self.shot_features[0].shape[1]
-        num_classes = max(
-            [np.max(label) for label in self.shot_labels]
-        ) + 1
+        num_classes = max([np.max(label) for label in self.shot_labels]) + 1
 
         train_data = construct_segmentation_labels(
             self.shot_coordinates,
@@ -332,9 +361,9 @@ class SegmentationUpsampling(PatchLevelTaskAdaptor):
             dataset, batch_size=32, shuffle=True, collate_fn=custom_collate
         )
 
-        self.decoder = SegmentationDecoder(input_dim=input_dim, patch_size=self.patch_size, num_classes=num_classes).to(
-            torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        )
+        self.decoder = SegmentationDecoder(
+            input_dim=input_dim, patch_size=self.patch_size, num_classes=num_classes
+        ).to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
         self.decoder = train_decoder(
             self.decoder, dataloader, num_epochs=self.num_epochs, lr=self.learning_rate
         )
@@ -360,8 +389,6 @@ class SegmentationUpsampling(PatchLevelTaskAdaptor):
         )
 
         return predicted_masks
-    
-
 
 
 def make_patch_level_neural_representation(
@@ -392,18 +419,19 @@ def make_patch_level_neural_representation(
         "title": title,
     }
 
+
 class Decoder3D(nn.Module):
     def __init__(self, latent_dim, target_shape, decoder_kwargs):
         super().__init__()
         self.vector_to_tensor = VectorToTensor(latent_dim, target_shape)
         self.decoder = SegResNetDecoderOnly(**decoder_kwargs)
-    
+
     def forward(self, x):
         x = self.vector_to_tensor(x)
         return self.decoder(x)
 
 
-def train_decoder3d(decoder, data_loader, device):  
+def train_decoder3d(decoder, data_loader, device):
     loss_fn = DiceLoss(sigmoid=True)
     optimizer = optim.Adam(decoder.parameters(), lr=1e-3)
 
@@ -413,19 +441,20 @@ def train_decoder3d(decoder, data_loader, device):
         decoder.train()
         epoch_loss = 0
         for idx, batch in enumerate(data_loader):
-            patch_emb = batch['patch'].to(device)
-            patch_label = batch['patch_label'].to(device)   
+            patch_emb = batch["patch"].to(device)
+            patch_label = batch["patch_label"].to(device)
             optimizer.zero_grad()
             de_output = decoder(patch_emb)
 
             loss = loss_fn(de_output.squeeze(1), patch_label)
             loss.backward()
             optimizer.step()
-                
+
             epoch_loss += loss.item()
         print(f"Epoch {epoch+1}, Loss: {loss / len(data_loader)}")
-            
-    return decoder 
+
+    return decoder
+
 
 def world_to_voxel(coord, origin, spacing, inv_direction):
     relative = np.array(coord) - origin
@@ -433,37 +462,42 @@ def world_to_voxel(coord, origin, spacing, inv_direction):
     voxel = voxel / spacing
     return np.round(voxel).astype(int)
 
+
 def create_grid(decoded_patches):
     grids = {}
 
     for idx, patches in decoded_patches.items():
         # Pull meta from the first patch
         meta = patches[0]
-        image_size = meta['image_size']
-        image_origin = meta['image_origin']
-        image_spacing = meta['image_spacing']
-        direction = np.array(meta['image_direction']).reshape(3, 3)
+        image_size = meta["image_size"]
+        image_origin = meta["image_origin"]
+        image_spacing = meta["image_spacing"]
+        direction = np.array(meta["image_direction"]).reshape(3, 3)
         inv_direction = np.linalg.inv(direction)
-        patch_size = meta['patch_size']
+        patch_size = meta["patch_size"]
 
         padded_shape = [
-                int(np.ceil(image_size[d] / patch_size[d]) * patch_size[d])
-                for d in range(3)
-            ]        
-        pX, pY, pZ = patch_size       # SITK order
+            int(np.ceil(image_size[d] / patch_size[d]) * patch_size[d])
+            for d in range(3)
+        ]
+        pX, pY, pZ = patch_size  # SITK order
         patch_size = (pZ, pY, pX)  # NumPy order
         padding = [(padded_shape[d] - image_size[d]) // 2 for d in range(3)]
         padding_mm = np.array(padding) * image_spacing
         adjusted_origin = image_origin - inv_direction @ padding_mm
         # Initialize grid
-        pX, pY, pZ = padded_shape       # SITK order
+        pX, pY, pZ = padded_shape  # SITK order
         grid_shape = (pZ, pY, pX)  # NumPy order
         grid = np.zeros(grid_shape, dtype=np.float32)
 
         for patch in patches:
-            i, j, k = world_to_voxel(patch['coord'], adjusted_origin, image_spacing, inv_direction)
-            patch_array = patch['features'].squeeze(0)
-            grid[k:k+patch_size[0], j:j+patch_size[1], i:i+patch_size[2]] += patch_array
+            i, j, k = world_to_voxel(
+                patch["coord"], adjusted_origin, image_spacing, inv_direction
+            )
+            patch_array = patch["features"].squeeze(0)
+            grid[
+                k : k + patch_size[0], j : j + patch_size[1], i : i + patch_size[2]
+            ] += patch_array
 
         x_start = padding[0]
         x_end = x_start + image_size[0]
@@ -473,111 +507,148 @@ def create_grid(decoded_patches):
         z_end = z_start + image_size[2]
         cropped = grid[z_start:z_end, y_start:y_end, x_start:x_end]
 
-        grids.update({idx : cropped})
+        grids.update({idx: cropped})
     return grids
+
 
 def inference3d(decoder, data_loader, device, return_binary):
     decoder.eval()
-    with torch.no_grad():  
+    with torch.no_grad():
         grouped_predictions = defaultdict(lambda: defaultdict(list))
 
         for batch in data_loader:
-            unique_ids_in_batch = set(int(i) for i in batch['case_number'])
-            inputs = batch['patch'].to(device)  # shape: [B, ...]
-            coords = batch['coordinates']  # list of 3 tensors
-            image_idxs = batch['case_number']
+            unique_ids_in_batch = set(int(i) for i in batch["case_number"])
+            inputs = batch["patch"].to(device)  # shape: [B, ...]
+            coords = batch["coordinates"]  # list of 3 tensors
+            image_idxs = batch["case_number"]
 
             outputs = decoder(inputs)  # shape: [B, ...]
             probs = torch.sigmoid(outputs)
             if return_binary:
                 pred_mask = (probs > 0.5).float()
-            else: 
+            else:
                 pred_mask = probs
 
             batch["image_origin"] = batch["image_origin"][0]
             batch["image_spacing"] = batch["image_spacing"][0]
             for i in range(len(image_idxs)):
                 image_id = int(image_idxs[i])
-                coord = tuple(float(c) for c in coords[i])  # convert list to tuple for use as dict key
-                grouped_predictions[image_id][coord].append({
-                    'features': pred_mask[i].cpu().numpy(),
-                    'patch_size': [int(batch['patch_size'][j][i]) for j in range(len(batch['patch_size']))],
-                    'image_size': [int(batch['image_size'][j][i]) for j in range(len(batch['image_size']))],
-                    'image_origin': [float(batch['image_origin'][j][i]) for j in range(len(batch['image_origin']))],
-                    'image_spacing': [float(batch['image_spacing'][j][i]) for j in range(len(batch['image_spacing']))],
-                    'image_direction': [float(batch['image_direction'][j][i]) for j in range(len(batch['image_direction']))],
-                })
+                coord = tuple(
+                    float(c) for c in coords[i]
+                )  # convert list to tuple for use as dict key
+                grouped_predictions[image_id][coord].append(
+                    {
+                        "features": pred_mask[i].cpu().numpy(),
+                        "patch_size": [
+                            int(batch["patch_size"][j][i])
+                            for j in range(len(batch["patch_size"]))
+                        ],
+                        "image_size": [
+                            int(batch["image_size"][j][i])
+                            for j in range(len(batch["image_size"]))
+                        ],
+                        "image_origin": [
+                            float(batch["image_origin"][j][i])
+                            for j in range(len(batch["image_origin"]))
+                        ],
+                        "image_spacing": [
+                            float(batch["image_spacing"][j][i])
+                            for j in range(len(batch["image_spacing"]))
+                        ],
+                        "image_direction": [
+                            float(batch["image_direction"][j][i])
+                            for j in range(len(batch["image_direction"]))
+                        ],
+                    }
+                )
 
         averaged_patches = defaultdict(list)
 
         for image_id, coord_dict in grouped_predictions.items():
             for coord, patches in coord_dict.items():
-                all_features = [p['features'] for p in patches]
+                all_features = [p["features"] for p in patches]
                 stacked = np.stack(all_features, axis=0)
                 avg_features = np.mean(stacked, axis=0)
 
-                averaged_patches[image_id].append({
-                    'coord': list(coord),
-                    'features': avg_features,
-                    'patch_size': patches[0]['patch_size'],
-                    'image_size': patches[0]['image_size'],
-                    'image_origin': patches[0]['image_origin'],
-                    'image_spacing': patches[0]['image_spacing'],
-                    'image_direction': patches[0]['image_direction'],
-                })
+                averaged_patches[image_id].append(
+                    {
+                        "coord": list(coord),
+                        "features": avg_features,
+                        "patch_size": patches[0]["patch_size"],
+                        "image_size": patches[0]["image_size"],
+                        "image_origin": patches[0]["image_origin"],
+                        "image_spacing": patches[0]["image_spacing"],
+                        "image_direction": patches[0]["image_direction"],
+                    }
+                )
 
         grids = create_grid(averaged_patches)
         return [j for j in grids.values()]
+
 
 def construct_data_with_labels(
     coordinates,
     embeddings,
     cases,
     patch_size,
-    labels=None, 
+    labels=None,
     image_sizes=None,
     image_origins=None,
     image_spacings=None,
-    image_directions=None):
+    image_directions=None,
+):
     data_array = []
 
     for case_idx, case in enumerate(cases):
-        #patch_spacing = img_feat['meta']['patch-spacing']
+        # patch_spacing = img_feat['meta']['patch-spacing']
         case_embeddings = embeddings[case_idx]
         patch_coordinates = coordinates[case_idx]
 
         lbl_feat = labels[case_idx] if labels is not None else None
 
-        if len(case_embeddings) != len(patch_coordinates): 
-            patch_coordinates = np.repeat(patch_coordinates, repeats=len(case_embeddings), axis=0)
-   
+        if len(case_embeddings) != len(patch_coordinates):
+            patch_coordinates = np.repeat(
+                patch_coordinates, repeats=len(case_embeddings), axis=0
+            )
+
         if lbl_feat is not None:
-            if len(case_embeddings) != len(lbl_feat['patches']): 
-                lbl_feat['patches'] = np.repeat(lbl_feat['patches'], repeats=len(case_embeddings), axis=0)
+            if len(case_embeddings) != len(lbl_feat["patches"]):
+                lbl_feat["patches"] = np.repeat(
+                    lbl_feat["patches"], repeats=len(case_embeddings), axis=0
+                )
 
         for i, patch_img in enumerate(case_embeddings):
             data_dict = {
-                'patch': np.array(patch_img, dtype=np.float32),
-                'coordinates': patch_coordinates[i], 
-                'patch_size': patch_size, 
-                'case_number': case_idx
+                "patch": np.array(patch_img, dtype=np.float32),
+                "coordinates": patch_coordinates[i],
+                "patch_size": patch_size,
+                "case_number": case_idx,
             }
 
             if lbl_feat is not None:
-                patch_lbl = lbl_feat['patches'][i]
-                assert np.allclose(patch_coordinates[i], patch_lbl['coordinates']), "Coordinates don't match!"
-                data_dict['patch_label'] = np.array(patch_lbl['features'], dtype=np.float32) 
-            
-            if(image_sizes is not None) and (image_origins is not None) and (image_spacings is not None) and (image_directions is not None):
+                patch_lbl = lbl_feat["patches"][i]
+                assert np.allclose(
+                    patch_coordinates[i], patch_lbl["coordinates"]
+                ), "Coordinates don't match!"
+                data_dict["patch_label"] = np.array(
+                    patch_lbl["features"], dtype=np.float32
+                )
+
+            if (
+                (image_sizes is not None)
+                and (image_origins is not None)
+                and (image_spacings is not None)
+                and (image_directions is not None)
+            ):
                 image_size = image_sizes[case]
                 image_origin = image_origins[case]
                 image_spacing = image_spacings[case]
                 image_direction = image_directions[case]
-                
-                data_dict['image_size'] = image_size
-                data_dict['image_origin'] = image_origin, 
-                data_dict['image_spacing'] = image_spacing, 
-                data_dict['image_direction'] = image_direction
+
+                data_dict["image_size"] = image_size
+                data_dict["image_origin"] = (image_origin,)
+                data_dict["image_spacing"] = (image_spacing,)
+                data_dict["image_direction"] = image_direction
 
             data_array.append(data_dict)
 
@@ -585,13 +656,13 @@ def construct_data_with_labels(
 
 
 def extract_patch_labels(
-        image,
-        image_spacing,
-        image_origin, 
-        image_direction,
-        patch_size: list[int] = [16, 256, 256],
-        patch_spacing: list[float] | None = None,
-    ) -> list[dict]:
+    image,
+    image_spacing,
+    image_origin,
+    image_direction,
+    patch_size: list[int] = [16, 256, 256],
+    patch_spacing: list[float] | None = None,
+) -> list[dict]:
     """
     Generate a list of patch features from a radiology image
 
@@ -621,12 +692,16 @@ def extract_patch_labels(
     if patch_spacing is None:
         patch_spacing = image.GetSpacing()
 
-    for patch, coordinates in tqdm(zip(patches, coordinates), total=len(patches), desc="Extracting features"):
+    for patch, coordinates in tqdm(
+        zip(patches, coordinates), total=len(patches), desc="Extracting features"
+    ):
         patch_array = sitk.GetArrayFromImage(patch)
-        patch_features.append({
-            "coordinates": list(coordinates[0]),  # save the start coordinates
-            "features": patch_array,
-        })
+        patch_features.append(
+            {
+                "coordinates": list(coordinates[0]),  # save the start coordinates
+                "features": patch_array,
+            }
+        )
 
     patch_labels = make_patch_level_neural_representation(
         patch_features=patch_features,
@@ -636,23 +711,25 @@ def extract_patch_labels(
         image_origin=image.GetOrigin(),
         image_spacing=image.GetSpacing(),
         image_direction=image.GetDirection(),
-        title='patch_labels',
+        title="patch_labels",
     )
 
     return patch_labels
+
 
 def load_patch_data(data_array: np.ndarray, batch_size: int = 4) -> DataLoader:
     train_ds = dataset_monai(data=data_array)
     train_loader = dataloader_monai(train_ds, batch_size=batch_size, shuffle=False)
     return train_loader
 
+
 class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
     """
     Patch-level adaptor that trains a 3D upsampling decoder for segmentation.
 
-    This adaptor takes precomputed patch-level features from 3D medical images 
-    and performs segmentation by training a decoder that upsamples the features 
-    back to voxel space. 
+    This adaptor takes precomputed patch-level features from 3D medical images
+    and performs segmentation by training a decoder that upsamples the features
+    back to voxel space.
 
     Steps:
     1. Extract patch-level segmentation labels using spatial metadata.
@@ -668,9 +745,9 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
         test_feats : Patch-level feature embeddings for testing.
         test_coords : Patch coordinates corresponding to test_feats.
         test_cases : Case identifiers for testing patches.
-        test_image_sizes, test_image_origins, test_image_spacings, test_image_directions: 
+        test_image_sizes, test_image_origins, test_image_spacings, test_image_directions:
             Metadata for reconstructing full-size test predictions.
-        train_image_spacing, train_image_origins, train_image_directions: 
+        train_image_spacing, train_image_origins, train_image_directions:
             Metadata for extracting training labels at patch-level.
         patch_size : Size of each 3D patch.
         return_binary : Whether to threshold predictions to binary masks.
@@ -685,7 +762,7 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
         test_feats,
         test_coords,
         test_cases,
-        test_image_sizes, 
+        test_image_sizes,
         test_image_origins,
         test_image_spacings,
         test_image_directions,
@@ -693,7 +770,7 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
         train_image_origins,
         train_image_directions,
         patch_size,
-        return_binary = True,
+        return_binary=True,
     ):
         label_patch_features = []
         for idx, patch in enumerate(train_labels):
@@ -702,7 +779,7 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
                 train_image_spacing[train_cases[idx]],
                 train_image_origins[train_cases[idx]],
                 train_image_directions[train_cases[idx]],
-                patch_size
+                patch_size,
             )
             label_patch_features.append(label_feats)
         label_patch_features = np.array(label_patch_features, dtype=object)
@@ -739,9 +816,14 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
         )
         train_loader = load_patch_data(train_data)
 
-        target_patch_size = tuple(int(j/16) for j in self.patch_size)
-        target_shape = (512, target_patch_size[2], target_patch_size[1], target_patch_size[0])
-        
+        target_patch_size = tuple(int(j / 16) for j in self.patch_size)
+        target_shape = (
+            512,
+            target_patch_size[2],
+            target_patch_size[1],
+            target_patch_size[0],
+        )
+
         # set up device and model
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.decoder = Decoder3D(
@@ -776,14 +858,15 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
         # run inference using the trained decoder
         return inference3d(self.decoder, test_loader, self.device, self.return_binary)
 
+
 class SegResNetDecoderOnly(nn.Module):
     """
     A decoder-only variant of monai's SegResNetDS. (https://docs.monai.io/en/stable/networks.html)
-    
-    This network accepts a latent feature vector (e.g. [512]) and reshapes it to 
-    a 5D tensor (for 3D data) as the initial input. It then decodes the representation 
+
+    This network accepts a latent feature vector (e.g. [512]) and reshapes it to
+    a 5D tensor (for 3D data) as the initial input. It then decodes the representation
     through a series of upsampling blocks to produce an output segmentation (or regression) map.
-    
+
     Args:
         spatial_dims (int): Number of spatial dimensions. Default is 3.
         init_filters (int): Base number of filters (not used for encoder, only to help define defaults). Default is 32.
@@ -791,12 +874,13 @@ class SegResNetDecoderOnly(nn.Module):
         out_channels (int): Number of output channels. Default is 2.
         act (tuple or str): Activation type/arguments. Default is "relu".
         norm (tuple or str): Normalization type/arguments. Default is "batch".
-        blocks_up (tuple): Number of blocks (repeat count) in each upsampling stage. 
+        blocks_up (tuple): Number of blocks (repeat count) in each upsampling stage.
                            For example, (1, 1, 1) will result in three upsampling stages.
         dsdepth (int): Number of decoder stages to produce deep supervision heads.
                        Only the last `dsdepth` levels will produce an output head.
         upsample_mode (str): Upsampling method. Default is "deconv".
     """
+
     def __init__(
         self,
         spatial_dims: int = 3,
@@ -815,10 +899,12 @@ class SegResNetDecoderOnly(nn.Module):
         self.out_channels = out_channels
         self.dsdepth = max(dsdepth, 1)
         self.resolution = resolution
-        
+
         anisotropic_scales = None
         if resolution:
-            anisotropic_scales = scales_for_resolution(resolution, n_stages=len(blocks_up)+1)
+            anisotropic_scales = scales_for_resolution(
+                resolution, n_stages=len(blocks_up) + 1
+            )
         self.anisotropic_scales = anisotropic_scales
 
         # Prepare activation and normalization configurations.
@@ -828,14 +914,16 @@ class SegResNetDecoderOnly(nn.Module):
             norm[1].setdefault("affine", True)
         if has_option(Act[act[0]], "inplace"):
             act[1].setdefault("inplace", True)
-        
+
         n_up = len(blocks_up)
         filters = latent_channels
-        
+
         self.up_layers = nn.ModuleList()
         for i in range(n_up):
             kernel_size, _, stride = (
-                aniso_kernel(anisotropic_scales[len(blocks_up) - i - 1]) if anisotropic_scales else (3, 1, 2)
+                aniso_kernel(anisotropic_scales[len(blocks_up) - i - 1])
+                if anisotropic_scales
+                else (3, 1, 2)
             )
 
             level = nn.ModuleDict()
@@ -861,28 +949,31 @@ class SegResNetDecoderOnly(nn.Module):
                 for _ in range(blocks_up[i])
             ]
             level["blocks"] = nn.Sequential(*blocks)
-            
+
             # Add a deep supervision head if this level is within the last dsdepth levels.
             if i >= n_up - dsdepth:
                 level["head"] = Conv[Conv.CONV, spatial_dims](
-                    in_channels=filters // 2, out_channels=out_channels, kernel_size=1, bias=True
+                    in_channels=filters // 2,
+                    out_channels=out_channels,
+                    kernel_size=1,
+                    bias=True,
                 )
             else:
                 level["head"] = nn.Identity()
-            
+
             self.up_layers.append(level)
             filters = filters // 2  # Update the number of channels for the next stage.
-    
+
     def forward(self, out_flat: torch.Tensor) -> torch.Tensor:
         """
         Args:
             out_flat (torch.Tensor): A 1D latent feature vector with shape [latent_channels].
-            
+
         Returns:
             torch.Tensor: The decoded output. For deep supervision, the last head output is returned.
         """
         x = out_flat
-        
+
         outputs = []
         for level in self.up_layers:
             x = level["upsample"](x)
@@ -890,7 +981,7 @@ class SegResNetDecoderOnly(nn.Module):
             # If this level has a head (for deep supervision), get its output.
             if not isinstance(level["head"], nn.Identity):
                 outputs.append(level["head"](x))
-        
+
         # If deep supervision is used, return the output from the last head;
         # otherwise, simply return the final tensor.
         if outputs:
@@ -901,19 +992,20 @@ class SegResNetDecoderOnly(nn.Module):
 class VectorToTensor(nn.Module):
     """
     Projects a 1D latent vector into a 4D/5D tensor with spatial dimensions.
-    
-    For a 3D image, this transforms a vector of size `latent_dim` into a tensor 
-    with shape [batch, out_channels, D, H, W]. In this example, we assume the target 
+
+    For a 3D image, this transforms a vector of size `latent_dim` into a tensor
+    with shape [batch, out_channels, D, H, W]. In this example, we assume the target
     shape (excluding the batch dimension) is (out_channels, 2, 16, 16).
-    
+
     Args:
         latent_dim (int): Dimensionality of the latent vector (e.g., 512).
         target_shape (tuple): The target output shape excluding the batch dimension.
                               For example, (64, 2, 16, 16) where 64 is the number of channels.
     """
+
     def __init__(self, latent_dim: int, target_shape: tuple):
         super().__init__()
-        self.target_shape = target_shape  
+        self.target_shape = target_shape
         target_numel = 1
         for dim in target_shape:
             target_numel *= dim
@@ -923,12 +1015,12 @@ class VectorToTensor(nn.Module):
         """
         Args:
             x (torch.Tensor): A latent feature vector of shape [latent_dim] or [batch, latent_dim].
-            
+
         Returns:
             torch.Tensor: A tensor of shape [batch, *target_shape].
         """
         if x.dim() == 1:
-            x = x.unsqueeze(0)  
+            x = x.unsqueeze(0)
         x = self.fc(x)
         x = x.view(x.size(0), *self.target_shape)
         return x

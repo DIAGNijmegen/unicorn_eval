@@ -26,7 +26,10 @@ from unicorn_eval.adaptors.regression import (
     MultiLayerPerceptronRegressor,
 )
 from unicorn_eval.adaptors.detection import DensityMap
-from unicorn_eval.adaptors.segmentation import SegmentationUpsampling, SegmentationUpsampling3D
+from unicorn_eval.adaptors.segmentation import (
+    SegmentationUpsampling,
+    SegmentationUpsampling3D,
+)
 
 __all__ = [
     "KNN",
@@ -40,5 +43,5 @@ __all__ = [
     "MultiLayerPerceptronRegressor",
     "DensityMap",
     "SegmentationUpsampling",
-    "SegmentationUpsampling3D"
+    "SegmentationUpsampling3D",
 ]

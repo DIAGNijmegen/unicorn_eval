@@ -5,6 +5,7 @@ from scipy.ndimage import binary_erosion, label
 import itertools
 import SimpleITK as sitk
 
+
 def calculate_angle_between_lines(point1, point2, point3, point4):
     # Convert points to vectors
     vector1 = np.array([point2[0] - point1[0], point2[1] - point1[1]])
@@ -45,13 +46,14 @@ def find_perpendicular_diameter(point1, point2, boundary_points):
             angle = calculate_angle_between_lines(point1, point2, point3, point4)
             # Check if the angle of the line formed by p1 and p2 is close to perpendicular
             if abs(angle - 90) < angle_dev:
-                distance = np.linalg.norm(point3-point4)
+                distance = np.linalg.norm(point3 - point4)
                 if distance > max_distance:
                     max_distance = distance
                     short_axis_points = [point3, point4]
         angle_dev += 1
 
     return max_distance, short_axis_points[0], short_axis_points[1]
+
 
 def sape(y_true, y_pred):
     """
@@ -62,6 +64,7 @@ def sape(y_true, y_pred):
         return 0  # Return 0 if both y_true and y_pred are 0
     else:
         return abs(y_pred - y_true) / denominator
+
 
 def long_and_short_axis_diameters(mask):
     """
@@ -77,7 +80,9 @@ def long_and_short_axis_diameters(mask):
             labeled_seg, num_features = label(axial_slice)
             if num_features > 1:
                 # Remove all but largest component
-                largest_component = collections.Counter(x for x in labeled_seg.flatten() if x != 0).most_common(1)[0][0]
+                largest_component = collections.Counter(
+                    x for x in labeled_seg.flatten() if x != 0
+                ).most_common(1)[0][0]
                 labeled_seg[labeled_seg != largest_component] = 0
                 labeled_seg[labeled_seg == largest_component] = 1
 
@@ -87,7 +92,7 @@ def long_and_short_axis_diameters(mask):
             boundary_points = np.argwhere(boundary_mask == 1)
 
             # Compute all pairwise distances between boundary points
-            distances = pdist(boundary_points, metric='euclidean')
+            distances = pdist(boundary_points, metric="euclidean")
 
             # Convert the distances to a square form
             distance_matrix = squareform(distances)
@@ -97,8 +102,13 @@ def long_and_short_axis_diameters(mask):
 
             if long_diameter > long_axis_diameter:
                 longest_z = z
-                indices = np.unravel_index(np.argmax(distance_matrix), distance_matrix.shape)
-                point1, point2 = boundary_points[indices[0]], boundary_points[indices[1]]
+                indices = np.unravel_index(
+                    np.argmax(distance_matrix), distance_matrix.shape
+                )
+                point1, point2 = (
+                    boundary_points[indices[0]],
+                    boundary_points[indices[1]],
+                )
                 longest_z_bp = boundary_points
 
                 long_axis_diameter = long_diameter
@@ -106,11 +116,14 @@ def long_and_short_axis_diameters(mask):
 
     if longest_z != None:
         # Now get the longest perpendicular short axis
-        short_diameter, point3, point4 = find_perpendicular_diameter(point1, point2, longest_z_bp)
+        short_diameter, point3, point4 = find_perpendicular_diameter(
+            point1, point2, longest_z_bp
+        )
         short_axis_diameter = short_diameter
         short_axis_points = [np.append(point3, longest_z), np.append(point4, longest_z)]
 
     return long_axis_diameter, short_axis_diameter, long_axis_points, short_axis_points
+
 
 def dice_coefficient(mask1, mask2):
     mask1 = np.asarray(mask1).astype(bool)
@@ -118,11 +131,12 @@ def dice_coefficient(mask1, mask2):
     # Calculate intersection
     intersection = np.logical_and(mask1, mask2)
     # Calculate Dice
-    dice = 2. * intersection.sum() / (mask1.sum() + mask2.sum())
+    dice = 2.0 * intersection.sum() / (mask1.sum() + mask2.sum())
     if np.isnan(dice):
         return 0
     else:
         return dice
+
 
 def compute_uls_score(gts, preds):
     uls_scores = 0
@@ -134,9 +148,12 @@ def compute_uls_score(gts, preds):
         dice = dice_coefficient(gt, pred)
         sape_long = sape(gt_long, pred_long)
         sape_short = sape(gt_short, pred_short)
-        uls_score = (0.888 * dice + 0.056 * (1 - min(1, sape_long))
-                                    + 0.056 * (1 - min(1, sape_short)))
+        uls_score = (
+            0.888 * dice
+            + 0.056 * (1 - min(1, sape_long))
+            + 0.056 * (1 - min(1, sape_short))
+        )
         uls_scores += uls_score
-    
+
     uls_score_final = uls_scores / len(gts)
     return uls_score_final
