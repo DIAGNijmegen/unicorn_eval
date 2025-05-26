@@ -13,3 +13,7 @@ openslide-python
 openslide-bin
 pycm
 dragon_eval==0.2.10
+monai
+picai_prep>=2.1.13
+report_guided_annotation
+picai_eval
