@@ -79,7 +79,7 @@ INPUT_SLUGS_DICT = {
     ],
     "Task11_segmenting_three_anatomical_structures_in_lumbar_spine_mri": [
         "sagittal-spine-mri"
-    ],    
+    ],
     "Task20_generating_caption_from_wsi": [
         "he-staining"
     ]
@@ -94,7 +94,7 @@ MODEL_OUTPUT_SLUG_DICT = {
     "Task08_detecting_mitotic_figures_in_breast_cancer_wsis": "patch-neural-representation",
     "Task09_segmenting_rois_in_breast_cancer_wsis": "patch-neural-representation",
     "Task10_segmenting_lesions_within_vois_in_ct": "patch-neural-representation",
-    "Task11_segmenting_three_anatomical_structures_in_lumbar_spine_mri": "patch-neural-representation",    
+    "Task11_segmenting_three_anatomical_structures_in_lumbar_spine_mri": "patch-neural-representation",
     "Task20_generating_caption_from_wsi": "nlp-predictions-dataset",
 }
 
@@ -103,8 +103,7 @@ LABEL_SLUG_DICT = {
     "Task03_predicting_the_time_to_biochemical_recurrence_in_he_prostatectomies": "overall-survival-years.json",
     "Task04_predicting_slide_level_tumor_proportion_score_in_ihc_stained_wsi": "pd-l1-tps-binned.json",
     "Task05_detecting_signet_ring_cells_in_he_stained_wsi_of_gastric_cancer": "cell-classification.json",
-    "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams": "images/transverse-cspca-label/{case_id}.mha", 
-
+    "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams": "images/transverse-cspca-label/{case_id}.mha",
     "Task08_detecting_mitotic_figures_in_breast_cancer_wsis": "mitotic-figures.json",
     "Task09_segmenting_rois_in_breast_cancer_wsis": "images/tumor-stroma-and-other/{case_id}.tif",
     "Task10_segmenting_lesions_within_vois_in_ct": "images/ct-binary-uls/{case_id}.mha",
@@ -173,7 +172,8 @@ def process(job):
 
     assert image_name is not None, "No image found in predictions.json"
     case_name = Path(image_name).stem
-    # remove suffixes '_adc', '_t2w', and '_hbv' from the case name if present
+
+    # remove suffixes "_adc", "_t2w", and "_hbv" from the case name if present
     for suffix in ["_adc", "_t2w", "_hbv"]:
         if case_name.endswith(suffix):
             case_name = case_name[: -len(suffix)]
@@ -183,6 +183,7 @@ def process(job):
     modality = case_info.modality.values[0]
 
     if modality == "vision":
+
         prediction = None
         slug_embedding = MODEL_OUTPUT_SLUG_DICT[task_name]
 
@@ -206,6 +207,7 @@ def process(job):
                 features.append(feature)
             embeddings = np.concatenate(features)
             coordinates, spacing, patch_size, image_size, image_spacing, image_origin, image_direction = None, None, None, None, None, None, None
+
         elif slug_embedding == "patch-neural-representation":
             # TODO: better handle the case when there are multiple encoded inputs for a case
             # right now we concatenate the features
@@ -226,6 +228,7 @@ def process(job):
                     image_direction = curr_image_direction
                     first = False
             embeddings = np.concatenate(features)
+
     elif modality == "vision-language":
 
         model_output_slug = MODEL_OUTPUT_SLUG_DICT[task_name]
@@ -375,17 +378,19 @@ def load_tif_file(*, location):
     class_labels = level_0_np[:, :, 0]  # shape: (H, W)
     return class_labels
 
+
 def load_mha_file(*, location):
     class_labels = sitk.ReadImage(location)
-    if 'transverse-cspca-label' in str(location): 
+    if "transverse-cspca-label" in str(location):
         pat_case = Sample(scans=[class_labels], lbl = class_labels, settings=PreprocessingSettings(spacing=[1,1,1], matrix_size=[16,256,256]))
         pat_case.preprocess()
         class_labels = pat_case.lbl
     image_orientation = sitk.DICOMOrientImageFilter_GetOrientationFromDirectionCosines(class_labels.GetDirection())
-    if image_orientation != 'SPL': 
-        class_labels = sitk.DICOMOrient(class_labels, desiredCoordinateOrientation='SPL')
+    if image_orientation != "SPL":
+        class_labels = sitk.DICOMOrient(class_labels, desiredCoordinateOrientation="SPL")
     class_labels = sitk.GetArrayFromImage(class_labels)
     return class_labels
+
 
 def write_metrics(*, metrics):
     # write a json document used for ranking results on the leaderboard
@@ -393,7 +398,7 @@ def write_metrics(*, metrics):
         f.write(json.dumps(metrics, indent=4))
 
 
-def write_combined_metrics(*, metric_dict: dict[dict], save_predictions: bool = False) -> None:
+def write_combined_metrics(*, metric_dict: dict[dict], save_predictions: bool = True) -> None:
     metrics = {"metrics": {}, "normalized_metrics": {}}
     predictions = {"predictions": []}
 
@@ -408,8 +413,8 @@ def write_combined_metrics(*, metric_dict: dict[dict], save_predictions: bool = 
         for metric_name, metric_value in task_metrics["additional_metrics"].items():
             task_identifier = task_name.split("_")[0]
             metrics["metrics"][f"{task_identifier}_{metric_name}"] = metric_value
-        
-        if not save_predictions: 
+
+        if save_predictions:
             case_prediction = [
                 p.tolist() if isinstance(p, np.ndarray) else p
                 for p in task_metrics["predictions"]
@@ -426,7 +431,7 @@ def write_combined_metrics(*, metric_dict: dict[dict], save_predictions: bool = 
         content=metrics,
     )
 
-    if not save_predictions:
+    if save_predictions:
         write_json_file(
             location=OUTPUT_DIRECTORY / "predictions.json",
             content=predictions,
@@ -580,6 +585,7 @@ def main():
 
             elif task_type == "detection":
 
+                #TODO: add extra labels to the extra_labels array
                 if not task_name == "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams":
                     case_extra_labels = get_cases_extra_labels_detection(results["cases_image_sizes"], results["cases_image_spacings"])
 
@@ -597,10 +603,10 @@ def main():
                 test_image_sizes=case_image_size,
                 shot_extra_labels=shot_extra_labels,
                 test_image_spacing=case_image_spacings,
-                test_image_origins=case_image_origins, 
+                test_image_origins=case_image_origins,
                 test_image_directions=case_image_directions,
                 shots_image_spacing=shot_image_spacings,
-                shots_image_origins=shot_image_origins, 
+                shots_image_origins=shot_image_origins,
                 shots_image_directions=shot_image_directions
             )
 
@@ -621,9 +627,9 @@ def main():
         )
         task_metrics[task_name] = metrics
 
-    if task_type == 'segmentation': 
-        write_combined_metrics(metric_dict=task_metrics, save_predictions=True)
-    else: 
+    if task_type == "segmentation" or task_type == "detection":
+        write_combined_metrics(metric_dict=task_metrics, save_predictions=False)
+    else:
         write_combined_metrics(metric_dict=task_metrics)
     return 0
 

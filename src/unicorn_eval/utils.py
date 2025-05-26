@@ -62,7 +62,7 @@ METRIC_DICT = {
         "range": (0, 1),
     },
     "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams": {
-        "name": "picai", 
+        "name": "picai",
         "fn": compute_picai_score,
         "range": (0,1),
     },
@@ -82,8 +82,8 @@ METRIC_DICT = {
         "range": (0, 1),
     },
     "Task11_segmenting_three_anatomical_structures_in_lumbar_spine_mri": {
-        "name": "spider_score", 
-        "fn": compute_spider_score, 
+        "name": "spider_score",
+        "fn": compute_spider_score,
         "range": (0,1),
     },
     "Task20_generating_caption_from_wsi": {
@@ -233,39 +233,39 @@ def adapt_features(
         )
     elif adaptor_name == "segmentation-upsampling-3d":
         adaptor = SegmentationUpsampling3D(
-            train_feats= shot_features,
-            train_coords= shot_coordinates,
-            train_cases= shot_names,
-            train_labels= shot_labels,
-            test_feats = test_features,
-            test_coords= test_coordinates,
+            train_feats=shot_features,
+            train_coords=shot_coordinates,
+            train_cases=shot_names,
+            train_labels=shot_labels,
+            test_feats =test_features,
+            test_coords=test_coordinates,
             test_cases= test_names, # try to remove this input
-            test_image_sizes= test_image_sizes,
-            test_image_origins= test_image_origins, 
-            test_image_spacings= test_image_spacing,
-            test_image_directions= test_image_directions,
+            test_image_sizes=test_image_sizes,
+            test_image_origins=test_image_origins,
+            test_image_spacings=test_image_spacing,
+            test_image_directions=test_image_directions,
             patch_size= patch_size,
-            train_image_spacing= shots_image_spacing,
-            train_image_origins= shots_image_origins,
-            train_image_directions= shots_image_directions,
+            train_image_spacing=shots_image_spacing,
+            train_image_origins=shots_image_origins,
+            train_image_directions=shots_image_directions,
         )
     elif adaptor_name == "detection-by-segmentation-upsampling-3d":
         adaptor = SegmentationUpsampling3D(
-            train_feats= shot_features,
-            train_coords= shot_coordinates,
-            train_cases= shot_names,
-            train_labels= shot_labels,
-            test_feats = test_features,
-            test_coords= test_coordinates,
-            test_cases= test_names, # try to remove this input
-            test_image_sizes= test_image_sizes,
-            test_image_origins= test_image_origins, 
-            test_image_spacings= test_image_spacing,
-            test_image_directions= test_image_directions,
-            patch_size= patch_size,
-            train_image_spacing= shots_image_spacing,
-            train_image_origins= shots_image_origins,
-            train_image_directions= shots_image_directions,
+            train_feats=shot_features,
+            train_coords=shot_coordinates,
+            train_cases=shot_names,
+            train_labels=shot_labels,
+            test_feats=test_features,
+            test_coords=test_coordinates,
+            test_cases=test_names, # try to remove this input
+            test_image_sizes=test_image_sizes,
+            test_image_origins=test_image_origins,
+            test_image_spacings=test_image_spacing,
+            test_image_directions=test_image_directions,
+            patch_size=patch_size,
+            train_image_spacing=shots_image_spacing,
+            train_image_origins=shots_image_origins,
+            train_image_directions=shots_image_directions,
             return_binary= False,
         )
     else:
@@ -423,7 +423,7 @@ def extract_embeddings_and_labels(processed_results):
             shot_id = result["case_id"]
             tasks[task_name]["shot_image_spacings"][shot_id] = result["image_spacing"]
             tasks[task_name]["shot_image_origins"][shot_id] = result["image_origin"]
-            tasks[task_name]["shot_image_directions"][shot_id] =  result["image_direction"] 
+            tasks[task_name]["shot_image_directions"][shot_id] = result["image_direction"]
         elif result["split"] == "case":
             tasks[task_name]["case_embeddings"].append(result["embeddings"])
             tasks[task_name]["case_labels"].append(result["label"])
@@ -436,14 +436,14 @@ def extract_embeddings_and_labels(processed_results):
             tasks[task_name]["cases_image_spacings"][case_id] = result["image_spacing"]
             tasks[task_name]["cases_image_sizes"][case_id] = image_size
             tasks[task_name]["cases_image_origins"][case_id] = result["image_origin"]
-            tasks[task_name]["cases_image_directions"][case_id] =  result["image_direction"] 
+            tasks[task_name]["cases_image_directions"][case_id] = result["image_direction"]
 
     for task_name, task_data in tasks.items():
         task_type = task_data["task_type"]
         if task_type in ["classification", "regression"]:
             tasks[task_name] = process_image_representation(task_data)
         elif task_type == "detection":
-            if not task_name == "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams": 
+            if not task_name == "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams":
                 tasks[task_name] = process_detection(task_data)
 
     return tasks
