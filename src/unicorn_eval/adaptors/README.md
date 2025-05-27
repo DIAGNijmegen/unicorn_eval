@@ -67,7 +67,7 @@ Below are the approved adaptors for each task type.
 
 ### 🧩 Adaptor Radiology Detection Points
 
-- _Not available yet_
+- `detection-by-segmentation-upsampling-3d`
 
 ---
 
