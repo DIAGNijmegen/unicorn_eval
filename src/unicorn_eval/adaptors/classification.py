@@ -408,7 +408,7 @@ class MultiLayerPerceptron(CaseLevelTaskAdaptor):
             logits = self.model(self.test_features)
             if self.return_probabilities:
                 probabilities = torch.softmax(logits, dim=1)
-                return probabilities.cpu().numpy()
+                return probabilities[:, 1].cpu().numpy()
             else:
                 _, test_predictions = torch.max(logits, 1)
                 return test_predictions.cpu().numpy()

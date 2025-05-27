@@ -296,7 +296,6 @@ def compute_cpm(
         # ---- seriesuids.csv ------------------------------------------------
         series_csv = _dump([[cid] for cid in case_ids], tmp_dir,
                            "seriesuids.csv")
-        print("DEBUG  seriesuids    :", case_ids)
         # ---- annotations.csv ----------------------------------------------
         ann_rows = [[seriesuid_label,
                      coordX_label, coordY_label, coordZ_label,
@@ -311,8 +310,7 @@ def compute_cpm(
                     f"{float(diam_rec['diameter'])}"
                 ])
         ann_csv = _dump(ann_rows, tmp_dir, "annotations.csv")
-        print("DEBUG  ann_rows (GT) :", len(ann_rows) - 1, "rows")
-        print("       first 3 rows  :", ann_rows[:4])
+
         # ---- candidates.csv -----------------------------------------------
 
         cand_rows = [[seriesuid_label,

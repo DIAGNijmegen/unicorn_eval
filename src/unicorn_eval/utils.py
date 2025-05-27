@@ -16,8 +16,8 @@ import json
 from functools import partial
 
 import numpy as np
-from sklearn.metrics import cohen_kappa_score
-from sksurv.metrics import concordance_index_censored, roc_auc_score
+from sklearn.metrics import cohen_kappa_score, roc_auc_score
+from sksurv.metrics import concordance_index_censored
 
 from unicorn_eval.adaptors import (
     KNN,
@@ -365,7 +365,7 @@ def process_image_representation(data):
     return data
 
 
-def process_detection(data, task_name: str):
+def process_detection(data, task_name: str | None = None):
 
     def extract_points(labels):
         """
@@ -414,7 +414,7 @@ def process_detection(data, task_name: str):
                             "name": p.get("name", f"case{case_id}_pt{idx}"),
                         }
                     )
-
+                    
             elif isinstance(case_extra, (list, np.ndarray)):
                 for idx, d in enumerate(case_extra):
                     diameter_records.append(
@@ -497,10 +497,10 @@ def extract_embeddings_and_labels(processed_results):
 
     # now post-process each task
     for task_name, data in tasks.items():
-        tt = data["task_type"]
-        if tt in ["classification", "regression"]:
+        task_type = data["task_type"]
+        if task_type in ["classification", "regression"]:
             tasks[task_name] = process_image_representation(data)
-        elif tt == "detection":
+        elif task_type == "detection":
             tasks[task_name] = process_detection(data, task_name)
 
     return tasks
