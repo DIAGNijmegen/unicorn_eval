@@ -64,10 +64,10 @@ Below are the approved adaptors for each task type.
 
 ### 🧩 Adaptor Radiology Detection Points
 
-- `patch-nodule-regressor`
+`patch-nodule-regressor`
 
 ---
 
 ### 🧩 Adaptor Radiology Detection Segmentation
 
-- `detection-by-segmentation`
+- `detection-by-segmentation-upsampling-3d`

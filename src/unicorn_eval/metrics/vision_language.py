@@ -12,8 +12,6 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import os
-
 import numpy as np
 from bert_score import BERTScorer
 from pycocoevalcap.bleu.bleu import Bleu
@@ -145,10 +143,11 @@ def compute_bert_score(reports_true, reports_pred):
     """
     p_list, r_list, f1_list = [], [], []
 
-    model_directory = "/opt/app/unicorn_eval/models/bert-base-multilingual-cased"
-
-    # Ensure the model directory exists
-    assert Path(model_directory).exists(), f"Model directory {model_directory} does not exist."
+    model_directory = "/opt/app/unicorn_eval/models/dragon-bert-base-mixed-domain"
+    # ensure the model directory exists
+    assert Path(
+        model_directory
+    ).exists(), f"Model directory {model_directory} does not exist."
 
     scorer = BERTScorer(
         model_type=model_directory, num_layers=12, lang="nl", device="cpu"  # local path
@@ -163,9 +162,6 @@ def compute_bert_score(reports_true, reports_pred):
     r_list = np.array(r_list)
 
     average_f1 = f1_list.mean().item()
-    average_p = p_list.mean().item()
-    average_r = r_list.mean().item()
-
     return average_f1
 
 
@@ -180,6 +176,7 @@ def compute_average_language_metric(reports_true, reports_pred):
     Returns:
         dict: Dictionary containing averaged scores for CIDEr, BLEU, ROUGE-L, METEOR, and BERTScore F1.
     """
+
     metrics, normalized_metrics = {}, {}
 
     metric_info = {
@@ -200,5 +197,4 @@ def compute_average_language_metric(reports_true, reports_pred):
     # compute average of normalized metrics
     average_normalized_metric = np.mean(list(normalized_metrics.values()))
     metrics["average_language_metric"] = average_normalized_metric
-
     return metrics
