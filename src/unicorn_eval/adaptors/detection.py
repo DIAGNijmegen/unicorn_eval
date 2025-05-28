@@ -368,14 +368,16 @@ class DensityMap(PatchLevelTaskAdaptor):
 
 
 class TwoLayerPerceptron(nn.Module):
-        """2LP used for offline training."""
-        def __init__(self, input_dim: int, hidden_dim: int = 64) -> None:
-            super().__init__()
-            self.fc1  = nn.Linear(input_dim, hidden_dim)
-            self.relu = nn.ReLU()
-            self.fc2  = nn.Linear(hidden_dim, 4)  # dx, dy, dz, logit_p
-        def forward(self, x: torch.Tensor) -> torch.Tensor:
-            return self.fc2(self.relu(self.fc1(x)))  # [N,4]
+    """2LP used for offline training."""
+
+    def __init__(self, input_dim: int, hidden_dim: int = 64) -> None:
+        super().__init__()
+        self.fc1 = nn.Linear(input_dim, hidden_dim)
+        self.relu = nn.ReLU()
+        self.fc2 = nn.Linear(hidden_dim, 4)  # dx, dy, dz, logit_p
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.fc2(self.relu(self.fc1(x)))  # [N,4]
 
 
 class PatchNoduleRegressor(PatchLevelTaskAdaptor):
@@ -445,7 +447,7 @@ class PatchNoduleRegressor(PatchLevelTaskAdaptor):
         """
         Convert *voxel* index of the patch centre to patient‑space millimetres.
         """
-        v_mm = (np.array(patch_idx) + 0.5) * np.array(spacing) # mm
+        v_mm = (np.array(patch_idx) + 0.5) * np.array(spacing)  # mm
         R = np.array(direction).reshape(3, 3)
         return np.array(origin) + R.dot(v_mm)
 
@@ -462,17 +464,15 @@ class PatchNoduleRegressor(PatchLevelTaskAdaptor):
           image_direction, patch_size, patch_nodules.
         """
 
-        feats = np.stack([p["feature"] for p in patches]) # [N, D]
-        idxs = np.stack([p["patch_idx"] for p in patches]) # [N, 3]
-        nods = [p["patch_nodules"] for p in patches] # list of lists
+        feats = np.stack([p["feature"] for p in patches])  # [N, D]
+        idxs = np.stack([p["patch_idx"] for p in patches])  # [N, 3]
+        nods = [p["patch_nodules"] for p in patches]  # list of lists
         offsets, cls_labels = [], []
         for p, idx, nod_list in zip(patches, idxs, nods):
             origin = np.array(p["image_origin"])
             spacing = np.array(p["image_spacing"])
             direction = np.array(p["image_direction"]).reshape(3, 3)
-            pc = self.compute_patch_center_3d(
-                idx, spacing, origin, direction
-            )
+            pc = self.compute_patch_center_3d(idx, spacing, origin, direction)
             if nod_list:
                 coords = np.array(nod_list)
                 nearest = coords[np.argmin(np.linalg.norm(coords - pc, axis=1))]
@@ -487,13 +487,15 @@ class PatchNoduleRegressor(PatchLevelTaskAdaptor):
         x = torch.tensor(feats, dtype=torch.float32, device=device)
         y_off = torch.tensor(offsets, dtype=torch.float32, device=device)
         y_cls = torch.tensor(cls_labels, dtype=torch.float32, device=device)
-        self.model = TwoLayerPerceptron(input_dim=x.shape[1], hidden_dim=hidden_dim).to(device)
+        self.model = TwoLayerPerceptron(input_dim=x.shape[1], hidden_dim=hidden_dim).to(
+            device
+        )
         optimizer = optim.Adam(self.model.parameters(), lr=lr)
         box_loss = nn.MSELoss()
         cls_loss = nn.BCEWithLogitsLoss()
         for _ in range(num_epochs):
             optimizer.zero_grad()
-            out = self.model(x) # [N,4]
+            out = self.model(x)  # [N,4]
             loss = box_loss(out[:, :3], y_off) + cls_loss(out[:, 3], y_cls)
             loss.backward()
             optimizer.step()
@@ -506,16 +508,20 @@ class PatchNoduleRegressor(PatchLevelTaskAdaptor):
         device = next(self.model.parameters()).device
         feats = np.stack([p["feature"] for p in patches])
         x = torch.tensor(feats, dtype=torch.float32, device=device)
-        out = self.model(x).cpu().numpy() # [N,4]
+        out = self.model(x).cpu().numpy()  # [N,4]
         delta, logits = out[:, :3], out[:, 3]
-        centers = np.stack([
-            self.compute_patch_center_3d(
-                p["patch_idx"],
-                p["image_spacing"], p["image_origin"],
-                p["image_direction"]
-            )
-            for p in patches
-        ], axis=0)
+        centers = np.stack(
+            [
+                self.compute_patch_center_3d(
+                    p["patch_idx"],
+                    p["image_spacing"],
+                    p["image_origin"],
+                    p["image_direction"],
+                )
+                for p in patches
+            ],
+            axis=0,
+        )
         world_centres = centers + delta
         probs = 1 / (1 + np.exp(-logits))
         return np.concatenate([world_centres, probs[:, None]], axis=1)
@@ -533,14 +539,16 @@ class PatchNoduleRegressor(PatchLevelTaskAdaptor):
             spacing = self.shot_image_spacings[case_id]
             direction = self.shot_image_directions[case_id]
             for feat, idx in zip(feats_case, idxs_case):
-                patch_dicts.append({
-                    "feature": feat,
-                    "patch_idx": idx,
-                    "image_origin": origin,
-                    "image_spacing": spacing,
-                    "image_direction": direction,
-                    "patch_nodules": nods_case,
-                })
+                patch_dicts.append(
+                    {
+                        "feature": feat,
+                        "patch_idx": idx,
+                        "image_origin": origin,
+                        "image_spacing": spacing,
+                        "image_direction": direction,
+                        "patch_nodules": nods_case,
+                    }
+                )
         self.train_from_patches(
             patches=patch_dicts,
             hidden_dim=self.hidden_dim,
@@ -551,7 +559,7 @@ class PatchNoduleRegressor(PatchLevelTaskAdaptor):
     def predict(self) -> np.ndarray:
 
         test_dicts: list[dict] = []
-        case_ids: list[str]  = []
+        case_ids: list[str] = []
 
         for feats_case, idxs_case, case_id in zip(
             self.test_features,
@@ -562,15 +570,17 @@ class PatchNoduleRegressor(PatchLevelTaskAdaptor):
             spacing = self.test_image_spacings[case_id]
             direction = self.test_image_directions[case_id]
             for feat, idx in zip(feats_case, idxs_case):
-                test_dicts.append({
-                    "feature": feat,
-                    "patch_idx": idx,
-                    "image_origin": origin,
-                    "image_spacing": spacing,
-                    "image_direction": direction,
-                    "patch_nodules": [], # no GT here
-                })
-                case_ids.append(case_id) # keep alignment with test_dicts
+                test_dicts.append(
+                    {
+                        "feature": feat,
+                        "patch_idx": idx,
+                        "image_origin": origin,
+                        "image_spacing": spacing,
+                        "image_direction": direction,
+                        "patch_nodules": [],  # no GT here
+                    }
+                )
+                case_ids.append(case_id)  # keep alignment with test_dicts
 
         # raw predictions [x,y,z,p] for every patch
         raw_preds = self.infer_from_patches(test_dicts)
@@ -587,7 +597,9 @@ class PatchNoduleRegressor(PatchLevelTaskAdaptor):
 
         # Nodule count printout
         n_kept = int(mask.sum())
-        print(f"[MLPRegressor] Returning {n_kept} nodules (p > 0.9) "
-              f"out of {len(mask)} patches")
+        print(
+            f"[MLPRegressor] Returning {n_kept} nodules (p > 0.9) "
+            f"out of {len(mask)} patches"
+        )
 
         return preds

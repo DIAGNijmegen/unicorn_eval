@@ -244,6 +244,7 @@ class LogisticRegression(CaseLevelTaskAdaptor):
         predict() -> np.ndarray:
             Predicts the labels for the test features using the trained model.
     """
+
     def __init__(
         self,
         shot_features,
@@ -305,6 +306,7 @@ class LinearProbing(CaseLevelTaskAdaptor):
         predict() -> np.ndarray:
             Predicts the labels for the test features using the trained model.
     """
+
     def __init__(
         self,
         shot_features,
@@ -395,6 +397,7 @@ class MLPClassifier(nn.Module):
     """
     A simple MLP classifier with a tunable number of hidden layers.
     """
+
     def __init__(
         self, input_dim: int, hidden_dim: int, output_dim: int, num_layers: int
     ):
@@ -432,6 +435,7 @@ class MultiLayerPerceptron(CaseLevelTaskAdaptor):
         predict() -> np.ndarray:
             Generates predictions for the test data using the fitted model.
     """
+
     def __init__(
         self,
         shot_features,

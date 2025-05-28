@@ -29,7 +29,6 @@ import numpy as np
 import sklearn.metrics as skl_metrics
 
 
-
 def read_csv(filename: str) -> List[List[str]]:
     rows: List[List[str]] = []
     with open(filename, newline="", encoding="utf-8-sig") as f:
@@ -64,13 +63,13 @@ class NoduleFinding:
         self.seriesuid = seriesInstanceUID
 
 
-seriesuid_label      = "seriesuid"
-coordX_label         = "coordX"
-coordY_label         = "coordY"
-coordZ_label         = "coordZ"
-diameter_mm_label    = "diameter_mm"
+seriesuid_label = "seriesuid"
+coordX_label = "coordX"
+coordY_label = "coordY"
+coordZ_label = "coordZ"
+diameter_mm_label = "diameter_mm"
 CADProbability_label = "probability"
-fixedFPs             = [0.125, 0.25, 0.5, 1, 2, 4, 8]
+fixedFPs = [0.125, 0.25, 0.5, 1, 2, 4, 8]
 
 
 def getCPM(
@@ -100,7 +99,7 @@ def computeFROC(
             FROCProbList_local.append(FROCProbList[i])
 
     numberOfDetectedLesions = sum(FROCGTList_local)
-    totalNumberOfLesions    = sum(FROCGTList)
+    totalNumberOfLesions = sum(FROCGTList)
     totalNumberOfCandidates = len(FROCProbList_local)
 
     # ------------------------------------------------------------------ #
@@ -111,9 +110,7 @@ def computeFROC(
         return np.array([0.0]), np.array([0.0]), np.array([0.0])
     # ------------------------------------------------------------------ #
 
-    fpr, tpr, thresholds = skl_metrics.roc_curve(
-        FROCGTList_local, FROCProbList_local
-    )
+    fpr, tpr, thresholds = skl_metrics.roc_curve(FROCGTList_local, FROCProbList_local)
 
     if sum(FROCGTList) == len(FROCGTList):
         fps = np.zeros(len(fpr))
@@ -160,9 +157,9 @@ def collect(
     annotations_filename: str,
     seriesuids_filename: str,
 ):
-    annotations  = read_csv(annotations_filename)
-    seriesUIDs   = [row[0] for row in read_csv(seriesuids_filename)]
-    allNodules   = collectNoduleAnnotations(annotations, seriesUIDs)
+    annotations = read_csv(annotations_filename)
+    seriesUIDs = [row[0] for row in read_csv(seriesuids_filename)]
+    allNodules = collectNoduleAnnotations(annotations, seriesUIDs)
     return allNodules, seriesUIDs
 
 
@@ -173,7 +170,7 @@ def evaluateCAD_for_cpm(
     maxNumberOfCADMarks: int = -1,
 ) -> float:
     results = read_csv(results_filename)
-    header  = results[0]
+    header = results[0]
 
     allCandsCAD: Dict[str, Dict[int, NoduleFinding]] = {}
     for seriesuid in seriesUIDs:
@@ -208,21 +205,21 @@ def evaluateCAD_for_cpm(
     excludeList: List[bool] = []
 
     for seriesuid in seriesUIDs:
-        candidates    = allCandsCAD.get(seriesuid, {})
-        remaining     = candidates.copy()
-        noduleAnnots  = allNodules.get(seriesuid, [])
+        candidates = allCandsCAD.get(seriesuid, {})
+        remaining = candidates.copy()
+        noduleAnnots = allNodules.get(seriesuid, [])
 
         for na in noduleAnnots:
             x, y, z = map(float, (na.coordX, na.coordY, na.coordZ))
-            diam    = float(na.diameter_mm)
-            diam    = diam if diam >= 0.0 else 10.0
-            rad2    = (diam / 2.0) ** 2
+            diam = float(na.diameter_mm)
+            diam = diam if diam >= 0.0 else 10.0
+            rad2 = (diam / 2.0) ** 2
             matches: List[NoduleFinding] = []
             for key, cand in list(candidates.items()):
                 dx = x - float(cand.coordX)
                 dy = y - float(cand.coordY)
                 dz = z - float(cand.coordZ)
-                if dx*dx + dy*dy + dz*dz < rad2:
+                if dx * dx + dy * dy + dz * dz < rad2:
                     matches.append(cand)
                     remaining.pop(key, None)
 
@@ -240,16 +237,14 @@ def evaluateCAD_for_cpm(
                 FPDivisorList.append(seriesuid)
                 excludeList.append(True)
 
-        for cand in remaining.values():          # false positives
+        for cand in remaining.values():  # false positives
             candFPs += 1
             FROCGTList.append(0.0)
             FROCProbList.append(float(cand.CADprobability))
             FPDivisorList.append(seriesuid)
             excludeList.append(False)
 
-    fps, sens, _ = computeFROC(
-        FROCGTList, FROCProbList, len(seriesUIDs), excludeList
-    )
+    fps, sens, _ = computeFROC(FROCGTList, FROCProbList, len(seriesUIDs), excludeList)
     meanSens, _ = getCPM(fps, sens, fixedFPs)
     return meanSens
 
@@ -260,15 +255,14 @@ def noduleCADEvaluation_for_cpm(
     results_filename: str,
     max_number_cad_marks: int = -1,
 ) -> float:
-    allNodules, seriesUIDs = collect(
-        annotations_filename, seriesuids_filename
-    )
+    allNodules, seriesUIDs = collect(annotations_filename, seriesuids_filename)
     return evaluateCAD_for_cpm(
         seriesUIDs,
         results_filename,
         allNodules,
         maxNumberOfCADMarks=max_number_cad_marks,
     )
+
 
 # ------------------------------------------------------------------ #
 #  ----- helper for temporary CSV creation ------------------------- #
@@ -282,7 +276,7 @@ def _dump(rows: List[List[str]], dir_: Path, fname: str) -> str:
 
 def compute_cpm(
     case_ids: Sequence[str],
-    test_predictions,                 # iterable of [test_id,x,y,z,p]
+    test_predictions,  # iterable of [test_id,x,y,z,p]
     test_labels: Sequence[Sequence[Tuple[float, float, float]]],
     test_extra_labels,
 ) -> float:
@@ -294,41 +288,52 @@ def compute_cpm(
         tmp_dir = Path(tmp_dir_str)
 
         # ---- seriesuids.csv ------------------------------------------------
-        series_csv = _dump([[cid] for cid in case_ids], tmp_dir,
-                           "seriesuids.csv")
+        series_csv = _dump([[cid] for cid in case_ids], tmp_dir, "seriesuids.csv")
         # ---- annotations.csv ----------------------------------------------
-        ann_rows = [[seriesuid_label,
-                     coordX_label, coordY_label, coordZ_label,
-                     diameter_mm_label]]
+        ann_rows = [
+            [
+                seriesuid_label,
+                coordX_label,
+                coordY_label,
+                coordZ_label,
+                diameter_mm_label,
+            ]
+        ]
 
         diam_iter = iter(test_extra_labels)
 
         for case_name, coords in zip(case_ids, test_labels):
             # For each coordinate triple in this case
-            for (x, y, z) in coords:
+            for x, y, z in coords:
                 # Grab the *next* diameter dict from your flat iterator
                 diam_struct = next(diam_iter)
 
                 # Now build your row
-                ann_rows.append([
-                    case_name,
-                    f"{x:.6f}",   # format to e.g. 6dp if you like
-                    f"{y:.6f}",
-                    f"{z:.6f}",
-                    f"{float(diam_struct['diameter']):.6f}"
-                ])
+                ann_rows.append(
+                    [
+                        case_name,
+                        f"{x:.6f}",  # format to e.g. 6dp if you like
+                        f"{y:.6f}",
+                        f"{z:.6f}",
+                        f"{float(diam_struct['diameter']):.6f}",
+                    ]
+                )
         ann_csv = _dump(ann_rows, tmp_dir, "annotations.csv")
         # ---- candidates.csv -----------------------------------------------
 
-        cand_rows = [[seriesuid_label,
-                      coordX_label, coordY_label, coordZ_label,
-                      CADProbability_label]]
+        cand_rows = [
+            [
+                seriesuid_label,
+                coordX_label,
+                coordY_label,
+                coordZ_label,
+                CADProbability_label,
+            ]
+        ]
         for row in test_predictions:
             test_id, x, y, z, p = row
-            if test_id in case_ids:          # ignore stray predictions
-                cand_rows.append([
-                    test_id, f"{x}", f"{y}", f"{z}", f"{p}"
-                ])
+            if test_id in case_ids:  # ignore stray predictions
+                cand_rows.append([test_id, f"{x}", f"{y}", f"{z}", f"{p}"])
         cand_csv = _dump(cand_rows, tmp_dir, "candidates.csv")
         # ---- run evaluator -------------------------------------------------
 
