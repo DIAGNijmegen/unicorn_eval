@@ -356,7 +356,8 @@ class LinearProbingRegressor(CaseLevelTaskAdaptor):
             if self.survival:
                 hazards = torch.sigmoid(logits)
                 survival = torch.cumprod(1 - hazards, dim=1)
-                test_predictions = -torch.sum(survival, dim=1)
+                risk_scores = -torch.sum(survival, dim=1)
+                test_predictions = -risk_scores
             else:
                 _, test_predictions = torch.max(logits, 1)
         return test_predictions.cpu().numpy()
@@ -529,7 +530,8 @@ class MultiLayerPerceptronRegressor(CaseLevelTaskAdaptor):
             if self.survival:
                 hazards = torch.sigmoid(logits)
                 survival = torch.cumprod(1 - hazards, dim=1)
-                test_predictions = -torch.sum(survival, dim=1)
+                risk_scores = -torch.sum(survival, dim=1)
+                test_predictions = -risk_scores
             else:
                 _, test_predictions = torch.max(logits, 1)
         return test_predictions.cpu().numpy()

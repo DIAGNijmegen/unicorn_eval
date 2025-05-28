@@ -298,7 +298,7 @@ class LinearProbing(CaseLevelTaskAdaptor):
         num_epochs (int): The number of epochs for training the linear model. Default is 100.
         learning_rate (float): The learning rate for the optimizer. Default is 0.001.
         patience (int): Number of epochs with no improvement after which training will be stopped. Default is 10.
-        shot_extra_labels (np.ndarray): Optional additional labels for training, used in survival analysis.
+        shot_extra_labels (np.ndarray): Optional additional labels for training.
         return_probabilities (bool): Whether to return class probabilities instead of predictions.
     Methods:
         fit():
@@ -427,7 +427,7 @@ class MultiLayerPerceptron(CaseLevelTaskAdaptor):
         num_epochs (int): Number of training epochs. Default is 100.
         learning_rate (float): Learning rate for the optimizer. Default is 0.001.
         patience (int): Number of epochs with no improvement after which training will be stopped. Default is 10.
-        shot_extra_labels (np.ndarray): Optional additional labels for training, used in survival analysis.
+        shot_extra_labels (np.ndarray): Optional additional labels for training.
         return_probabilities (bool): Whether to return class probabilities instead of predictions.
     Methods:
         fit():
