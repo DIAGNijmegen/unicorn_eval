@@ -65,7 +65,7 @@ METRIC_DICT = {
         "fn": compute_f1,
         "range": (0, 1),
     },
-        "Task07_detecting_lung_nodules_in_thoracic_ct": {
+    "Task07_detecting_lung_nodules_in_thoracic_ct": {
         "name": "sensitivity",
         "fn": compute_cpm,
         "range": (0, 1),
@@ -401,7 +401,6 @@ def process_detection(data, task_name: str | None = None):
     if task_name == "Task07_detecting_lung_nodules_in_thoracic_ct":
         # build: [{'point': …, 'diameter': …, 'name': …}, …]
         diameter_records = []
-
         for case_id, case_extra in enumerate(extra_list):
             if isinstance(case_extra, dict):
                 # expected structure: {<study_id>: {'points': […]}}
@@ -416,10 +415,18 @@ def process_detection(data, task_name: str | None = None):
                     )
                     
             elif isinstance(case_extra, (list, np.ndarray)):
-                for idx, d in enumerate(case_extra):
-                    diameter_records.append(
-                        {"point": None, "diameter": float(d), "name": f"case{case_id}_pt{idx}"}
-                    )
+                first_tuple = case_extra[0]
+                if len(first_tuple) >= 1:
+                    element = first_tuple[0]
+                    
+                    if element is None:
+                        print("nothing to process in this case (got [(None,)])")
+                    
+                    elif isinstance(element, dict):
+                        for idx, d in enumerate(element.get('points')):
+                            diameter_records.append(
+                                    {"point": None, "diameter": float(d.get('diameter')), "name": f"case{case_id}_pt{idx}"}
+                            )
 
             elif isinstance(case_extra, (int, float)):
                 diameter_records.append(

@@ -53,6 +53,7 @@ REQUIRES_PROBABILITIES_DICT = {
     "Task03_predicting_the_time_to_biochemical_recurrence_in_he_prostatectomies": False,
     "Task04_predicting_slide_level_tumor_proportion_score_in_ihc_stained_wsi": False,
     "Task05_detecting_signet_ring_cells_in_he_stained_wsi_of_gastric_cancer": False,
+    "Task07_detecting_lung_nodules_in_thoracic_ct": False,  
     "Task08_detecting_mitotic_figures_in_breast_cancer_wsis": False,
     "Task09_segmenting_rois_in_breast_cancer_wsis": False,
 }

@@ -300,14 +300,22 @@ def compute_cpm(
         ann_rows = [[seriesuid_label,
                      coordX_label, coordY_label, coordZ_label,
                      diameter_mm_label]]
-        for cid, coords_case, diam_struct in zip(
-            case_ids, test_labels, test_extra_labels
-        ):
-            diam_list = diam_struct[0]["points"]
-            for (x, y, z), diam_rec in zip(coords_case, diam_list):
+
+        diam_iter = iter(test_extra_labels)
+
+        for case_name, coords in zip(case_ids, test_labels):
+            # For each coordinate triple in this case
+            for (x, y, z) in coords:
+                # Grab the *next* diameter dict from your flat iterator
+                diam_struct = next(diam_iter)
+
+                # Now build your row
                 ann_rows.append([
-                    cid, f"{x}", f"{y}", f"{z}",
-                    f"{float(diam_rec['diameter'])}"
+                    case_name,
+                    f"{x:.6f}",   # format to e.g. 6dp if you like
+                    f"{y:.6f}",
+                    f"{z:.6f}",
+                    f"{float(diam_struct['diameter']):.6f}"
                 ])
         ann_csv = _dump(ann_rows, tmp_dir, "annotations.csv")
 
