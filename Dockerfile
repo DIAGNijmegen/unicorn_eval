@@ -40,7 +40,7 @@ WORKDIR /opt/app/
 # install python libraries
 RUN python -m pip install --upgrade pip setuptools pip-tools
 COPY --chown=user:user requirements.in .
-RUN python -m pip install -r requirements.in
+RUN python -m pip install --no-cache-dir -r requirements.in
 
 # install unicorn_eval
 COPY --chown=user:user . /opt/app/unicorn_eval

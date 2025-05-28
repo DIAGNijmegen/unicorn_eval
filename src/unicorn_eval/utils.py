@@ -16,35 +16,42 @@ import json
 from functools import partial
 
 import numpy as np
-from sklearn.metrics import cohen_kappa_score
+from sklearn.metrics import cohen_kappa_score, roc_auc_score
 from sksurv.metrics import concordance_index_censored
 
 from unicorn_eval.adaptors import (
     KNN,
-    KNNRegressor,
-    MultiLayerPerceptron,
-    MultiLayerPerceptronRegressor,
     DensityMap,
+    KNNRegressor,
     LinearProbing,
     LinearProbingRegressor,
     LogisticRegression,
+    MultiLayerPerceptron,
+    MultiLayerPerceptronRegressor,
+    PatchNoduleRegressor,
     SegmentationUpsampling,
     SegmentationUpsampling3D,
     WeightedKNN,
     WeightedKNNRegressor,
 )
 from unicorn_eval.metrics.dice import compute_dice_score
-from unicorn_eval.metrics.uls import compute_uls_score
-from unicorn_eval.metrics.spider import compute_spider_score
 from unicorn_eval.metrics.f1_score import compute_f1
-from unicorn_eval.metrics.vision_language import compute_average_language_metric
 from unicorn_eval.metrics.picai_score import compute_picai_score
+from unicorn_eval.metrics.sensitivity import compute_cpm
+from unicorn_eval.metrics.spider import compute_spider_score
+from unicorn_eval.metrics.uls import compute_uls_score
+from unicorn_eval.metrics.vision_language import compute_average_language_metric
 
 METRIC_DICT = {
     "Task01_classifying_he_prostate_biopsies_into_isup_scores": {
         "name": "cohen-kappa-quadratic",
         "fn": partial(cohen_kappa_score, weights="quadratic"),
         "range": (-1, 1),
+    },
+    "Task02_classifying_lung_nodule_malignancy_in_ct": {
+        "name": "auc",
+        "fn": roc_auc_score,
+        "range": (0, 1),
     },
     "Task03_predicting_the_time_to_biochemical_recurrence_in_he_prostatectomies": {
         "name": "c-index",
@@ -65,6 +72,11 @@ METRIC_DICT = {
         "name": "picai",
         "fn": compute_picai_score,
         "range": (0,1),
+    },
+    "Task07_detecting_lung_nodules_in_thoracic_ct": {
+        "name": "sensitivity",
+        "fn": compute_cpm,
+        "range": (0, 1),
     },
     "Task08_detecting_mitotic_figures_in_breast_cancer_wsis": {
         "name": "f1",
@@ -110,10 +122,11 @@ def adapt_features(
     test_image_spacing=None,
     test_image_origins=None,
     test_image_directions=None,
-    shots_image_spacing=None,
-    shots_image_origins=None,
-    shots_image_directions=None,
+    shot_image_spacing=None,
+    shot_image_origins=None,
+    shot_image_directions=None,
     shot_extra_labels=None,
+    return_probabilities=False,
 ):
     num_shots = len(shot_features)
     if "-nn" in adaptor_name:
@@ -125,7 +138,8 @@ def adapt_features(
                     shot_features=shot_features,
                     shot_labels=shot_labels,
                     test_features=test_features,
-                    k=k
+                    k=k,
+                    return_probabilities=return_probabilities,
                 )
             elif task_type == "regression":
                 adaptor = WeightedKNNRegressor(
@@ -158,6 +172,7 @@ def adapt_features(
             max_iterations=1000,
             C=1.0,
             solver="lbfgs",
+            return_probabilities=return_probabilities,
         )
     elif "linear-probing" in adaptor_name:
         if task_type == "classification":
@@ -168,6 +183,7 @@ def adapt_features(
                 test_features=test_features,
                 num_epochs=100,
                 learning_rate=0.001,
+                return_probabilities=return_probabilities,
             )
         elif task_type == "regression":
             survival = False
@@ -192,6 +208,7 @@ def adapt_features(
                 hidden_dim=256,
                 num_epochs=100,
                 learning_rate=0.001,
+                return_probabilities=return_probabilities,
             )
         elif task_type == "regression":
             survival = False
@@ -207,6 +224,27 @@ def adapt_features(
                 num_epochs=100,
                 learning_rate=0.001,
             )
+
+        elif task_type == "detection":
+            adaptor = PatchNoduleRegressor(
+                shot_features=shot_features,
+                shot_labels=shot_labels,
+                shot_coordinates=shot_coordinates,
+                shot_ids=shot_names,
+                test_features=test_features,
+                test_coordinates=test_coordinates,
+                test_ids=test_names,
+                test_image_origins=test_image_origins,
+                test_image_spacings=test_image_spacing,
+                test_image_directions=test_image_directions,
+                shot_image_spacings=shot_image_spacing,
+                shot_image_origins=shot_image_origins,
+                shot_image_directions=shot_image_directions,
+                hidden_dim=64,
+                num_epochs=50,
+                lr=1e-3,
+            )
+
     elif adaptor_name == "density-map":
         adaptor = DensityMap(
             shot_features=shot_features,
@@ -233,43 +271,44 @@ def adapt_features(
         )
     elif adaptor_name == "segmentation-upsampling-3d":
         adaptor = SegmentationUpsampling3D(
-            train_feats=shot_features,
-            train_coords=shot_coordinates,
-            train_cases=shot_names,
-            train_labels=shot_labels,
-            test_feats =test_features,
-            test_coords=test_coordinates,
-            test_cases= test_names, # try to remove this input
-            test_image_sizes=test_image_sizes,
-            test_image_origins=test_image_origins,
-            test_image_spacings=test_image_spacing,
-            test_image_directions=test_image_directions,
-            patch_size= patch_size,
-            train_image_spacing=shots_image_spacing,
-            train_image_origins=shots_image_origins,
-            train_image_directions=shots_image_directions,
-        )
-    elif adaptor_name == "detection-by-segmentation-upsampling-3d":
-        adaptor = SegmentationUpsampling3D(
-            train_feats=shot_features,
-            train_coords=shot_coordinates,
-            train_cases=shot_names,
-            train_labels=shot_labels,
-            test_feats=test_features,
-            test_coords=test_coordinates,
-            test_cases=test_names, # try to remove this input
+            shot_features=shot_features,
+            shot_coordinates=shot_coordinates,
+            shot_names=shot_names,
+            shot_labels=shot_labels,
+            test_features=test_features,
+            test_coordinates=test_coordinates,
+            test_names=test_names, # try to remove this input
             test_image_sizes=test_image_sizes,
             test_image_origins=test_image_origins,
             test_image_spacings=test_image_spacing,
             test_image_directions=test_image_directions,
             patch_size=patch_size,
-            train_image_spacing=shots_image_spacing,
-            train_image_origins=shots_image_origins,
-            train_image_directions=shots_image_directions,
-            return_binary= False,
+            shot_image_spacing=shot_image_spacing,
+            shot_image_origins=shot_image_origins,
+            shot_image_directions=shot_image_directions,
+        )
+    elif adaptor_name == "detection-by-segmentation-upsampling-3d":
+        adaptor = SegmentationUpsampling3D(
+            shot_features=shot_features,
+            shot_coordinates=shot_coordinates,
+            shot_names=shot_names,
+            shot_labels=shot_labels,
+            test_features=test_features,
+            test_coordinates=test_coordinates,
+            test_names=test_names, # try to remove this input
+            test_image_sizes=test_image_sizes,
+            test_image_origins=test_image_origins,
+            test_image_spacings=test_image_spacing,
+            test_image_directions=test_image_directions,
+            patch_size=patch_size,
+            shot_image_spacing=shot_image_spacing,
+            shot_image_origins=shot_image_origins,
+            shot_image_directions=shot_image_directions,
+            return_binary=False,
         )
     else:
         raise ValueError(f"Unknown adaptor: {adaptor_name}")
+
     adaptor.fit()
     predictions = adaptor.predict()
     return predictions
@@ -288,22 +327,33 @@ def convert_numpy_types(obj):
 def evaluate_predictions(task_name, case_ids, test_predictions, test_labels, test_extra_labels=None, test_image_spacing=None):
 
     metrics = {
-        "predictions": [],  # list to store individual case results
-        "metrics": {}, # dictionary to store main metric
-        "additional_metrics": {},  # dictionary to store additional metrics
+        "predictions": [],          # list to store individual case results
+        "metrics": {},              # dictionary to store main metric
+        "additional_metrics": {},   # dictionary to store additional metrics
     }
 
-    for case_id, prediction, ground_truth in zip(case_ids, test_predictions, test_labels):
-        ground_truth = convert_numpy_types(ground_truth)
-        prediction = convert_numpy_types(prediction)
-
+    # To get all nodule predictions for Task 7
+    if task_name == "Task07_detecting_lung_nodules_in_thoracic_ct":
+        # One entry containing the full arrays
         metrics["predictions"].append(
             {
-                "case_id": case_id,
-                "ground_truth": ground_truth,
-                "prediction": prediction,
+                "case_id": convert_numpy_types(case_ids),
+                "ground_truth": convert_numpy_types(test_labels),
+                "prediction": convert_numpy_types(test_predictions),
             }
         )
+    else:
+        iterable = zip(case_ids, test_predictions, test_labels)
+        for case_id, prediction, ground_truth in iterable:
+            ground_truth = convert_numpy_types(ground_truth)
+            prediction = convert_numpy_types(prediction)
+            metrics["predictions"].append(
+                {
+                    "case_id": case_id,
+                    "ground_truth": ground_truth,
+                    "prediction": prediction,
+                }
+            )
 
     # handle metric computation based on task_name
     metric_name = METRIC_DICT[task_name]["name"]
@@ -312,6 +362,10 @@ def evaluate_predictions(task_name, case_ids, test_predictions, test_labels, tes
     additional_metric_dict = {}
     if task_name == "Task01_classifying_he_prostate_biopsies_into_isup_scores":
         metric_value = metric_fn(test_labels, test_predictions)
+        metric_dict[metric_name] = metric_value
+    elif task_name == "Task02_classifying_lung_nodule_malignancy_in_ct":
+        malignancy_risk = test_predictions[:,1]
+        metric_value = metric_fn(test_labels, malignancy_risk)
         metric_dict[metric_name] = metric_value
     elif task_name == "Task03_predicting_the_time_to_biochemical_recurrence_in_he_prostatectomies":
         events = test_extra_labels["event"].astype(bool)
@@ -326,6 +380,9 @@ def evaluate_predictions(task_name, case_ids, test_predictions, test_labels, tes
     elif task_name == "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams":
         metric_value = metric_fn(test_labels, test_predictions)
         metric_dict[metric_name] = metric_value
+    elif task_name == "Task07_detecting_lung_nodules_in_thoracic_ct":
+        metric_value = metric_fn(case_ids, test_predictions, test_labels, test_extra_labels)
+        metric_dict[metric_name] = metric_value
     elif task_name == "Task08_detecting_mitotic_figures_in_breast_cancer_wsis":
         metric_value = metric_fn(test_labels, test_predictions, 16)
         metric_dict[metric_name] = metric_value
@@ -339,7 +396,7 @@ def evaluate_predictions(task_name, case_ids, test_predictions, test_labels, tes
         metric_value = metric_fn(test_labels, test_predictions, test_image_spacing, case_ids)
         metric_dict[metric_name] = metric_value
     elif task_name == "Task20_generating_caption_from_wsi":
-        language_metric_dict = metric_fn(test_labels, test_predictions) # a dictionnary
+        language_metric_dict = metric_fn(test_labels, test_predictions)  # a dictionary
         metric_dict[metric_name] = language_metric_dict.pop(metric_name)
         additional_metric_dict.update(language_metric_dict)
     else:
@@ -369,16 +426,81 @@ def process_image_representation(data):
     return data
 
 
-def process_detection(data):
+def process_detection(data, task_name: str | None = None):
     def extract_points(labels):
-        return [np.array([(p["point"][0], p["point"][1]) for p in gt["points"]]).tolist() for gt in labels]
-    # add comment
+        """
+        Pull out coordinate tuples from a list of GT dictionaries.
+
+        * Keeps the first three coordinates when available.
+        * Falls back to the first two coordinates for 2‑D points.
+
+        Returns
+        -------
+        list[list[tuple]]
+            Two‑level list: ``[case_idx][pt_idx] -> tuple``.
+        """
+        pts_all = []
+        for gt in labels:
+            case_pts = []
+            for p in gt.get("points", []):
+                pt = p.get("point")
+                if pt is None:
+                    continue
+                case_pts.append(tuple(pt[:3]) if len(pt) >= 3 else tuple(pt[:2]))
+            pts_all.append(case_pts)
+        return pts_all
+
     data["shot_labels"] = extract_points(data["shot_labels"])
     data["case_labels"] = extract_points(data["case_labels"])
-    if data["case_extra_labels"] and data["case_extra_labels"][0] is not None:
-        data["case_extra_labels"] = np.concatenate(data["case_extra_labels"], axis=0)
-    else:
+
+    extra_list = data.get("case_extra_labels")
+    if not extra_list or extra_list[0] is None:
         data["case_extra_labels"] = None
+        return data
+
+    if task_name == "Task07_detecting_lung_nodules_in_thoracic_ct":
+        # build: [{'point': …, 'diameter': …, 'name': …}, …]
+        diameter_records = []
+        for case_id, case_extra in enumerate(extra_list):
+            if isinstance(case_extra, dict):
+                # expected structure: {<study_id>: {'points': […]}}
+                nested = next(iter(case_extra.values()), {})
+                for idx, p in enumerate(nested.get("points", [])):
+                    diameter_records.append(
+                        {
+                            "point": tuple(p["point"][:3]),
+                            "diameter": float(p["diameter"]),
+                            "name": p.get("name", f"case{case_id}_pt{idx}"),
+                        }
+                    )
+
+            elif isinstance(case_extra, (list, np.ndarray)):
+                first_tuple = case_extra[0]
+                if len(first_tuple) >= 1:
+                    element = first_tuple[0]
+
+                    if element is None:
+                        print("nothing to process in this case (got [(None,)])")
+
+                    elif isinstance(element, dict):
+                        for idx, d in enumerate(element.get('points')):
+                            diameter_records.append(
+                                    {"point": None, "diameter": float(d.get('diameter')), "name": f"case{case_id}_pt{idx}"}
+                            )
+
+            elif isinstance(case_extra, (int, float)):
+                diameter_records.append(
+                    {"point": None, "diameter": float(case_extra), "name": f"case{case_id}"}
+                )
+
+            else:
+                raise ValueError(f"Unsupported extra_label type: {type(case_extra)}")
+
+        data["case_extra_labels"] = diameter_records
+
+    else:
+        data["case_extra_labels"] = np.concatenate(extra_list, axis=0)
+
     return data
 
 
@@ -417,7 +539,7 @@ def extract_embeddings_and_labels(processed_results):
         if result["split"] == "shot":
             tasks[task_name]["shot_embeddings"].append(result["embeddings"])
             tasks[task_name]["shot_labels"].append(result["label"])
-            tasks[task_name]["shot_extra_labels"].append(result["extra_labels"])
+            tasks[task_name]["shot_extra_labels"].append(result.get("extra_labels"))
             tasks[task_name]["shot_ids"].append(result["case_id"])
             tasks[task_name]["shot_coordinates"].append(result["coordinates"])
             shot_id = result["case_id"]
@@ -427,25 +549,26 @@ def extract_embeddings_and_labels(processed_results):
         elif result["split"] == "case":
             tasks[task_name]["case_embeddings"].append(result["embeddings"])
             tasks[task_name]["case_labels"].append(result["label"])
-            tasks[task_name]["case_extra_labels"].append(result["extra_labels"])
-            tasks[task_name]["prediction"].append(result["prediction"])
+            tasks[task_name]["case_extra_labels"].append(result.get("extra_labels"))
+            tasks[task_name]["prediction"].append(result.get("prediction"))
             tasks[task_name]["case_ids"].append(result["case_id"])
             tasks[task_name]["cases_coordinates"].append(result["coordinates"])
             case_id = result["case_id"]
             image_size = result["image_size"]
+            # record per-case image metadata
             tasks[task_name]["cases_image_spacings"][case_id] = result["image_spacing"]
             tasks[task_name]["cases_image_sizes"][case_id] = image_size
             tasks[task_name]["cases_image_origins"][case_id] = result["image_origin"]
             tasks[task_name]["cases_image_directions"][case_id] = result["image_direction"]
 
+    # now post-process each task
     for task_name, task_data in tasks.items():
         task_type = task_data["task_type"]
         if task_type in ["classification", "regression"]:
             tasks[task_name] = process_image_representation(task_data)
         elif task_type == "detection":
             if not task_name == "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams":
-                tasks[task_name] = process_detection(task_data)
-
+                tasks[task_name] = process_detection(task_data, task_name)
     return tasks
 
 

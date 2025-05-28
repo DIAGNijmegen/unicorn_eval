@@ -371,6 +371,7 @@ class LinearProbing(CaseLevelTaskAdaptor):
             elif epoch - best_epoch > self.patience:
                 tqdm.tqdm.write(f"Early stopping at epoch {epoch+1}")
                 break
+
             tqdm.tqdm.write(
                 f"Epoch {epoch+1}/{self.num_epochs} - Loss: {loss.item():.4f}"
             )
@@ -505,6 +506,7 @@ class MultiLayerPerceptron(CaseLevelTaskAdaptor):
             elif epoch - best_epoch > self.patience:
                 tqdm.tqdm.write(f"Early stopping at epoch {epoch+1}")
                 break
+
             tqdm.tqdm.write(
                 f"Epoch {epoch+1}/{self.num_epochs} - Loss: {epoch_loss:.4f}"
             )

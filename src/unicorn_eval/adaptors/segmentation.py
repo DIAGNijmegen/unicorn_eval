@@ -12,35 +12,34 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 from __future__ import annotations
-import numpy as np
+
 import math
+from collections import defaultdict
+from typing import Iterable
+
+import numpy as np
+import SimpleITK as sitk
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from torch.utils.data import DataLoader, Dataset
-from torch.utils.data._utils.collate import default_collate
-
-from unicorn_eval.adaptors.base import PatchLevelTaskAdaptor
-
-from monai.losses import DiceLoss
-from unicorn_eval.adaptors.patch_extraction import extract_patches
-from collections import defaultdict
-import SimpleITK as sitk
-from tqdm import tqdm
-from monai.data import Dataset as dataset_monai
 from monai.data import DataLoader as dataloader_monai
-from typing import Iterable
-
+from monai.data import Dataset as dataset_monai
+from monai.losses import DiceLoss
+from monai.networks.blocks.upsample import UpSample
+from monai.networks.layers.factories import Act, Conv, Norm, split_args
 from monai.networks.nets.segresnet_ds import (
     SegResBlock,
     aniso_kernel,
     scales_for_resolution,
 )
-
-from monai.networks.blocks.upsample import UpSample
-from monai.networks.layers.factories import Act, Conv, Norm, split_args
 from monai.utils import has_option
+from torch.utils.data import DataLoader, Dataset
+from torch.utils.data._utils.collate import default_collate
+from tqdm import tqdm
+
+from unicorn_eval.adaptors.base import PatchLevelTaskAdaptor
+from unicorn_eval.adaptors.patch_extraction import extract_patches
 
 
 def compute_num_upsample_layers(initial_size, target_size):
@@ -349,14 +348,14 @@ class SegmentationUpsampling(PatchLevelTaskAdaptor):
         input_dim = self.shot_features[0].shape[1]
         num_classes = max([np.max(label) for label in self.shot_labels]) + 1
 
-        train_data = construct_segmentation_labels(
+        shot_data = construct_segmentation_labels(
             self.shot_coordinates,
             self.shot_features,
             self.shot_names,
             labels=self.shot_labels,
             patch_size=self.patch_size,
         )
-        dataset = SegmentationDataset(preprocessed_data=train_data)
+        dataset = SegmentationDataset(preprocessed_data=shot_data)
         dataloader = DataLoader(
             dataset, batch_size=32, shuffle=True, collate_fn=custom_collate
         )
@@ -738,16 +737,16 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
     4. At inference, apply the trained decoder to test patch features and reconstruct full-size predictions.
 
     Args:
-        train_feats : Patch-level feature embeddings for training.
-        train_coords : Patch coordinates corresponding to train_feats.
-        train_cases : Case identifiers for training patches.
-        train_labels : Full-resolution segmentation labels.
-        test_feats : Patch-level feature embeddings for testing.
-        test_coords : Patch coordinates corresponding to test_feats.
-        test_cases : Case identifiers for testing patches.
+        shot_features : Patch-level feature embeddings of few shots used for for training.
+        shot_labels : Full-resolution segmentation labels.
+        shot_coordinates : Patch coordinates corresponding to shot_features.
+        shot_names : Case identifiers for few shot patches.
+        test_features : Patch-level feature embeddings for testing.
+        test_coordinates : Patch coordinates corresponding to test_features.
+        test_names : Case identifiers for testing patches.
         test_image_sizes, test_image_origins, test_image_spacings, test_image_directions:
             Metadata for reconstructing full-size test predictions.
-        train_image_spacing, train_image_origins, train_image_directions:
+        shot_image_spacing, shot_image_origins, shot_image_directions:
             Metadata for extracting training labels at patch-level.
         patch_size : Size of each 3D patch.
         return_binary : Whether to threshold predictions to binary masks.
@@ -755,66 +754,66 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
 
     def __init__(
         self,
-        train_feats,
-        train_coords,
-        train_cases,
-        train_labels,
-        test_feats,
-        test_coords,
-        test_cases,
+        shot_features,
+        shot_labels,
+        shot_coordinates,
+        shot_names,
+        test_features,
+        test_coordinates,
+        test_names,
         test_image_sizes,
         test_image_origins,
         test_image_spacings,
         test_image_directions,
-        train_image_spacing,
-        train_image_origins,
-        train_image_directions,
+        shot_image_spacing,
+        shot_image_origins,
+        shot_image_directions,
         patch_size,
         return_binary=True,
     ):
         label_patch_features = []
-        for idx, patch in enumerate(train_labels):
+        for idx, patch in enumerate(shot_labels):
             label_feats = extract_patch_labels(
                 patch,
-                train_image_spacing[train_cases[idx]],
-                train_image_origins[train_cases[idx]],
-                train_image_directions[train_cases[idx]],
+                shot_image_spacing[shot_names[idx]],
+                shot_image_origins[shot_names[idx]],
+                shot_image_directions[shot_names[idx]],
                 patch_size,
             )
             label_patch_features.append(label_feats)
         label_patch_features = np.array(label_patch_features, dtype=object)
 
         super().__init__(
-            shot_features=train_feats,
+            shot_features=shot_features,
             shot_labels=label_patch_features,
-            shot_coordinates=train_coords,
-            test_features=test_feats,
-            test_coordinates=test_coords,
+            shot_coordinates=shot_coordinates,
+            test_features=test_features,
+            test_coordinates=test_coordinates,
             shot_extra_labels=None,  # not used here
         )
 
-        self.train_cases = train_cases
-        self.test_cases = test_cases
+        self.shot_names = shot_names
+        self.test_cases = test_names
         self.test_image_sizes = test_image_sizes
         self.test_image_origins = test_image_origins
         self.test_image_spacings = test_image_spacings
         self.test_image_directions = test_image_directions
-        self.train_image_spacing = train_image_spacing
-        self.train_image_origins = train_image_origins
-        self.train_image_directions = train_image_directions
+        self.shot_image_spacing = shot_image_spacing
+        self.shot_image_origins = shot_image_origins
+        self.shot_image_directions = shot_image_directions
         self.patch_size = patch_size
         self.return_binary = return_binary
 
     def fit(self):
         # build training data and loader
-        train_data = construct_data_with_labels(
+        shot_data = construct_data_with_labels(
             coordinates=self.shot_coordinates,
             embeddings=self.shot_features,
-            cases=self.train_cases,
+            cases=self.shot_names,
             patch_size=self.patch_size,
             labels=self.shot_labels,
         )
-        train_loader = load_patch_data(train_data)
+        train_loader = load_patch_data(shot_data)
 
         target_patch_size = tuple(int(j / 16) for j in self.patch_size)
         target_shape = (

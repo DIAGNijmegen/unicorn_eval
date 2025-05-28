@@ -314,6 +314,7 @@ class LinearProbingRegressor(CaseLevelTaskAdaptor):
         best_loss = float("inf")
         best_epoch = 0
         best_state = self.model.state_dict()
+
         for epoch in tqdm.tqdm(
             range(self.num_epochs), desc="Training", unit="epoch", leave=True
         ):
@@ -338,6 +339,7 @@ class LinearProbingRegressor(CaseLevelTaskAdaptor):
             elif epoch - best_epoch > self.patience:
                 tqdm.tqdm.write(f"Early stopping at epoch {epoch+1}")
                 break
+
             tqdm.tqdm.write(
                 f"Epoch {epoch+1}/{self.num_epochs} - Loss: {loss.item():.4f}"
             )
@@ -485,6 +487,7 @@ class MultiLayerPerceptronRegressor(CaseLevelTaskAdaptor):
         best_loss = float("inf")
         best_epoch = 0
         best_state = self.model.state_dict()
+
         for epoch in tqdm.tqdm(
             range(self.num_epochs), desc="Training", unit="epoch", leave=True
         ):
@@ -509,6 +512,7 @@ class MultiLayerPerceptronRegressor(CaseLevelTaskAdaptor):
             elif epoch - best_epoch > self.patience:
                 tqdm.tqdm.write(f"Early stopping at epoch {epoch+1}")
                 break
+
             tqdm.tqdm.write(
                 f"Epoch {epoch+1}/{self.num_epochs} - Loss: {epoch_loss:.4f}"
             )

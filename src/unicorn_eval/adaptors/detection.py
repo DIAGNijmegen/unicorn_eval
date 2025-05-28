@@ -20,7 +20,7 @@ import torch.optim as optim
 from scipy.ndimage import filters, gaussian_filter
 from torch.utils.data import DataLoader, Dataset
 from torch.utils.data._utils.collate import default_collate
-
+from typing import Sequence
 from unicorn_eval.adaptors.base import PatchLevelTaskAdaptor
 
 
@@ -317,7 +317,7 @@ class DensityMap(PatchLevelTaskAdaptor):
     def fit(self):
         input_dim = self.shot_features[0].shape[1]
 
-        train_data = construct_detection_labels(
+        shot_data = construct_detection_labels(
             self.shot_coordinates,
             self.shot_features,
             self.shot_names,
@@ -326,7 +326,7 @@ class DensityMap(PatchLevelTaskAdaptor):
             heatmap_size=self.heatmap_size,
         )
 
-        dataset = DetectionDataset(preprocessed_data=train_data)
+        dataset = DetectionDataset(preprocessed_data=shot_data)
         dataloader = DataLoader(
             dataset, batch_size=32, shuffle=True, collate_fn=custom_collate
         )
@@ -365,3 +365,241 @@ class DensityMap(PatchLevelTaskAdaptor):
         )
 
         return predicted_points
+
+
+class TwoLayerPerceptron(nn.Module):
+    """2LP used for offline training."""
+
+    def __init__(self, input_dim: int, hidden_dim: int = 64) -> None:
+        super().__init__()
+        self.fc1 = nn.Linear(input_dim, hidden_dim)
+        self.relu = nn.ReLU()
+        self.fc2 = nn.Linear(hidden_dim, 4)  # dx, dy, dz, logit_p
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.fc2(self.relu(self.fc1(x)))  # [N,4]
+
+
+class PatchNoduleRegressor(PatchLevelTaskAdaptor):
+    """
+    This class implements a lightweight MLP regression head that, for each patch:
+      1. Predicts a 4-vector: [dx, dy, dz, logit_p], where (dx, dy, dz) are the predicted
+         offsets from the patch center to the true nodule center in patient-space millimetres,
+         and logit_p is the raw classification score.
+      3. Converts patch indices to world-space coordinates via
+         `compute_patch_center_3d`, then reconstructs final nodule centers by adding
+         the predicted offsets to the patch center:
+      3. Applies a sigmoid to logit_p to obtain a detection probability per patch.
+
+    During inference, `infer_from_patches`:
+      - Computes each patch’s world-space center.
+      - Runs the MLP to get `[dx, dy, dz, logit_p]`.
+      - Adds the offsets to the patch centers to get nodule coordinates.
+      - Filters by a probability threshold (e.g., p > 0.9) and outputs an array of
+        [x, y, z, p].
+    """
+
+    def __init__(
+        self,
+        shot_features: list[np.ndarray],
+        shot_labels: list[list[Sequence[float]]],
+        shot_coordinates: list[np.ndarray],
+        shot_ids: list[str],
+        test_features: list[np.ndarray],
+        test_coordinates: list[np.ndarray],
+        test_ids: list[str],
+        shot_image_origins: dict[str, Sequence[float]],
+        shot_image_spacings: dict[str, Sequence[float]],
+        shot_image_directions: dict[str, Sequence[float]],
+        test_image_origins: dict[str, Sequence[float]],
+        test_image_spacings: dict[str, Sequence[float]],
+        test_image_directions: dict[str, Sequence[float]],
+        hidden_dim: int = 64,
+        num_epochs: int = 50,
+        lr: float = 1e-3,
+        shot_extra_labels: np.ndarray | None = None,
+    ):
+        super().__init__(
+            shot_features,
+            shot_labels,
+            shot_coordinates,
+            test_features,
+            test_coordinates,
+            shot_extra_labels,
+        )
+        self.shot_ids = shot_ids
+        self.test_ids = test_ids
+        self.shot_image_origins = shot_image_origins
+        self.shot_image_spacings = shot_image_spacings
+        self.shot_image_directions = shot_image_directions
+        self.test_image_origins = test_image_origins
+        self.test_image_spacings = test_image_spacings
+        self.test_image_directions = test_image_directions
+        self.hidden_dim = hidden_dim
+        self.num_epochs = num_epochs
+        self.lr = lr
+        input_dim = shot_features[0].shape[1]
+        self.fc1 = nn.Linear(input_dim, hidden_dim)
+        self.relu = nn.ReLU()
+        self.fc2 = nn.Linear(hidden_dim, 4)
+
+    def compute_patch_center_3d(self, patch_idx, spacing, origin, direction):
+        """
+        Convert *voxel* index of the patch centre to patient‑space millimetres.
+        """
+        v_mm = (np.array(patch_idx) + 0.5) * np.array(spacing)  # mm
+        R = np.array(direction).reshape(3, 3)
+        return np.array(origin) + R.dot(v_mm)
+
+    def train_from_patches(
+        self,
+        patches: list[dict],
+        hidden_dim: int = 64,
+        num_epochs: int = 50,
+        lr: float = 1e-3,
+    ):
+        """
+        Train a small MLP on a flat list of patch dicts:
+          each dict has feature, patch_idx, image_origin, image_spacing,
+          image_direction, patch_size, patch_nodules.
+        """
+
+        feats = np.stack([p["feature"] for p in patches])  # [N, D]
+        idxs = np.stack([p["patch_idx"] for p in patches])  # [N, 3]
+        nods = [p["patch_nodules"] for p in patches]  # list of lists
+        offsets, cls_labels = [], []
+        for p, idx, nod_list in zip(patches, idxs, nods):
+            origin = np.array(p["image_origin"])
+            spacing = np.array(p["image_spacing"])
+            direction = np.array(p["image_direction"]).reshape(3, 3)
+            pc = self.compute_patch_center_3d(idx, spacing, origin, direction)
+            if nod_list:
+                coords = np.array(nod_list)
+                nearest = coords[np.argmin(np.linalg.norm(coords - pc, axis=1))]
+                delta = nearest - pc
+                label = 1.0
+            else:
+                delta = np.zeros(3, dtype=float)
+                label = 0.0
+            offsets.append(delta)
+            cls_labels.append(label)
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        x = torch.tensor(feats, dtype=torch.float32, device=device)
+        y_off = torch.tensor(offsets, dtype=torch.float32, device=device)
+        y_cls = torch.tensor(cls_labels, dtype=torch.float32, device=device)
+        self.model = TwoLayerPerceptron(input_dim=x.shape[1], hidden_dim=hidden_dim).to(
+            device
+        )
+        optimizer = optim.Adam(self.model.parameters(), lr=lr)
+        box_loss = nn.MSELoss()
+        cls_loss = nn.BCEWithLogitsLoss()
+        for _ in range(num_epochs):
+            optimizer.zero_grad()
+            out = self.model(x)  # [N,4]
+            loss = box_loss(out[:, :3], y_off) + cls_loss(out[:, 3], y_cls)
+            loss.backward()
+            optimizer.step()
+
+    @torch.no_grad()
+    def infer_from_patches(self, patches: list[dict]) -> np.ndarray:
+        """
+        Run the trained network on patch dicts and return [x,y,z,p] per row.
+        """
+        device = next(self.model.parameters()).device
+        feats = np.stack([p["feature"] for p in patches])
+        x = torch.tensor(feats, dtype=torch.float32, device=device)
+        out = self.model(x).cpu().numpy()  # [N,4]
+        delta, logits = out[:, :3], out[:, 3]
+        centers = np.stack(
+            [
+                self.compute_patch_center_3d(
+                    p["patch_idx"],
+                    p["image_spacing"],
+                    p["image_origin"],
+                    p["image_direction"],
+                )
+                for p in patches
+            ],
+            axis=0,
+        )
+        world_centres = centers + delta
+        probs = 1 / (1 + np.exp(-logits))
+        return np.concatenate([world_centres, probs[:, None]], axis=1)
+
+    def fit(self):
+        # build a *flat* list of per-patch dicts for training
+        patch_dicts: list[dict] = []
+        for feats_case, idxs_case, nods_case, case_id in zip(
+            self.shot_features,
+            self.shot_coordinates,
+            self.shot_labels,
+            self.shot_ids,
+        ):
+            origin = self.shot_image_origins[case_id]
+            spacing = self.shot_image_spacings[case_id]
+            direction = self.shot_image_directions[case_id]
+            for feat, idx in zip(feats_case, idxs_case):
+                patch_dicts.append(
+                    {
+                        "feature": feat,
+                        "patch_idx": idx,
+                        "image_origin": origin,
+                        "image_spacing": spacing,
+                        "image_direction": direction,
+                        "patch_nodules": nods_case,
+                    }
+                )
+        self.train_from_patches(
+            patches=patch_dicts,
+            hidden_dim=self.hidden_dim,
+            num_epochs=self.num_epochs,
+            lr=self.lr,
+        )
+
+    def predict(self) -> np.ndarray:
+
+        test_dicts: list[dict] = []
+        case_ids: list[str] = []
+
+        for feats_case, idxs_case, case_id in zip(
+            self.test_features,
+            self.test_coordinates,
+            self.test_ids,
+        ):
+            origin = self.test_image_origins[case_id]
+            spacing = self.test_image_spacings[case_id]
+            direction = self.test_image_directions[case_id]
+            for feat, idx in zip(feats_case, idxs_case):
+                test_dicts.append(
+                    {
+                        "feature": feat,
+                        "patch_idx": idx,
+                        "image_origin": origin,
+                        "image_spacing": spacing,
+                        "image_direction": direction,
+                        "patch_nodules": [],  # no GT here
+                    }
+                )
+                case_ids.append(case_id)  # keep alignment with test_dicts
+
+        # raw predictions [x,y,z,p] for every patch
+        raw_preds = self.infer_from_patches(test_dicts)
+        probs = raw_preds[:, 3]
+
+        # ------- ONLY KEEP p > 0.9 -------- #
+        mask = probs > 0.9
+        raw_preds = raw_preds[mask]
+        case_ids = np.array(case_ids, dtype=object)[mask]
+
+        # prepend test_id to each prediction row
+        rows = [[cid, *pred] for cid, pred in zip(case_ids, raw_preds)]
+        preds = np.array(rows, dtype=object)
+
+        # Nodule count printout
+        n_kept = int(mask.sum())
+        print(
+            f"[MLPRegressor] Returning {n_kept} nodules (p > 0.9) "
+            f"out of {len(mask)} patches"
+        )
+
+        return preds

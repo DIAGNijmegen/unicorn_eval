@@ -40,21 +40,41 @@ INPUT_DIRECTORY = Path("/input")
 OUTPUT_DIRECTORY = Path("/output")
 GROUNDTRUTH_DIRECTORY = Path("/opt/ml/input/data/ground_truth")
 
+
 ADAPTOR_SLUGS_DICT = {
     "Task01_classifying_he_prostate_biopsies_into_isup_scores": "adaptor-pathology-classification",
+    "Task02_classifying_lung_nodule_malignancy_in_ct": "adaptor-radiology-classification",
     "Task03_predicting_the_time_to_biochemical_recurrence_in_he_prostatectomies": "adaptor-pathology-regression",
     "Task04_predicting_slide_level_tumor_proportion_score_in_ihc_stained_wsi": "adaptor-pathology-classification",
     "Task05_detecting_signet_ring_cells_in_he_stained_wsi_of_gastric_cancer": "adaptor-pathology-detection",
     "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams": "adaptor-radiology-detection-segmentation",
+    "Task07_detecting_lung_nodules_in_thoracic_ct": "adaptor-radiology-detection-points",
     "Task08_detecting_mitotic_figures_in_breast_cancer_wsis": "adaptor-pathology-detection",
     "Task09_segmenting_rois_in_breast_cancer_wsis": "adaptor-pathology-segmentation",
     "Task10_segmenting_lesions_within_vois_in_ct": "adaptor-radiology-segmentation",
     "Task11_segmenting_three_anatomical_structures_in_lumbar_spine_mri": "adaptor-radiology-segmentation",
 }
 
+REQUIRES_PROBABILITIES_DICT = {
+    "Task01_classifying_he_prostate_biopsies_into_isup_scores": False,
+    "Task02_classifying_lung_nodule_malignancy_in_ct": True,
+    "Task03_predicting_the_time_to_biochemical_recurrence_in_he_prostatectomies": False,
+    "Task04_predicting_slide_level_tumor_proportion_score_in_ihc_stained_wsi": False,
+    "Task05_detecting_signet_ring_cells_in_he_stained_wsi_of_gastric_cancer": False,
+    "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams": False,
+    "Task07_detecting_lung_nodules_in_thoracic_ct": False,  
+    "Task08_detecting_mitotic_figures_in_breast_cancer_wsis": False,
+    "Task09_segmenting_rois_in_breast_cancer_wsis": False,
+    "Task10_segmenting_lesions_within_vois_in_ct": False,
+    "Task11_segmenting_three_anatomical_structures_in_lumbar_spine_mri": False,
+}
+
 INPUT_SLUGS_DICT = {
     "Task01_classifying_he_prostate_biopsies_into_isup_scores": [
         "prostate-tissue-biopsy-whole-slide-image"
+    ],
+    "Task02_classifying_lung_nodule_malignancy_in_ct": [
+        "chest-ct-region-of-interest-cropout"
     ],
     "Task03_predicting_the_time_to_biochemical_recurrence_in_he_prostatectomies": [
         "prostatectomy-tissue-whole-slide-image"
@@ -67,6 +87,9 @@ INPUT_SLUGS_DICT = {
     ],
     "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams": [
         "transverse-t2-prostate-mri",
+    ],
+    "Task07_detecting_lung_nodules_in_thoracic_ct": [
+        "chest-ct",
     ],
     "Task08_detecting_mitotic_figures_in_breast_cancer_wsis": [
         "histopathology-region-of-interest-cropout"
@@ -87,10 +110,12 @@ INPUT_SLUGS_DICT = {
 
 MODEL_OUTPUT_SLUG_DICT = {
     "Task01_classifying_he_prostate_biopsies_into_isup_scores": "image-neural-representation",
+    "Task02_classifying_lung_nodule_malignancy_in_ct": "image-neural-representation",
     "Task03_predicting_the_time_to_biochemical_recurrence_in_he_prostatectomies": "image-neural-representation",
     "Task04_predicting_slide_level_tumor_proportion_score_in_ihc_stained_wsi": "image-neural-representation",
     "Task05_detecting_signet_ring_cells_in_he_stained_wsi_of_gastric_cancer": "patch-neural-representation",
     "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams": "patch-neural-representation",
+    "Task07_detecting_lung_nodules_in_thoracic_ct": "patch-neural-representation",
     "Task08_detecting_mitotic_figures_in_breast_cancer_wsis": "patch-neural-representation",
     "Task09_segmenting_rois_in_breast_cancer_wsis": "patch-neural-representation",
     "Task10_segmenting_lesions_within_vois_in_ct": "patch-neural-representation",
@@ -100,10 +125,12 @@ MODEL_OUTPUT_SLUG_DICT = {
 
 LABEL_SLUG_DICT = {
     "Task01_classifying_he_prostate_biopsies_into_isup_scores": "isup-grade.json",
+    "Task02_classifying_lung_nodule_malignancy_in_ct": "lung-nodule-malignancy-risk.json",
     "Task03_predicting_the_time_to_biochemical_recurrence_in_he_prostatectomies": "overall-survival-years.json",
     "Task04_predicting_slide_level_tumor_proportion_score_in_ihc_stained_wsi": "pd-l1-tps-binned.json",
     "Task05_detecting_signet_ring_cells_in_he_stained_wsi_of_gastric_cancer": "cell-classification.json",
     "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams": "images/transverse-cspca-label/{case_id}.mha",
+    "Task07_detecting_lung_nodules_in_thoracic_ct": "nodule-locations.json",
     "Task08_detecting_mitotic_figures_in_breast_cancer_wsis": "mitotic-figures.json",
     "Task09_segmenting_rois_in_breast_cancer_wsis": "images/tumor-stroma-and-other/{case_id}.tif",
     "Task10_segmenting_lesions_within_vois_in_ct": "images/ct-binary-uls/{case_id}.mha",
@@ -115,6 +142,9 @@ EXTRA_LABEL_SLUG_DICT = {
     "Task03_predicting_the_time_to_biochemical_recurrence_in_he_prostatectomies": [
         "event.json"
     ],
+    "Task07_detecting_lung_nodules_in_thoracic_ct": [
+        "diameter.json"
+    ]
 }
 
 LANGUAGE_TASK_NAMES = [
@@ -153,6 +183,11 @@ REGRESSION_EPSILON.update(
 
 def process(job):
     """Processes a single algorithm job, looking at the outputs"""
+
+    embeddings = coordinates = spacing = patch_size = None
+    image_size = image_spacing = prediction = None
+    image_origin = image_direction = None
+
     report = "Processing:\n"
     report += pformat(job)
     report += "\n"
@@ -233,10 +268,6 @@ def process(job):
 
         model_output_slug = MODEL_OUTPUT_SLUG_DICT[task_name]
 
-        embeddings = None
-        coordinates = None
-        spacing, patch_size, image_size, image_spacing, image_origin, image_direction = None, None, None, None, None, None
-
         # find the location of the results
         location_prediction = get_file_location(
             job_pk=job["pk"],
@@ -273,7 +304,11 @@ def process(job):
         for extra_slug_label in extra_slug_labels:
             slug_name = Path(extra_slug_label).stem
             extra_label_path = case_specific_ground_truth_dir / extra_slug_label
-            extra_labels[slug_name] = load_json_file(location=extra_label_path)
+            if extra_label_path.exists():
+                extra_labels[slug_name] = load_json_file(location=extra_label_path)
+            else:
+                print(f"WARNING: extra label file not found: {extra_label_path}")
+                extra_labels[slug_name] = None
 
         # convert extra_labels dictionary to a structured numpy array
         dtype = [(key, type(value)) for key, value in extra_labels.items()]
@@ -298,18 +333,16 @@ def process(job):
 def get_cases_extra_labels_detection(cases_image_sizes, cases_image_spacings):
     case_extra_labels = {}
     for case_id, image_size in cases_image_sizes.items():
+        # grab image dimensions along first two axes  (works for both 2D and 3D images)
+        width, height = image_size[0], image_size[1]
+        # grab image spacings (in µm) along first two axes (works for both 2D and 3D images)
         spacing = cases_image_spacings[case_id]
-
-        width, height = image_size
-        spacing_x_um, spacing_y_um = spacing
-
+        spacing_x_um, spacing_y_um = spacing[0], spacing[1]
         spacing_x_mm = spacing_x_um / 1000.0
         spacing_y_mm = spacing_y_um / 1000.0
         pixel_area_mm2 = spacing_x_mm * spacing_y_mm
         image_area_mm2 = width * height * pixel_area_mm2
-
         case_extra_labels[case_id] = image_area_mm2
-
     return case_extra_labels
 
 
@@ -557,6 +590,9 @@ def main():
         if modality == "vision":
 
             adaptor_name = adaptors[task_name]
+            return_probabilities = REQUIRES_PROBABILITIES_DICT[task_name]
+
+            patch_size = results["patch_size"]
 
             shot_embeddings = results["shot_embeddings"]
             shot_labels = results["shot_labels"]
@@ -565,15 +601,13 @@ def main():
             shot_image_spacings = results["shot_image_spacings"]
             shot_image_origins = results["shot_image_origins"]
             shot_image_directions = results["shot_image_directions"]
-            case_embeddings = results["case_embeddings"]
 
+            case_embeddings = results["case_embeddings"]
             case_extra_labels = results["case_extra_labels"]
-            patch_size = results["patch_size"]
             case_image_size = results["cases_image_sizes"]
             case_image_spacings = results["cases_image_spacings"]
             case_image_origins = results["cases_image_origins"]
             case_image_directions = results["cases_image_directions"]
-
 
             if task_type in ["classification", "regression"]:
 
@@ -585,9 +619,16 @@ def main():
 
             elif task_type == "detection":
 
-                #TODO: add extra labels to the extra_labels array
-                if not task_name == "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams":
-                    case_extra_labels = get_cases_extra_labels_detection(results["cases_image_sizes"], results["cases_image_spacings"])
+                if task_name not in [
+                    "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams",
+                    "Task07_detecting_lung_nodules_in_thoracic_ct",
+                ]:
+                    # compute image‐area extra‐labels for other detection tasks
+                    #TODO: add extra labels to the extra_labels array instead
+                    case_extra_labels = get_cases_extra_labels_detection(
+                        results["cases_image_sizes"],
+                        results["cases_image_spacings"],
+                    )
 
             predictions = adapt_features(
                 adaptor_name=adaptor_name,
@@ -605,9 +646,10 @@ def main():
                 test_image_spacing=case_image_spacings,
                 test_image_origins=case_image_origins,
                 test_image_directions=case_image_directions,
-                shots_image_spacing=shot_image_spacings,
-                shots_image_origins=shot_image_origins,
-                shots_image_directions=shot_image_directions
+                shot_image_spacing=shot_image_spacings,
+                shot_image_origins=shot_image_origins,
+                shot_image_directions=shot_image_directions,
+                return_probabilities=return_probabilities,
             )
 
         elif modality == "vision-language":
