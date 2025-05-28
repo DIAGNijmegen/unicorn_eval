@@ -105,9 +105,9 @@ def adapt_features(
     test_image_spacing=None,
     test_image_origins=None,
     test_image_directions=None,
-    train_image_spacing=None,
-    train_image_origins=None,
-    train_image_directions=None,
+    shot_image_spacing=None,
+    shot_image_origins=None,
+    shot_image_directions=None,
     return_probabilities=False,
 ):
     num_shots = len(shot_features)
@@ -219,9 +219,9 @@ def adapt_features(
                 test_image_origins=test_image_origins,
                 test_image_spacings=test_image_spacing,
                 test_image_directions=test_image_directions,
-                train_image_spacings=train_image_spacing,
-                train_image_origins=train_image_origins,
-                train_image_directions=train_image_directions,
+                shot_image_spacings=shot_image_spacing,
+                shot_image_origins=shot_image_origins,
+                shot_image_directions=shot_image_directions,
                 hidden_dim=64,
                 num_epochs=50,
                 lr=1e-3,
@@ -255,7 +255,6 @@ def adapt_features(
     else:
         raise ValueError(f"Unknown adaptor: {adaptor_name}")
 
-
     adaptor.fit()
     predictions = adaptor.predict()
     return predictions
@@ -281,12 +280,13 @@ def evaluate_predictions(task_name, case_ids, test_predictions, test_labels, tes
 
     # To get all nodule predictions for Task 7
     if task_name == "Task07_detecting_lung_nodules_in_thoracic_ct":
+        malignancy_risk = test_predictions[:, 1]
         # One entry containing the full arrays
         metrics["predictions"].append(
             {
                 "case_id": convert_numpy_types(case_ids),
                 "ground_truth": convert_numpy_types(test_labels),
-                "prediction": convert_numpy_types(test_predictions),
+                "prediction": convert_numpy_types(malignancy_risk),
             }
         )
     else:

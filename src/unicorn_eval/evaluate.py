@@ -132,10 +132,6 @@ def process(job):
     report += pformat(job)
     report += "\n"
 
-    print(f"\n===== JOB {job['pk']} =====", flush=True)
-    mapping_path = GROUNDTRUTH_DIRECTORY / "mapping.csv"
-    print("mapping.csv:", mapping_path, flush=True)
-
     mapping = pd.read_csv(GROUNDTRUTH_DIRECTORY / "mapping.csv")
 
     image_name = None
@@ -202,7 +198,6 @@ def process(job):
 
     slug_label = LABEL_SLUG_DICT[task_name]
     label_path = case_specific_ground_truth_dir / slug_label
-    print("label file:", label_path, flush=True)
 
     if label_path.suffix == ".json":
         label = load_json_file(location=label_path)
@@ -454,9 +449,9 @@ def main():
                 test_image_spacing=case_image_spacings,
                 test_image_origins=case_image_origins,
                 test_image_directions=case_image_directions,
-                train_image_spacing=shot_image_spacings,
-                train_image_origins=shot_image_origins,
-                train_image_directions=shot_image_directions,
+                shot_image_spacing=shot_image_spacings,
+                shot_image_origins=shot_image_origins,
+                shot_image_directions=shot_image_directions,
                 return_probabilities=return_probabilities,
             )
 

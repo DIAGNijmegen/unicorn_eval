@@ -15,8 +15,8 @@
 """
 LUNA16 CPM calculator — expected input: [caseId,x,y,z,p], this calculator mimics
 as closely as possible the original evaluation scripts used in the LUNA16 challenge with the CPM calculate included,
-this is the metric displayed on the leaderboard. 
-LUNA16 Evaluation: 
+this is the metric displayed on the leaderboard.
+LUNA16 Evaluation:
 https://www.dropbox.com/s/wue67fg9bk5xdxt/evaluationScript.zip?dl=0
 
 """
@@ -105,7 +105,7 @@ def computeFROC(
 
     # ------------------------------------------------------------------ #
     # Guard: if *no* positives survive the filter, return zeros so the
-    # CPM becomes 0 
+    # CPM becomes 0
     # ------------------------------------------------------------------ #
     if numberOfDetectedLesions == 0:
         return np.array([0.0]), np.array([0.0]), np.array([0.0])
@@ -296,7 +296,6 @@ def compute_cpm(
         # ---- seriesuids.csv ------------------------------------------------
         series_csv = _dump([[cid] for cid in case_ids], tmp_dir,
                            "seriesuids.csv")
-        print("DEBUG  seriesuids    :", case_ids)
         # ---- annotations.csv ----------------------------------------------
         ann_rows = [[seriesuid_label,
                      coordX_label, coordY_label, coordZ_label,
@@ -311,8 +310,6 @@ def compute_cpm(
                     f"{float(diam_rec['diameter'])}"
                 ])
         ann_csv = _dump(ann_rows, tmp_dir, "annotations.csv")
-        print("DEBUG  ann_rows (GT) :", len(ann_rows) - 1, "rows")
-        print("       first 3 rows  :", ann_rows[:4])
         # ---- candidates.csv -----------------------------------------------
 
         cand_rows = [[seriesuid_label,
@@ -325,8 +322,6 @@ def compute_cpm(
                     test_id, f"{x}", f"{y}", f"{z}", f"{p}"
                 ])
         cand_csv = _dump(cand_rows, tmp_dir, "candidates.csv")
-        print("DEBUG  cand_rows (CAD):", len(cand_rows) - 1, "rows")
-        print("       first 3 rows  :", cand_rows[:4])
         # ---- run evaluator -------------------------------------------------
 
         return noduleCADEvaluation_for_cpm(
