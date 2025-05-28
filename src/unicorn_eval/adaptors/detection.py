@@ -277,7 +277,9 @@ def construct_detection_labels(
                 cell_coordinates = None
                 heatmap = None
 
-            processed_data.append((patch_emb, heatmap, (x_patch, y_patch), f"{case_name}"))
+            processed_data.append(
+                (patch_emb, heatmap, (x_patch, y_patch), f"{case_name}")
+            )
 
     return processed_data
 
@@ -297,7 +299,13 @@ class DensityMap(PatchLevelTaskAdaptor):
         num_epochs=200,
         learning_rate=1e-5,
     ):
-        super().__init__(shot_features, shot_labels, shot_coordinates, test_features, test_coordinates)
+        super().__init__(
+            shot_features,
+            shot_labels,
+            shot_coordinates,
+            test_features,
+            test_coordinates,
+        )
         self.shot_names = shot_names
         self.test_names = test_names
         self.patch_size = patch_size
@@ -323,9 +331,9 @@ class DensityMap(PatchLevelTaskAdaptor):
             dataset, batch_size=32, shuffle=True, collate_fn=custom_collate
         )
 
-        self.decoder = DetectionDecoder(input_dim=input_dim, heatmap_size=self.heatmap_size).to(
-            torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        )
+        self.decoder = DetectionDecoder(
+            input_dim=input_dim, heatmap_size=self.heatmap_size
+        ).to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
 
         self.decoder = train_decoder(
             self.decoder,
@@ -410,7 +418,6 @@ class PatchNoduleRegressor(PatchLevelTaskAdaptor):
         shot_extra_labels: np.ndarray | None = None,
     ):
         super().__init__(
-            self,
             shot_features,
             shot_labels,
             shot_coordinates,
@@ -434,8 +441,7 @@ class PatchNoduleRegressor(PatchLevelTaskAdaptor):
         self.relu = nn.ReLU()
         self.fc2 = nn.Linear(hidden_dim, 4)
 
-    @staticmethod
-    def compute_patch_center_3d(patch_idx, spacing, origin, direction):
+    def compute_patch_center_3d(self, patch_idx, spacing, origin, direction):
         """
         Convert *voxel* index of the patch centre to patient‑space millimetres.
         """
@@ -443,7 +449,6 @@ class PatchNoduleRegressor(PatchLevelTaskAdaptor):
         R = np.array(direction).reshape(3, 3)
         return np.array(origin) + R.dot(v_mm)
 
-    @staticmethod
     def train_from_patches(
         self,
         patches: list[dict],
@@ -493,7 +498,6 @@ class PatchNoduleRegressor(PatchLevelTaskAdaptor):
             loss.backward()
             optimizer.step()
 
-    @staticmethod
     @torch.no_grad()
     def infer_from_patches(self, patches: list[dict]) -> np.ndarray:
         """
@@ -538,7 +542,7 @@ class PatchNoduleRegressor(PatchLevelTaskAdaptor):
                     "patch_nodules": nods_case,
                 })
         self.train_from_patches(
-            patch_dicts,
+            patches=patch_dicts,
             hidden_dim=self.hidden_dim,
             num_epochs=self.num_epochs,
             lr=self.lr,

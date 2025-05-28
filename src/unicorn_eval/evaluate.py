@@ -16,10 +16,14 @@ import json
 from multiprocessing import Pool
 from pathlib import Path
 from pprint import pformat
+from picai_prep.preprocessing import Sample, PreprocessingSettings
 
 import numpy as np
 import openslide
 import pandas as pd
+from dragon_eval import DragonEval
+from dragon_eval.evaluation import REGRESSION_EPSILON, TASK_TYPE, EvalType
+import SimpleITK as sitk
 
 from unicorn_eval.helpers import get_max_workers
 from unicorn_eval.utils import (
@@ -30,6 +34,7 @@ from unicorn_eval.utils import (
     normalize_metric,
     write_json_file,
 )
+
 
 INPUT_DIRECTORY = Path("/input")
 OUTPUT_DIRECTORY = Path("/output")
@@ -42,9 +47,12 @@ ADAPTOR_SLUGS_DICT = {
     "Task03_predicting_the_time_to_biochemical_recurrence_in_he_prostatectomies": "adaptor-pathology-regression",
     "Task04_predicting_slide_level_tumor_proportion_score_in_ihc_stained_wsi": "adaptor-pathology-classification",
     "Task05_detecting_signet_ring_cells_in_he_stained_wsi_of_gastric_cancer": "adaptor-pathology-detection",
+    "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams": "adaptor-radiology-detection-segmentation",
     "Task07_detecting_lung_nodules_in_thoracic_ct": "adaptor-radiology-detection-points",
     "Task08_detecting_mitotic_figures_in_breast_cancer_wsis": "adaptor-pathology-detection",
     "Task09_segmenting_rois_in_breast_cancer_wsis": "adaptor-pathology-segmentation",
+    "Task10_segmenting_lesions_within_vois_in_ct": "adaptor-radiology-segmentation",
+    "Task11_segmenting_three_anatomical_structures_in_lumbar_spine_mri": "adaptor-radiology-segmentation",
 }
 
 REQUIRES_PROBABILITIES_DICT = {
@@ -53,8 +61,12 @@ REQUIRES_PROBABILITIES_DICT = {
     "Task03_predicting_the_time_to_biochemical_recurrence_in_he_prostatectomies": False,
     "Task04_predicting_slide_level_tumor_proportion_score_in_ihc_stained_wsi": False,
     "Task05_detecting_signet_ring_cells_in_he_stained_wsi_of_gastric_cancer": False,
+    "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams": False,
+    "Task07_detecting_lung_nodules_in_thoracic_ct": False,  
     "Task08_detecting_mitotic_figures_in_breast_cancer_wsis": False,
     "Task09_segmenting_rois_in_breast_cancer_wsis": False,
+    "Task10_segmenting_lesions_within_vois_in_ct": False,
+    "Task11_segmenting_three_anatomical_structures_in_lumbar_spine_mri": False,
 }
 
 INPUT_SLUGS_DICT = {
@@ -73,14 +85,23 @@ INPUT_SLUGS_DICT = {
     "Task05_detecting_signet_ring_cells_in_he_stained_wsi_of_gastric_cancer": [
         "histopathology-region-of-interest-cropout"
     ],
+    "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams": [
+        "transverse-t2-prostate-mri",
+    ],
     "Task07_detecting_lung_nodules_in_thoracic_ct": [
-        "chest-ct"
+        "chest-ct",
     ],
     "Task08_detecting_mitotic_figures_in_breast_cancer_wsis": [
         "histopathology-region-of-interest-cropout"
     ],
     "Task09_segmenting_rois_in_breast_cancer_wsis": [
         "histopathology-region-of-interest-cropout"
+    ],
+    "Task10_segmenting_lesions_within_vois_in_ct": [
+        "stacked-3d-ct-volumes-of-lesions"
+    ],
+    "Task11_segmenting_three_anatomical_structures_in_lumbar_spine_mri": [
+        "sagittal-spine-mri"
     ],
     "Task20_generating_caption_from_wsi": [
         "he-staining"
@@ -93,9 +114,12 @@ MODEL_OUTPUT_SLUG_DICT = {
     "Task03_predicting_the_time_to_biochemical_recurrence_in_he_prostatectomies": "image-neural-representation",
     "Task04_predicting_slide_level_tumor_proportion_score_in_ihc_stained_wsi": "image-neural-representation",
     "Task05_detecting_signet_ring_cells_in_he_stained_wsi_of_gastric_cancer": "patch-neural-representation",
+    "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams": "patch-neural-representation",
     "Task07_detecting_lung_nodules_in_thoracic_ct": "patch-neural-representation",
     "Task08_detecting_mitotic_figures_in_breast_cancer_wsis": "patch-neural-representation",
     "Task09_segmenting_rois_in_breast_cancer_wsis": "patch-neural-representation",
+    "Task10_segmenting_lesions_within_vois_in_ct": "patch-neural-representation",
+    "Task11_segmenting_three_anatomical_structures_in_lumbar_spine_mri": "patch-neural-representation",
     "Task20_generating_caption_from_wsi": "nlp-predictions-dataset",
 }
 
@@ -105,9 +129,12 @@ LABEL_SLUG_DICT = {
     "Task03_predicting_the_time_to_biochemical_recurrence_in_he_prostatectomies": "overall-survival-years.json",
     "Task04_predicting_slide_level_tumor_proportion_score_in_ihc_stained_wsi": "pd-l1-tps-binned.json",
     "Task05_detecting_signet_ring_cells_in_he_stained_wsi_of_gastric_cancer": "cell-classification.json",
+    "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams": "images/transverse-cspca-label/{case_id}.mha",
     "Task07_detecting_lung_nodules_in_thoracic_ct": "nodule-locations.json",
     "Task08_detecting_mitotic_figures_in_breast_cancer_wsis": "mitotic-figures.json",
     "Task09_segmenting_rois_in_breast_cancer_wsis": "images/tumor-stroma-and-other/{case_id}.tif",
+    "Task10_segmenting_lesions_within_vois_in_ct": "images/ct-binary-uls/{case_id}.mha",
+    "Task11_segmenting_three_anatomical_structures_in_lumbar_spine_mri": "images/sagittal-spine-mr-segmentation/{case_id}.mha",
     "Task20_generating_caption_from_wsi": "nlp-predictions-dataset.json",
 }
 
@@ -119,6 +146,39 @@ EXTRA_LABEL_SLUG_DICT = {
         "diameter.json"
     ]
 }
+
+LANGUAGE_TASK_NAMES = [
+    "Task12_predicting_histopathology_sample_origin",
+    "Task13_classifying_pulmonary_nodule_presence",
+    "Task14_classifying_kidney_abnormality",
+    "Task15_hip_kellgren_lawrence_score",
+    "Task16_classifying_colon_histopathology_diagnosis",
+    "Task17_predicting_lesion_size_measurements",
+    "Task18_predicting_prostate_volume_psa_and_psa_density",
+    "Task19_anonymizing_report",
+]
+
+TASK_TYPE.update(
+    {
+        "Task12_predicting_histopathology_sample_origin": EvalType.NONORDINAL_MULTI_CLASS_CLASSIFICATION,
+        "Task13_classifying_pulmonary_nodule_presence": EvalType.BINARY_CLASSIFICATION,
+        "Task14_classifying_kidney_abnormality": EvalType.BINARY_CLASSIFICATION,
+        "Task15_hip_kellgren_lawrence_score": EvalType.NONORDINAL_MULTI_CLASS_CLASSIFICATION,
+        "Task16_classifying_colon_histopathology_diagnosis": EvalType.BINARY_CLASSIFICATION_NON_SHARED_TASK,
+        "Task17_predicting_lesion_size_measurements": EvalType.REGRESSION,
+        "Task18_predicting_prostate_volume_psa_and_psa_density": EvalType.REGRESSION,
+        "Task19_anonymizing_report": EvalType.TEXT_TARGET,
+    }
+)
+
+REGRESSION_EPSILON.update(
+    {
+        "Task17_predicting_lesion_size_measurements": 4,
+        "Task18_predicting_prostate_volume_psa_and_psa_density": np.array(
+            [4, 0.4, 0.04]
+        ),
+    }
+)
 
 
 def process(job):
@@ -148,6 +208,11 @@ def process(job):
     assert image_name is not None, "No image found in predictions.json"
     case_name = Path(image_name).stem
 
+    # remove suffixes "_adc", "_t2w", and "_hbv" from the case name if present
+    for suffix in ["_adc", "_t2w", "_hbv"]:
+        if case_name.endswith(suffix):
+            case_name = case_name[: -len(suffix)]
+
     case_info = mapping[mapping.case_id == case_name]
     task_name = case_info.task_name.values[0]
     modality = case_info.modality.values[0]
@@ -155,7 +220,6 @@ def process(job):
     if modality == "vision":
 
         prediction = None
-
         slug_embedding = MODEL_OUTPUT_SLUG_DICT[task_name]
 
         # find the location of the results
@@ -166,17 +230,39 @@ def process(job):
         )
 
         # read the results
-
-        result_algorithm = load_json_file(
+        neural_representations = load_json_file(
             location=location_neural_representation,
-        )[0]
+        )
 
+        features = []
         if slug_embedding == "image-neural-representation":
-            embeddings = np.array(result_algorithm["features"]).astype(np.float32)
-            coordinates, spacing, patch_size, image_size, image_spacing = None, None, None, None, None
-        elif slug_embedding == "patch-neural-representation":
-            embeddings, coordinates, spacing, patch_size, image_size, image_spacing, image_origin, image_direction = extract_data(result_algorithm)
+            for neural_representation in neural_representations:
+                feature = neural_representation["features"]
+                feature = np.array(feature).astype(np.float32)
+                features.append(feature)
+            embeddings = np.concatenate(features)
+            coordinates, spacing, patch_size, image_size, image_spacing, image_origin, image_direction = None, None, None, None, None, None, None
 
+        elif slug_embedding == "patch-neural-representation":
+            # TODO: better handle the case when there are multiple encoded inputs for a case
+            # right now we concatenate the features
+            # and use the first coordinates, spacing, patch_size, image_size, and image_spacing
+            first = True
+            for neural_representation in neural_representations:
+                feature, curr_coordinates, curr_spacing, curr_patch_size, curr_image_size, curr_image_spacing, curr_image_origin, curr_image_direction = (
+                    extract_data(neural_representation)
+                )
+                features.append(feature)
+                if first:
+                    coordinates = curr_coordinates
+                    spacing = curr_spacing
+                    patch_size = curr_patch_size
+                    image_size = curr_image_size
+                    image_spacing = curr_image_spacing
+                    image_origin = curr_image_origin
+                    image_direction = curr_image_direction
+                    first = False
+            embeddings = np.concatenate(features)
 
     elif modality == "vision-language":
 
@@ -204,6 +290,9 @@ def process(job):
     elif label_path.suffix == ".tif":
         label_path = Path(str(label_path).replace("{case_id}", case_name))
         label = load_tif_file(location=label_path)
+    elif label_path.suffix == ".mha":
+        label_path = Path(str(label_path).replace("{case_id}", case_name))
+        label = load_mha_file(location=label_path)
     else:
         raise ValueError(f"Unsupported file format: {label_path.suffix}")
 
@@ -312,14 +401,29 @@ def load_json_file(*, location):
     with open(location) as f:
         return json.loads(f.read())
 
+
 def load_tif_file(*, location):
     slide = openslide.OpenSlide(location)
     print("Image dimensions:", slide.dimensions)
     level_0 = slide.read_region((0, 0), 0, slide.dimensions)
- #   save_tif(level_0, location.stem)
+    #   save_tif(level_0, location.stem)
     level_0_np = np.array(level_0)
     class_labels = level_0_np[:, :, 0]  # shape: (H, W)
     return class_labels
+
+
+def load_mha_file(*, location):
+    class_labels = sitk.ReadImage(location)
+    if "transverse-cspca-label" in str(location):
+        pat_case = Sample(scans=[class_labels], lbl = class_labels, settings=PreprocessingSettings(spacing=[1,1,1], matrix_size=[16,256,256]))
+        pat_case.preprocess()
+        class_labels = pat_case.lbl
+    image_orientation = sitk.DICOMOrientImageFilter_GetOrientationFromDirectionCosines(class_labels.GetDirection())
+    if image_orientation != "SPL":
+        class_labels = sitk.DICOMOrient(class_labels, desiredCoordinateOrientation="SPL")
+    class_labels = sitk.GetArrayFromImage(class_labels)
+    return class_labels
+
 
 def write_metrics(*, metrics):
     # write a json document used for ranking results on the leaderboard
@@ -327,38 +431,127 @@ def write_metrics(*, metrics):
         f.write(json.dumps(metrics, indent=4))
 
 
-def write_combined_metrics(*, metric_dict: dict[dict]) -> None:
+def write_combined_metrics(*, metric_dict: dict[dict], save_predictions: bool = True) -> None:
     metrics = {"metrics": {}, "normalized_metrics": {}}
     predictions = {"predictions": []}
 
     for task_name, task_metrics in metric_dict.items():
-        case_prediction = [
-            p.tolist() if isinstance(p, np.ndarray) else p
-            for p in task_metrics["predictions"]
-        ]
-        predictions["predictions"].extend(case_prediction)
-
         for metric_name, metric_value in task_metrics["metrics"].items():
             task_identifier = task_name.split("_")[0]
             metrics["metrics"][f"{task_identifier}_{metric_name}"] = metric_value
-            metrics["normalized_metrics"][f"{task_identifier}_{metric_name}"] = normalize_metric(task_name, metric_value)
+            metrics["normalized_metrics"][f"{task_identifier}_{metric_name}"] = (
+                normalize_metric(task_name, metric_value)
+            )
 
         for metric_name, metric_value in task_metrics["additional_metrics"].items():
             task_identifier = task_name.split("_")[0]
             metrics["metrics"][f"{task_identifier}_{metric_name}"] = metric_value
 
+        if save_predictions:
+            case_prediction = [
+                p.tolist() if isinstance(p, np.ndarray) else p
+                for p in task_metrics["predictions"]
+            ]
+            predictions["predictions"].extend(case_prediction)
+
     # aggregate metrics when there are multiple tasks
-    metrics["metrics"]["mean"] = np.mean([metric_value for _, metric_value in metrics["normalized_metrics"].items()])
+    metrics["metrics"]["mean"] = np.mean(
+        [metric_value for _, metric_value in metrics["normalized_metrics"].items()]
+    )
 
     write_json_file(
         location=OUTPUT_DIRECTORY / "metrics.json",
         content=metrics,
     )
 
-    write_json_file(
-        location=OUTPUT_DIRECTORY / "predictions.json",
-        content=predictions,
+    if save_predictions:
+        write_json_file(
+            location=OUTPUT_DIRECTORY / "predictions.json",
+            content=predictions,
+        )
+
+
+def prepare_predictions_language(input_dir: Path, output_dir: Path, gt_dir: Path):
+    """
+    Map the predictions with random filenames to the correct task and fold.
+    """
+    # Collect the uids of the ground truth files if the path contains a task name
+    task_uids = {}
+    for gt_file in gt_dir.rglob("*.json"):
+        if any(task_name in str(gt_file) for task_name in LANGUAGE_TASK_NAMES):
+            with open(gt_file, "r") as f:
+                entries = json.load(f)
+            matched_task = next(
+                task for task in LANGUAGE_TASK_NAMES if task in str(gt_file)
+            )
+            uids = set(entry["uid"] for entry in entries)
+            task_uids[matched_task] = uids
+
+    # Match the predictions with the correct ground truth file
+    for pred_file in input_dir.rglob("*/output/nlp-predictions-dataset/*.json"):
+        if pred_file.name in ["predictions.json", "inputs.json"]:
+            continue
+
+        with open(pred_file, "r") as f:
+            entries = json.load(f)
+
+        uids = set([entry["uid"] for entry in entries])
+        for task, gt_uids in task_uids.items():
+            if uids == gt_uids:
+                output_file = (
+                    output_dir / f"{task}-fold0" / "nlp-predictions-dataset.json"
+                )
+                output_file.parent.mkdir(parents=True, exist_ok=True)
+                with open(output_file, "w") as f:
+                    json.dump(entries, f)
+                break
+
+
+def evaluate_language_predictions():
+    input_dir = (
+        INPUT_DIRECTORY
+        if INPUT_DIRECTORY.exists()
+        else Path("unicorn/test-predictions")
     )
+    # Make a temp folder
+    temp_metric_output_path = Path("/opt/app/predictions/language_results/metrics.json")
+    temp_metric_output_path.parent.mkdir(parents=True, exist_ok=True)
+    workdir = (
+        Path("/opt/app/predictions")
+        if Path("/opt/app/predictions").exists()
+        else Path("unicorn/workdir")
+    )
+    prepare_predictions_language(
+        input_dir=input_dir,
+        output_dir=workdir,
+        gt_dir=GROUNDTRUTH_DIRECTORY,
+    )
+
+    # determine which task we are evaluating
+    files = list(GROUNDTRUTH_DIRECTORY.glob("*.json"))
+    task_names = [
+        path.stem.replace(".json", "")
+        for path in files
+        if path.stem.replace(".json", "") in LANGUAGE_TASK_NAMES
+    ]
+
+    if task_names:
+        # evaluate
+        DragonEval(
+            ground_truth_path=GROUNDTRUTH_DIRECTORY,
+            predictions_path=workdir,
+            output_file=temp_metric_output_path,
+            folds=[0],
+            tasks=task_names,
+        ).evaluate()
+
+        # load the metrics
+        with open(temp_metric_output_path, "r") as f:
+            return json.load(f)
+
+    else:
+        print("No language tasks found in the ground truth files.")
+        return {}
 
 
 def main():
@@ -367,6 +560,10 @@ def main():
     print("=+=" * 10)
     print("grountruth folder contents:")
     print_directory_contents(GROUNDTRUTH_DIRECTORY)
+    print("=+=" * 10)
+
+    print("evaluating language predictions")
+    task_metrics = evaluate_language_predictions()
     print("=+=" * 10)
 
     metrics = {}
@@ -382,8 +579,6 @@ def main():
     with Pool(processes=max_workers) as pool:
         processed_results = pool.map(process, predictions)
     task_values = extract_embeddings_and_labels(processed_results)
-
-    task_metrics = {}
 
     for task_name, results in task_values.items():
 
@@ -423,11 +618,13 @@ def main():
                     case_embeddings = case_embeddings.squeeze(1)
 
             elif task_type == "detection":
-                if task_name == "Task07_detecting_lung_nodules_in_thoracic_ct":
-                    # to later extract the diameter
-                    case_extra_labels = results["case_extra_labels"]
-                else:
+
+                if task_name not in [
+                    "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams",
+                    "Task07_detecting_lung_nodules_in_thoracic_ct",
+                ]:
                     # compute image‐area extra‐labels for other detection tasks
+                    #TODO: add extra labels to the extra_labels array instead
                     case_extra_labels = get_cases_extra_labels_detection(
                         results["cases_image_sizes"],
                         results["cases_image_spacings"],
@@ -457,7 +654,9 @@ def main():
 
         elif modality == "vision-language":
             predictions = [pred["text"] for pred in results["prediction"]]
-            case_labels = [label["text"] for case in results["case_labels"] for label in case]
+            case_labels = [
+                label["text"] for case in results["case_labels"] for label in case
+            ]
             case_extra_labels = None
 
         metrics = evaluate_predictions(
@@ -466,11 +665,14 @@ def main():
             test_predictions=predictions,
             test_labels=case_labels,
             test_extra_labels=case_extra_labels,
+            test_image_spacing=case_image_spacings,
         )
         task_metrics[task_name] = metrics
 
-    write_combined_metrics(metric_dict=task_metrics)
-
+    if task_type == "segmentation" or task_type == "detection":
+        write_combined_metrics(metric_dict=task_metrics, save_predictions=False)
+    else:
+        write_combined_metrics(metric_dict=task_metrics)
     return 0
 
 

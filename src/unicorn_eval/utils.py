@@ -16,8 +16,8 @@ import json
 from functools import partial
 
 import numpy as np
-from sklearn.metrics import cohen_kappa_score
-from sksurv.metrics import concordance_index_censored, roc_auc_score
+from sklearn.metrics import cohen_kappa_score, roc_auc_score
+from sksurv.metrics import concordance_index_censored
 
 from unicorn_eval.adaptors import (
     KNN,
@@ -29,14 +29,18 @@ from unicorn_eval.adaptors import (
     LinearProbingRegressor,
     LogisticRegression,
     SegmentationUpsampling,
+    SegmentationUpsampling3D,
     WeightedKNN,
     WeightedKNNRegressor,
     PatchNoduleRegressor,
 )
 from unicorn_eval.metrics.dice import compute_dice_score
+from unicorn_eval.metrics.uls import compute_uls_score
+from unicorn_eval.metrics.spider import compute_spider_score
 from unicorn_eval.metrics.f1_score import compute_f1
 from unicorn_eval.metrics.vision_language import compute_average_language_metric
 from unicorn_eval.metrics.sensitivity import compute_cpm
+from unicorn_eval.metrics.picai_score import compute_picai_score
 
 
 METRIC_DICT = {
@@ -65,7 +69,12 @@ METRIC_DICT = {
         "fn": compute_f1,
         "range": (0, 1),
     },
-        "Task07_detecting_lung_nodules_in_thoracic_ct": {
+    "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams": {
+        "name": "picai",
+        "fn": compute_picai_score,
+        "range": (0,1),
+    },
+    "Task07_detecting_lung_nodules_in_thoracic_ct": {
         "name": "sensitivity",
         "fn": compute_cpm,
         "range": (0, 1),
@@ -79,6 +88,16 @@ METRIC_DICT = {
         "name": "dice",
         "fn": compute_dice_score,
         "range": (0, 1),
+    },
+    "Task10_segmenting_lesions_within_vois_in_ct": {
+        "name": "uls_score",
+        "fn": compute_uls_score,
+        "range": (0, 1),
+    },
+    "Task11_segmenting_three_anatomical_structures_in_lumbar_spine_mri": {
+        "name": "spider_score",
+        "fn": compute_spider_score,
+        "range": (0,1),
     },
     "Task20_generating_caption_from_wsi": {
         "name": "average_language_metric",
@@ -101,13 +120,13 @@ def adapt_features(
     test_names=None,
     patch_size=224,
     test_image_sizes=None,
-    shot_extra_labels=None,
     test_image_spacing=None,
     test_image_origins=None,
     test_image_directions=None,
     shot_image_spacing=None,
     shot_image_origins=None,
     shot_image_directions=None,
+    shot_extra_labels=None,
     return_probabilities=False,
 ):
     num_shots = len(shot_features)
@@ -251,7 +270,43 @@ def adapt_features(
             test_image_sizes=test_image_sizes,
             patch_size=patch_size[0],
         )
-
+    elif adaptor_name == "segmentation-upsampling-3d":
+        adaptor = SegmentationUpsampling3D(
+            train_feats=shot_features,
+            train_coords=shot_coordinates,
+            train_cases=shot_names,
+            train_labels=shot_labels,
+            test_feats =test_features,
+            test_coords=test_coordinates,
+            test_cases= test_names, # try to remove this input
+            test_image_sizes=test_image_sizes,
+            test_image_origins=test_image_origins,
+            test_image_spacings=test_image_spacing,
+            test_image_directions=test_image_directions,
+            patch_size= patch_size,
+            train_image_spacing=shot_image_spacing,
+            train_image_origins=shot_image_origins,
+            train_image_directions=shot_image_directions,
+        )
+    elif adaptor_name == "detection-by-segmentation-upsampling-3d":
+        adaptor = SegmentationUpsampling3D(
+            train_feats=shot_features,
+            train_coords=shot_coordinates,
+            train_cases=shot_names,
+            train_labels=shot_labels,
+            test_feats=test_features,
+            test_coords=test_coordinates,
+            test_cases=test_names, # try to remove this input
+            test_image_sizes=test_image_sizes,
+            test_image_origins=test_image_origins,
+            test_image_spacings=test_image_spacing,
+            test_image_directions=test_image_directions,
+            patch_size=patch_size,
+            train_image_spacing=shots_image_spacing,
+            train_image_origins=shots_image_origins,
+            train_image_directions=shots_image_directions,
+            return_binary=False,
+        )
     else:
         raise ValueError(f"Unknown adaptor: {adaptor_name}")
 
@@ -270,7 +325,7 @@ def convert_numpy_types(obj):
         return obj
 
 
-def evaluate_predictions(task_name, case_ids, test_predictions, test_labels, test_extra_labels=None):
+def evaluate_predictions(task_name, case_ids, test_predictions, test_labels, test_extra_labels=None, test_image_spacing=None):
 
     metrics = {
         "predictions": [],          # list to store individual case results
@@ -325,14 +380,22 @@ def evaluate_predictions(task_name, case_ids, test_predictions, test_labels, tes
     elif task_name == "Task05_detecting_signet_ring_cells_in_he_stained_wsi_of_gastric_cancer":
         metric_value = metric_fn(test_labels, test_predictions, 8)
         metric_dict[metric_name] = metric_value
+    elif task_name == "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams":
+        metric_value = metric_fn(test_labels, test_predictions)
+        metric_dict[metric_name] = metric_value
     elif task_name == "Task07_detecting_lung_nodules_in_thoracic_ct":
         metric_value = metric_fn(case_ids, test_predictions, test_labels, test_extra_labels)
-        metric_dict[metric_name] = metric_value
     elif task_name == "Task08_detecting_mitotic_figures_in_breast_cancer_wsis":
         metric_value = metric_fn(test_labels, test_predictions, 16)
         metric_dict[metric_name] = metric_value
     elif task_name == "Task09_segmenting_rois_in_breast_cancer_wsis":
         metric_value = metric_fn(test_labels, test_predictions)
+        metric_dict[metric_name] = metric_value
+    elif task_name == "Task10_segmenting_lesions_within_vois_in_ct":
+        metric_value = metric_fn(test_labels, test_predictions)
+        metric_dict[metric_name] = metric_value
+    elif task_name == "Task11_segmenting_three_anatomical_structures_in_lumbar_spine_mri":
+        metric_value = metric_fn(test_labels, test_predictions, test_image_spacing, case_ids)
         metric_dict[metric_name] = metric_value
     elif task_name == "Task20_generating_caption_from_wsi":
         language_metric_dict = metric_fn(test_labels, test_predictions)  # a dictionary
@@ -365,7 +428,7 @@ def process_image_representation(data):
     return data
 
 
-def process_detection(data, task_name: str):
+def process_detection(data, task_name: str | None = None):
 
     def extract_points(labels):
         """
@@ -401,7 +464,6 @@ def process_detection(data, task_name: str):
     if task_name == "Task07_detecting_lung_nodules_in_thoracic_ct":
         # build: [{'point': …, 'diameter': …, 'name': …}, …]
         diameter_records = []
-
         for case_id, case_extra in enumerate(extra_list):
             if isinstance(case_extra, dict):
                 # expected structure: {<study_id>: {'points': […]}}
@@ -414,12 +476,20 @@ def process_detection(data, task_name: str):
                             "name": p.get("name", f"case{case_id}_pt{idx}"),
                         }
                     )
-
+                    
             elif isinstance(case_extra, (list, np.ndarray)):
-                for idx, d in enumerate(case_extra):
-                    diameter_records.append(
-                        {"point": None, "diameter": float(d), "name": f"case{case_id}_pt{idx}"}
-                    )
+                first_tuple = case_extra[0]
+                if len(first_tuple) >= 1:
+                    element = first_tuple[0]
+                    
+                    if element is None:
+                        print("nothing to process in this case (got [(None,)])")
+                    
+                    elif isinstance(element, dict):
+                        for idx, d in enumerate(element.get('points')):
+                            diameter_records.append(
+                                    {"point": None, "diameter": float(d.get('diameter')), "name": f"case{case_id}_pt{idx}"}
+                            )
 
             elif isinstance(case_extra, (int, float)):
                 diameter_records.append(
@@ -478,8 +548,7 @@ def extract_embeddings_and_labels(processed_results):
             shot_id = result["case_id"]
             tasks[task_name]["shot_image_spacings"][shot_id] = result["image_spacing"]
             tasks[task_name]["shot_image_origins"][shot_id] = result["image_origin"]
-            tasks[task_name]["shot_image_directions"][shot_id] =  result["image_direction"]
-
+            tasks[task_name]["shot_image_directions"][shot_id] = result["image_direction"]
         elif result["split"] == "case":
             tasks[task_name]["case_embeddings"].append(result["embeddings"])
             tasks[task_name]["case_labels"].append(result["label"])
@@ -497,12 +566,12 @@ def extract_embeddings_and_labels(processed_results):
 
     # now post-process each task
     for task_name, data in tasks.items():
-        tt = data["task_type"]
-        if tt in ["classification", "regression"]:
+        task_type = data["task_type"]
+        if task_type in ["classification", "regression"]:
             tasks[task_name] = process_image_representation(data)
-        elif tt == "detection":
-            tasks[task_name] = process_detection(data, task_name)
-
+        elif task_type == "detection":
+            if not task_name == "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams":
+                tasks[task_name] = process_detection(task_data)
     return tasks
 
 

@@ -48,8 +48,12 @@ def preprocess_features(
         test_features = test_features - mean_feature
 
     if normalize_features:
-        shot_features = shot_features / np.linalg.norm(shot_features, axis=-1, keepdims=True)
-        test_features = test_features / np.linalg.norm(test_features, axis=-1, keepdims=True)
+        shot_features = shot_features / np.linalg.norm(
+            shot_features, axis=-1, keepdims=True
+        )
+        test_features = test_features / np.linalg.norm(
+            test_features, axis=-1, keepdims=True
+        )
 
     return shot_features, test_features
 
@@ -71,7 +75,17 @@ class KNN(CaseLevelTaskAdaptor):
         predict() -> np.ndarray:
             Predicts the labels or values for the provided test features.
     """
-    def __init__(self, shot_features, shot_labels, test_features, k, num_workers=8, center_features=False, normalize_features=False):
+
+    def __init__(
+        self,
+        shot_features,
+        shot_labels,
+        test_features,
+        k,
+        num_workers=8,
+        center_features=False,
+        normalize_features=False,
+    ):
         super().__init__(shot_features, shot_labels, test_features)
         self.k = k
         self.num_workers = num_workers
@@ -81,7 +95,10 @@ class KNN(CaseLevelTaskAdaptor):
 
     def fit(self):
         processed_shot_features, _ = preprocess_features(
-            self.shot_features, self.test_features, center=self.center_features, normalize_features=self.normalize_features
+            self.shot_features,
+            self.test_features,
+            center=self.center_features,
+            normalize_features=self.normalize_features,
         )
 
         self.model = KNeighborsClassifier(n_neighbors=self.k, n_jobs=self.num_workers)
@@ -89,11 +106,16 @@ class KNN(CaseLevelTaskAdaptor):
 
     def predict(self) -> np.ndarray:
         _, processed_test_features = preprocess_features(
-            self.shot_features, self.test_features, center=self.center_features, normalize_features=self.normalize_features
+            self.shot_features,
+            self.test_features,
+            center=self.center_features,
+            normalize_features=self.normalize_features,
         )
 
         if self.model is None:
-            raise ValueError("Model has not been fitted yet. Call `fit` before `predict`.")
+            raise ValueError(
+                "Model has not been fitted yet. Call `fit` before `predict`."
+            )
 
         return self.model.predict(processed_test_features)
 
@@ -119,7 +141,19 @@ class WeightedKNN(CaseLevelTaskAdaptor):
         predict() -> np.ndarray | tuple[np.ndarray, np.ndarray]:
             Predicts the output for the test features based on the k-nearest neighbors.
     """
-    def __init__(self, shot_features, shot_labels, test_features, k, metric="cosine", center_features=False, normalize_features=False, return_probabilities=False, class_values=None):
+
+    def __init__(
+        self,
+        shot_features,
+        shot_labels,
+        test_features,
+        k,
+        metric="cosine",
+        center_features=False,
+        normalize_features=False,
+        return_probabilities=False,
+        class_values=None,
+    ):
         super().__init__(shot_features, shot_labels, test_features)
         self.k = k
         self.metric = metric
@@ -134,7 +168,10 @@ class WeightedKNN(CaseLevelTaskAdaptor):
 
     def fit(self):
         self.shot_features, self.test_features = preprocess_features(
-            self.shot_features, self.test_features, center=self.center_features, normalize_features=self.normalize_features
+            self.shot_features,
+            self.test_features,
+            center=self.center_features,
+            normalize_features=self.normalize_features,
         )
 
         # define similarity function
@@ -149,18 +186,26 @@ class WeightedKNN(CaseLevelTaskAdaptor):
 
         self.unique_classes = np.unique(self.shot_labels)
         self.class_to_idx = {cls: idx for idx, cls in enumerate(self.unique_classes)}
-        self.num_classes =  int(self.shot_labels.max()) + 1
+        self.num_classes = int(self.shot_labels.max()) + 1
 
     def predict(self) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
-        if self.shot_features is None or self.test_features is None or self.similarity_fn is None:
-            raise ValueError("Model has not been fitted yet. Call `fit` before `predict`.")
+        if (
+            self.shot_features is None
+            or self.test_features is None
+            or self.similarity_fn is None
+        ):
+            raise ValueError(
+                "Model has not been fitted yet. Call `fit` before `predict`."
+            )
 
         test_predictions = []
         test_probabilities = []
 
         for test_point in self.test_features:
-            similarities = self.similarity_fn(test_point.reshape(1, -1), self.shot_features).flatten()
-            k_indices = np.argsort(-similarities)[:self.k]
+            similarities = self.similarity_fn(
+                test_point.reshape(1, -1), self.shot_features
+            ).flatten()
+            k_indices = np.argsort(-similarities)[: self.k]
             k_labels = self.shot_labels[k_indices]
             k_similarities = similarities[k_indices]
 
@@ -199,7 +244,16 @@ class LogisticRegression(CaseLevelTaskAdaptor):
         predict() -> np.ndarray:
             Predicts the labels for the test features using the trained model.
     """
-    def __init__(self, shot_features, shot_labels, test_features, max_iterations=1000, C=1.0, solver="lbfgs", return_probabilities=False):
+    def __init__(
+        self,
+        shot_features,
+        shot_labels,
+        test_features,
+        max_iterations=1000,
+        C=1.0,
+        solver="lbfgs",
+        return_probabilities=False,
+    ):
         super().__init__(shot_features, shot_labels, test_features)
         self.max_iterations = max_iterations
         self.C = C
@@ -208,10 +262,7 @@ class LogisticRegression(CaseLevelTaskAdaptor):
 
     def fit(self):
         self.model = sklearn.linear_model.LogisticRegression(
-            C=self.C,
-            max_iter=self.max_iterations,
-            solver=self.solver,
-            random_state=0
+            C=self.C, max_iter=self.max_iterations, solver=self.solver, random_state=0
         )
         self.model.fit(self.shot_features, self.shot_labels)
 
@@ -254,7 +305,17 @@ class LinearProbing(CaseLevelTaskAdaptor):
         predict() -> np.ndarray:
             Predicts the labels for the test features using the trained model.
     """
-    def __init__(self, shot_features, shot_labels, test_features, num_epochs=100, learning_rate=0.001, patience=10, shot_extra_labels=None, return_probabilities=False):
+    def __init__(
+        self,
+        shot_features,
+        shot_labels,
+        test_features,
+        num_epochs=100,
+        learning_rate=0.001,
+        patience=10,
+        shot_extra_labels=None,
+        return_probabilities=False,
+    ):
         super().__init__(shot_features, shot_labels, test_features, shot_extra_labels)
         self.num_epochs = num_epochs
         self.learning_rate = learning_rate
@@ -267,21 +328,33 @@ class LinearProbing(CaseLevelTaskAdaptor):
         self.criterion = nn.CrossEntropyLoss()
 
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.shot_features = torch.tensor(self.shot_features, dtype=torch.float32).to(self.device)
-        self.shot_labels = torch.tensor(self.shot_labels, dtype=torch.long).to(self.device)
-        self.test_features = torch.tensor(self.test_features, dtype=torch.float32).to(self.device)
+        self.shot_features = torch.tensor(self.shot_features, dtype=torch.float32).to(
+            self.device
+        )
+        self.shot_labels = torch.tensor(self.shot_labels, dtype=torch.long).to(
+            self.device
+        )
+        self.test_features = torch.tensor(self.test_features, dtype=torch.float32).to(
+            self.device
+        )
 
         self.model = LinearClassifier(input_dim, self.num_classes).to(self.device)
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
 
-        total_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
-        print(f"🚀 Starting training on {self.device} with {total_params:,} trainable parameters.")
+        total_params = sum(
+            p.numel() for p in self.model.parameters() if p.requires_grad
+        )
+        print(
+            f"🚀 Starting training on {self.device} with {total_params:,} trainable parameters."
+        )
         print(self.model)
 
         best_loss = float("inf")
         best_epoch = 0
         best_state = self.model.state_dict()
-        for epoch in tqdm.tqdm(range(self.num_epochs), desc="Training", unit="epoch", leave=True):
+        for epoch in tqdm.tqdm(
+            range(self.num_epochs), desc="Training", unit="epoch", leave=True
+        ):
             self.model.train()
             self.optimizer.zero_grad()
             logits = self.model(self.shot_features)
@@ -296,10 +369,15 @@ class LinearProbing(CaseLevelTaskAdaptor):
             elif epoch - best_epoch > self.patience:
                 tqdm.tqdm.write(f"Early stopping at epoch {epoch+1}")
                 break
-            tqdm.tqdm.write(f"Epoch {epoch+1}/{self.num_epochs} - Loss: {loss.item():.4f}")
+
+            tqdm.tqdm.write(
+                f"Epoch {epoch+1}/{self.num_epochs} - Loss: {loss.item():.4f}"
+            )
 
         self.model.load_state_dict(best_state)
-        tqdm.tqdm.write(f"Restored best model from epoch {best_epoch+1} with loss {best_loss:.4f}")
+        tqdm.tqdm.write(
+            f"Restored best model from epoch {best_epoch+1} with loss {best_loss:.4f}"
+        )
 
     def predict(self) -> np.ndarray:
         self.model.eval()
@@ -317,8 +395,9 @@ class MLPClassifier(nn.Module):
     """
     A simple MLP classifier with a tunable number of hidden layers.
     """
-
-    def __init__(self, input_dim: int, hidden_dim: int, output_dim: int, num_layers: int):
+    def __init__(
+        self, input_dim: int, hidden_dim: int, output_dim: int, num_layers: int
+    ):
         super().__init__()
         layers = []
         layers.append(nn.Linear(input_dim, hidden_dim))
@@ -353,7 +432,19 @@ class MultiLayerPerceptron(CaseLevelTaskAdaptor):
         predict() -> np.ndarray:
             Generates predictions for the test data using the fitted model.
     """
-    def __init__(self, shot_features, shot_labels, test_features, hidden_dim=256, num_layers=3, num_epochs=100, learning_rate=0.001, patience=10, shot_extra_labels=None, return_probabilities=False):
+    def __init__(
+        self,
+        shot_features,
+        shot_labels,
+        test_features,
+        hidden_dim=256,
+        num_layers=3,
+        num_epochs=100,
+        learning_rate=0.001,
+        patience=10,
+        shot_extra_labels=None,
+        return_probabilities=False,
+    ):
         super().__init__(shot_features, shot_labels, test_features, shot_extra_labels)
         self.hidden_dim = hidden_dim
         self.num_layers = num_layers
@@ -368,21 +459,35 @@ class MultiLayerPerceptron(CaseLevelTaskAdaptor):
         self.criterion = nn.CrossEntropyLoss()
 
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.shot_features = torch.tensor(self.shot_features, dtype=torch.float32).to(self.device)
-        self.shot_labels = torch.tensor(self.shot_labels, dtype=torch.long).to(self.device)
-        self.test_features = torch.tensor(self.test_features, dtype=torch.float32).to(self.device)
+        self.shot_features = torch.tensor(self.shot_features, dtype=torch.float32).to(
+            self.device
+        )
+        self.shot_labels = torch.tensor(self.shot_labels, dtype=torch.long).to(
+            self.device
+        )
+        self.test_features = torch.tensor(self.test_features, dtype=torch.float32).to(
+            self.device
+        )
 
-        self.model = MLPClassifier(input_dim, self.hidden_dim, self.num_classes, self.num_layers).to(self.device)
+        self.model = MLPClassifier(
+            input_dim, self.hidden_dim, self.num_classes, self.num_layers
+        ).to(self.device)
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
 
-        total_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
-        print(f"🚀 Starting training on {self.device} with {total_params:,} trainable parameters.")
+        total_params = sum(
+            p.numel() for p in self.model.parameters() if p.requires_grad
+        )
+        print(
+            f"🚀 Starting training on {self.device} with {total_params:,} trainable parameters."
+        )
         print(self.model)
 
         best_loss = float("inf")
         best_epoch = 0
         best_state = self.model.state_dict()
-        for epoch in tqdm.tqdm(range(self.num_epochs), desc="Training", unit="epoch", leave=True):
+        for epoch in tqdm.tqdm(
+            range(self.num_epochs), desc="Training", unit="epoch", leave=True
+        ):
             self.model.train()
             self.optimizer.zero_grad()
             logits = self.model(self.shot_features)
@@ -397,10 +502,15 @@ class MultiLayerPerceptron(CaseLevelTaskAdaptor):
             elif epoch - best_epoch > self.patience:
                 tqdm.tqdm.write(f"Early stopping at epoch {epoch+1}")
                 break
-            tqdm.tqdm.write(f"Epoch {epoch+1}/{self.num_epochs} - Loss: {epoch_loss:.4f}")
+
+            tqdm.tqdm.write(
+                f"Epoch {epoch+1}/{self.num_epochs} - Loss: {epoch_loss:.4f}"
+            )
 
         self.model.load_state_dict(best_state)
-        tqdm.tqdm.write(f"Restored best model from epoch {best_epoch+1} with loss {best_loss:.4f}")
+        tqdm.tqdm.write(
+            f"Restored best model from epoch {best_epoch+1} with loss {best_loss:.4f}"
+        )
 
     def predict(self) -> np.ndarray:
         self.model.eval()

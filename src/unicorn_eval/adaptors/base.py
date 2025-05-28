@@ -29,7 +29,13 @@ class CaseLevelTaskAdaptor(ABC):
         shot_extra_labels (np.ndarray, optional): Additional labels for the few-shots, if applicable. Defaults to None.
     """
 
-    def __init__(self, shot_features: np.ndarray, shot_labels: np.ndarray, test_features: np.ndarray, shot_extra_labels: np.ndarray = None):
+    def __init__(
+        self,
+        shot_features: np.ndarray,
+        shot_labels: np.ndarray,
+        test_features: np.ndarray,
+        shot_extra_labels: np.ndarray = None,
+    ):
         """
         Initializes the CaseLevelTaskAdaptor with few-shot and test data.
 
