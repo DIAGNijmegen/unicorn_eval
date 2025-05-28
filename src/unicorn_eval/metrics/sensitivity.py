@@ -331,8 +331,6 @@ def compute_cpm(
                     test_id, f"{x}", f"{y}", f"{z}", f"{p}"
                 ])
         cand_csv = _dump(cand_rows, tmp_dir, "candidates.csv")
-        print("DEBUG  cand_rows (CAD):", len(cand_rows) - 1, "rows")
-        print("       first 3 rows  :", cand_rows[:4])
         # ---- run evaluator -------------------------------------------------
 
         return noduleCADEvaluation_for_cpm(
