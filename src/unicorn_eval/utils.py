@@ -565,10 +565,10 @@ def extract_embeddings_and_labels(processed_results):
             tasks[task_name]["cases_image_directions"][case_id] = result["image_direction"]
 
     # now post-process each task
-    for task_name, data in tasks.items():
-        task_type = data["task_type"]
+    for task_name, task_data in tasks.items():
+        task_type = task_data["task_type"]
         if task_type in ["classification", "regression"]:
-            tasks[task_name] = process_image_representation(data)
+            tasks[task_name] = process_image_representation(task_data)
         elif task_type == "detection":
             if not task_name == "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams":
                 tasks[task_name] = process_detection(task_data)
