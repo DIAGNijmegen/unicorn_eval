@@ -21,27 +21,26 @@ from sksurv.metrics import concordance_index_censored
 
 from unicorn_eval.adaptors import (
     KNN,
-    KNNRegressor,
-    MultiLayerPerceptron,
-    MultiLayerPerceptronRegressor,
     DensityMap,
+    KNNRegressor,
     LinearProbing,
     LinearProbingRegressor,
     LogisticRegression,
+    MultiLayerPerceptron,
+    MultiLayerPerceptronRegressor,
+    PatchNoduleRegressor,
     SegmentationUpsampling,
     SegmentationUpsampling3D,
     WeightedKNN,
     WeightedKNNRegressor,
-    PatchNoduleRegressor,
 )
 from unicorn_eval.metrics.dice import compute_dice_score
-from unicorn_eval.metrics.uls import compute_uls_score
-from unicorn_eval.metrics.spider import compute_spider_score
 from unicorn_eval.metrics.f1_score import compute_f1
-from unicorn_eval.metrics.vision_language import compute_average_language_metric
-from unicorn_eval.metrics.sensitivity import compute_cpm
 from unicorn_eval.metrics.picai_score import compute_picai_score
-
+from unicorn_eval.metrics.sensitivity import compute_cpm
+from unicorn_eval.metrics.spider import compute_spider_score
+from unicorn_eval.metrics.uls import compute_uls_score
+from unicorn_eval.metrics.vision_language import compute_average_language_metric
 
 METRIC_DICT = {
     "Task01_classifying_he_prostate_biopsies_into_isup_scores": {
@@ -272,39 +271,39 @@ def adapt_features(
         )
     elif adaptor_name == "segmentation-upsampling-3d":
         adaptor = SegmentationUpsampling3D(
-            train_feats=shot_features,
-            train_coords=shot_coordinates,
-            train_cases=shot_names,
-            train_labels=shot_labels,
-            test_feats =test_features,
-            test_coords=test_coordinates,
-            test_cases= test_names, # try to remove this input
-            test_image_sizes=test_image_sizes,
-            test_image_origins=test_image_origins,
-            test_image_spacings=test_image_spacing,
-            test_image_directions=test_image_directions,
-            patch_size= patch_size,
-            train_image_spacing=shot_image_spacing,
-            train_image_origins=shot_image_origins,
-            train_image_directions=shot_image_directions,
-        )
-    elif adaptor_name == "detection-by-segmentation-upsampling-3d":
-        adaptor = SegmentationUpsampling3D(
-            train_feats=shot_features,
-            train_coords=shot_coordinates,
-            train_cases=shot_names,
-            train_labels=shot_labels,
-            test_feats=test_features,
-            test_coords=test_coordinates,
-            test_cases=test_names, # try to remove this input
+            shot_features=shot_features,
+            shot_coordinates=shot_coordinates,
+            shot_names=shot_names,
+            shot_labels=shot_labels,
+            test_features=test_features,
+            test_coordinates=test_coordinates,
+            test_names=test_names, # try to remove this input
             test_image_sizes=test_image_sizes,
             test_image_origins=test_image_origins,
             test_image_spacings=test_image_spacing,
             test_image_directions=test_image_directions,
             patch_size=patch_size,
-            train_image_spacing=shot_image_spacing,
-            train_image_origins=shot_image_origins,
-            train_image_directions=shot_image_directions,
+            shot_image_spacing=shot_image_spacing,
+            shot_image_origins=shot_image_origins,
+            shot_image_directions=shot_image_directions,
+        )
+    elif adaptor_name == "detection-by-segmentation-upsampling-3d":
+        adaptor = SegmentationUpsampling3D(
+            shot_features=shot_features,
+            shot_coordinates=shot_coordinates,
+            shot_names=shot_names,
+            shot_labels=shot_labels,
+            test_features=test_features,
+            test_coordinates=test_coordinates,
+            test_names=test_names, # try to remove this input
+            test_image_sizes=test_image_sizes,
+            test_image_origins=test_image_origins,
+            test_image_spacings=test_image_spacing,
+            test_image_directions=test_image_directions,
+            patch_size=patch_size,
+            shot_image_spacing=shot_image_spacing,
+            shot_image_origins=shot_image_origins,
+            shot_image_directions=shot_image_directions,
             return_binary=False,
         )
     else:
@@ -345,11 +344,9 @@ def evaluate_predictions(task_name, case_ids, test_predictions, test_labels, tes
         )
     else:
         iterable = zip(case_ids, test_predictions, test_labels)
-
         for case_id, prediction, ground_truth in iterable:
             ground_truth = convert_numpy_types(ground_truth)
             prediction = convert_numpy_types(prediction)
-
             metrics["predictions"].append(
                 {
                     "case_id": case_id,
@@ -367,8 +364,8 @@ def evaluate_predictions(task_name, case_ids, test_predictions, test_labels, tes
         metric_value = metric_fn(test_labels, test_predictions)
         metric_dict[metric_name] = metric_value
     elif task_name == "Task02_classifying_lung_nodule_malignancy_in_ct":
-        test_predictions = test_predictions[:,1]
-        metric_value = metric_fn(test_labels, test_predictions)
+        malignancy_risk = test_predictions[:,1]
+        metric_value = metric_fn(test_labels, malignancy_risk)
         metric_dict[metric_name] = metric_value
     elif task_name == "Task03_predicting_the_time_to_biochemical_recurrence_in_he_prostatectomies":
         events = test_extra_labels["event"].astype(bool)
@@ -476,15 +473,15 @@ def process_detection(data, task_name: str | None = None):
                             "name": p.get("name", f"case{case_id}_pt{idx}"),
                         }
                     )
-                    
+
             elif isinstance(case_extra, (list, np.ndarray)):
                 first_tuple = case_extra[0]
                 if len(first_tuple) >= 1:
                     element = first_tuple[0]
-                    
+
                     if element is None:
                         print("nothing to process in this case (got [(None,)])")
-                    
+
                     elif isinstance(element, dict):
                         for idx, d in enumerate(element.get('points')):
                             diameter_records.append(
