@@ -302,9 +302,9 @@ def adapt_features(
             test_image_spacings=test_image_spacing,
             test_image_directions=test_image_directions,
             patch_size=patch_size,
-            train_image_spacing=shots_image_spacing,
-            train_image_origins=shots_image_origins,
-            train_image_directions=shots_image_directions,
+            train_image_spacing=shot_image_spacing,
+            train_image_origins=shot_image_origins,
+            train_image_directions=shot_image_directions,
             return_binary=False,
         )
     else:
@@ -335,13 +335,12 @@ def evaluate_predictions(task_name, case_ids, test_predictions, test_labels, tes
 
     # To get all nodule predictions for Task 7
     if task_name == "Task07_detecting_lung_nodules_in_thoracic_ct":
-        malignancy_risk = test_predictions[:, 1]
         # One entry containing the full arrays
         metrics["predictions"].append(
             {
                 "case_id": convert_numpy_types(case_ids),
                 "ground_truth": convert_numpy_types(test_labels),
-                "prediction": convert_numpy_types(malignancy_risk),
+                "prediction": convert_numpy_types(test_predictions),
             }
         )
     else:
@@ -368,6 +367,7 @@ def evaluate_predictions(task_name, case_ids, test_predictions, test_labels, tes
         metric_value = metric_fn(test_labels, test_predictions)
         metric_dict[metric_name] = metric_value
     elif task_name == "Task02_classifying_lung_nodule_malignancy_in_ct":
+        test_predictions = test_predictions[:,1]
         metric_value = metric_fn(test_labels, test_predictions)
         metric_dict[metric_name] = metric_value
     elif task_name == "Task03_predicting_the_time_to_biochemical_recurrence_in_he_prostatectomies":
@@ -385,6 +385,7 @@ def evaluate_predictions(task_name, case_ids, test_predictions, test_labels, tes
         metric_dict[metric_name] = metric_value
     elif task_name == "Task07_detecting_lung_nodules_in_thoracic_ct":
         metric_value = metric_fn(case_ids, test_predictions, test_labels, test_extra_labels)
+        metric_dict[metric_name] = metric_value
     elif task_name == "Task08_detecting_mitotic_figures_in_breast_cancer_wsis":
         metric_value = metric_fn(test_labels, test_predictions, 16)
         metric_dict[metric_name] = metric_value
@@ -429,7 +430,6 @@ def process_image_representation(data):
 
 
 def process_detection(data, task_name: str | None = None):
-
     def extract_points(labels):
         """
         Pull out coordinate tuples from a list of GT dictionaries.
@@ -571,7 +571,7 @@ def extract_embeddings_and_labels(processed_results):
             tasks[task_name] = process_image_representation(task_data)
         elif task_type == "detection":
             if not task_name == "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams":
-                tasks[task_name] = process_detection(task_data)
+                tasks[task_name] = process_detection(task_data, task_name)
     return tasks
 
 

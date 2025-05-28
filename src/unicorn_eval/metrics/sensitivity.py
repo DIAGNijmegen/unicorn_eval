@@ -83,6 +83,7 @@ def getCPM(
             if diffCurr < diffPrior:
                 fixedSens[i] = sens[j]
                 diffPrior = diffCurr
+
     return np.mean(fixedSens), fixedSens
 
 
@@ -106,7 +107,7 @@ def computeFROC(
     # Guard: if *no* positives survive the filter, return zeros so the
     # CPM becomes 0
     # ------------------------------------------------------------------ #
-    if numberOfDetectedLesions == 0:
+    if numberOfDetectedLesions < 1:
         return np.array([0.0]), np.array([0.0]), np.array([0.0])
     # ------------------------------------------------------------------ #
 
@@ -301,14 +302,11 @@ def compute_cpm(
         ]
 
         diam_iter = iter(test_extra_labels)
-
         for case_name, coords in zip(case_ids, test_labels):
             # For each coordinate triple in this case
             for x, y, z in coords:
-                # Grab the *next* diameter dict from your flat iterator
                 diam_struct = next(diam_iter)
 
-                # Now build your row
                 ann_rows.append(
                     [
                         case_name,
