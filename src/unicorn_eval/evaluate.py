@@ -193,6 +193,7 @@ def process(job):
     report += "\n"
 
     mapping = pd.read_csv(GROUNDTRUTH_DIRECTORY / "mapping.csv")
+    mapping.case_id = mapping.case_id.astype("str")
 
     image_name = None
     for slug_inputs in INPUT_SLUGS_DICT.values():
