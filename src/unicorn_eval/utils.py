@@ -129,6 +129,7 @@ def adapt_features(
     return_probabilities=False,
 ):
     num_shots = len(shot_features)
+
     if "-nn" in adaptor_name:
         k = int(adaptor_name.split("-")[0])
         k = min(k, num_shots)
@@ -163,6 +164,7 @@ def adapt_features(
                     test_features=test_features,
                     k=k
                 )
+
     elif adaptor_name == "logistic-regression":
         assert task_type == "classification"
         adaptor = LogisticRegression(
@@ -174,6 +176,7 @@ def adapt_features(
             solver="lbfgs",
             return_probabilities=return_probabilities,
         )
+
     elif "linear-probing" in adaptor_name:
         if task_type == "classification":
             adaptor = LinearProbing(
@@ -198,6 +201,7 @@ def adapt_features(
                 num_epochs=100,
                 learning_rate=0.001,
             )
+
     elif "mlp" in adaptor_name:
         if task_type == "classification":
             adaptor = MultiLayerPerceptron(
@@ -225,25 +229,25 @@ def adapt_features(
                 learning_rate=0.001,
             )
 
-        elif task_type == "detection":
-            adaptor = PatchNoduleRegressor(
-                shot_features=shot_features,
-                shot_labels=shot_labels,
-                shot_coordinates=shot_coordinates,
-                shot_ids=shot_names,
-                test_features=test_features,
-                test_coordinates=test_coordinates,
-                test_ids=test_names,
-                test_image_origins=test_image_origins,
-                test_image_spacings=test_image_spacing,
-                test_image_directions=test_image_directions,
-                shot_image_spacings=shot_image_spacing,
-                shot_image_origins=shot_image_origins,
-                shot_image_directions=shot_image_directions,
-                hidden_dim=64,
-                num_epochs=50,
-                lr=1e-3,
-            )
+    elif adaptor_name == "patch-nodule-regressor":
+        adaptor = PatchNoduleRegressor(
+            shot_features=shot_features,
+            shot_labels=shot_labels,
+            shot_coordinates=shot_coordinates,
+            shot_ids=shot_names,
+            test_features=test_features,
+            test_coordinates=test_coordinates,
+            test_ids=test_names,
+            test_image_origins=test_image_origins,
+            test_image_spacings=test_image_spacing,
+            test_image_directions=test_image_directions,
+            shot_image_spacings=shot_image_spacing,
+            shot_image_origins=shot_image_origins,
+            shot_image_directions=shot_image_directions,
+            hidden_dim=64,
+            num_epochs=50,
+            lr=0.001,
+        )
 
     elif adaptor_name == "density-map":
         adaptor = DensityMap(
@@ -257,6 +261,7 @@ def adapt_features(
             patch_size=patch_size[0],
             heatmap_size=16,
         )
+
     elif adaptor_name == "segmentation-upsampling":
         adaptor = SegmentationUpsampling(
             shot_features=shot_features,
@@ -269,6 +274,7 @@ def adapt_features(
             test_image_sizes=test_image_sizes,
             patch_size=patch_size[0],
         )
+
     elif adaptor_name == "segmentation-upsampling-3d":
         adaptor = SegmentationUpsampling3D(
             shot_features=shot_features,
@@ -287,6 +293,7 @@ def adapt_features(
             shot_image_origins=shot_image_origins,
             shot_image_directions=shot_image_directions,
         )
+
     elif adaptor_name == "detection-by-segmentation-upsampling-3d":
         adaptor = SegmentationUpsampling3D(
             shot_features=shot_features,
@@ -306,6 +313,7 @@ def adapt_features(
             shot_image_directions=shot_image_directions,
             return_binary=False,
         )
+
     else:
         raise ValueError(f"Unknown adaptor: {adaptor_name}")
 
