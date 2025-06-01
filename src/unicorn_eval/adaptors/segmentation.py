@@ -29,10 +29,10 @@ from monai.losses import DiceLoss
 from monai.networks.blocks.upsample import UpSample
 from monai.networks.layers.factories import Act, Conv, Norm, split_args
 from monai.networks.nets.segresnet_ds import (
-    SegResBlock,
     aniso_kernel,
     scales_for_resolution,
 )
+from monai.networks.layers.utils import get_act_layer, get_norm_layer
 from monai.utils import has_option
 from torch.utils.data import DataLoader, Dataset
 from torch.utils.data._utils.collate import default_collate
@@ -910,7 +910,7 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
         # run inference using the trained decoder
         return inference3d(self.decoder, test_loader, self.device, self.return_binary, self.test_labels)
 
-from monai.networks.layers.utils import get_act_layer, get_norm_layer
+
 class SegResNetDecoderOnly(nn.Module):
     """
     A decoder-only variant of monai's SegResNetDS. (https://docs.monai.io/en/stable/networks.html)
