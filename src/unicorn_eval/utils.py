@@ -21,13 +21,14 @@ from sksurv.metrics import concordance_index_censored
 
 from unicorn_eval.adaptors import (
     KNN,
-    KNNRegressor,
-    MultiLayerPerceptron,
-    MultiLayerPerceptronRegressor,
     DensityMap,
+    KNNRegressor,
     LinearProbing,
     LinearProbingRegressor,
     LogisticRegression,
+    MultiLayerPerceptron,
+    MultiLayerPerceptronRegressor,
+    PatchNoduleRegressor,
     SegmentationUpsampling,
     SegmentationUpsampling3D,
     WeightedKNN,
@@ -35,12 +36,12 @@ from unicorn_eval.adaptors import (
     PatchNoduleRegressor,
 )
 from unicorn_eval.metrics.dice import compute_dice_score
-from unicorn_eval.metrics.uls import compute_uls_score
-from unicorn_eval.metrics.spider import compute_spider_score
 from unicorn_eval.metrics.f1_score import compute_f1
-from unicorn_eval.metrics.vision_language import compute_average_language_metric
-from unicorn_eval.metrics.sensitivity import compute_cpm
 from unicorn_eval.metrics.picai_score import compute_picai_score
+from unicorn_eval.metrics.sensitivity import compute_cpm
+from unicorn_eval.metrics.spider import compute_spider_score
+from unicorn_eval.metrics.uls import compute_uls_score
+from unicorn_eval.metrics.vision_language import compute_average_language_metric
 
 
 METRIC_DICT = {
@@ -132,6 +133,7 @@ def adapt_features(
     return_probabilities=False,
 ):
     num_shots = len(shot_features)
+
     if "-nn" in adaptor_name:
         k = int(adaptor_name.split("-")[0])
         k = min(k, num_shots)
@@ -166,6 +168,7 @@ def adapt_features(
                     test_features=test_features,
                     k=k
                 )
+
     elif adaptor_name == "logistic-regression":
         assert task_type == "classification"
         adaptor = LogisticRegression(
@@ -177,6 +180,7 @@ def adapt_features(
             solver="lbfgs",
             return_probabilities=return_probabilities,
         )
+
     elif "linear-probing" in adaptor_name:
         if task_type == "classification":
             adaptor = LinearProbing(
@@ -201,6 +205,7 @@ def adapt_features(
                 num_epochs=100,
                 learning_rate=0.001,
             )
+
     elif "mlp" in adaptor_name:
         if task_type == "classification":
             adaptor = MultiLayerPerceptron(
@@ -228,25 +233,25 @@ def adapt_features(
                 learning_rate=0.001,
             )
 
-        elif task_type == "detection":
-            adaptor = PatchNoduleRegressor(
-                shot_features=shot_features,
-                shot_labels=shot_labels,
-                shot_coordinates=shot_coordinates,
-                shot_ids=shot_names,
-                test_features=test_features,
-                test_coordinates=test_coordinates,
-                test_ids=test_names,
-                test_image_origins=test_image_origins,
-                test_image_spacings=test_image_spacing,
-                test_image_directions=test_image_directions,
-                shot_image_spacings=shot_image_spacing,
-                shot_image_origins=shot_image_origins,
-                shot_image_directions=shot_image_directions,
-                hidden_dim=64,
-                num_epochs=50,
-                lr=1e-3,
-            )
+    elif adaptor_name == "patch-nodule-regressor":
+        adaptor = PatchNoduleRegressor(
+            shot_features=shot_features,
+            shot_labels=shot_labels,
+            shot_coordinates=shot_coordinates,
+            shot_ids=shot_names,
+            test_features=test_features,
+            test_coordinates=test_coordinates,
+            test_ids=test_names,
+            test_image_origins=test_image_origins,
+            test_image_spacings=test_image_spacing,
+            test_image_directions=test_image_directions,
+            shot_image_spacings=shot_image_spacing,
+            shot_image_origins=shot_image_origins,
+            shot_image_directions=shot_image_directions,
+            hidden_dim=64,
+            num_epochs=50,
+            lr=0.001,
+        )
 
     elif adaptor_name == "density-map":
         adaptor = DensityMap(
@@ -260,6 +265,7 @@ def adapt_features(
             patch_size=patch_size[0],
             heatmap_size=16,
         )
+
     elif adaptor_name == "segmentation-upsampling":
         adaptor = SegmentationUpsampling(
             shot_features=shot_features,
@@ -272,6 +278,7 @@ def adapt_features(
             test_image_sizes=test_image_sizes,
             patch_size=patch_size[0],
         )
+
     elif adaptor_name == "segmentation-upsampling-3d":
         adaptor = SegmentationUpsampling3D(
             train_feats=shot_features,
@@ -313,6 +320,27 @@ def adapt_features(
             train_image_directions=shot_image_directions,
             return_binary=False,
         )
+
+    elif adaptor_name == "detection-by-segmentation-upsampling-3d":
+        adaptor = SegmentationUpsampling3D(
+            shot_features=shot_features,
+            shot_coordinates=shot_coordinates,
+            shot_names=shot_names,
+            shot_labels=shot_labels,
+            test_features=test_features,
+            test_coordinates=test_coordinates,
+            test_names=test_names, # try to remove this input
+            test_image_sizes=test_image_sizes,
+            test_image_origins=test_image_origins,
+            test_image_spacings=test_image_spacing,
+            test_image_directions=test_image_directions,
+            patch_size=patch_size,
+            shot_image_spacing=shot_image_spacing,
+            shot_image_origins=shot_image_origins,
+            shot_image_directions=shot_image_directions,
+            return_binary=False,
+        )
+
     else:
         raise ValueError(f"Unknown adaptor: {adaptor_name}")
 
@@ -351,11 +379,9 @@ def evaluate_predictions(task_name, case_ids, test_predictions, test_labels, tes
         )
     else:
         iterable = zip(case_ids, test_predictions, test_labels)
-
         for case_id, prediction, ground_truth in iterable:
             ground_truth = convert_numpy_types(ground_truth)
             prediction = convert_numpy_types(prediction)
-
             metrics["predictions"].append(
                 {
                     "case_id": case_id,
@@ -373,8 +399,8 @@ def evaluate_predictions(task_name, case_ids, test_predictions, test_labels, tes
         metric_value = metric_fn(test_labels, test_predictions)
         metric_dict[metric_name] = metric_value
     elif task_name == "Task02_classifying_lung_nodule_malignancy_in_ct":
-        test_predictions = test_predictions[:,1]
-        metric_value = metric_fn(test_labels, test_predictions)
+        malignancy_risk = test_predictions[:,1]
+        metric_value = metric_fn(test_labels, malignancy_risk)
         metric_dict[metric_name] = metric_value
     elif task_name == "Task03_predicting_the_time_to_biochemical_recurrence_in_he_prostatectomies":
         events = test_extra_labels["event"].astype(bool)
@@ -482,15 +508,14 @@ def process_detection(data, task_name: str | None = None):
                             "name": p.get("name", f"case{case_id}_pt{idx}"),
                         }
                     )
-                    
             elif isinstance(case_extra, (list, np.ndarray)):
                 first_tuple = case_extra[0]
                 if len(first_tuple) >= 1:
                     element = first_tuple[0]
-                    
+
                     if element is None:
                         print("nothing to process in this case (got [(None,)])")
-                    
+
                     elif isinstance(element, dict):
                         for idx, d in enumerate(element.get('points')):
                             diameter_records.append(

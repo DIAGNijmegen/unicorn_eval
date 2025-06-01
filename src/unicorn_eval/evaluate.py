@@ -36,9 +36,9 @@ from unicorn_eval.utils import (
 )
 
 
-INPUT_DIRECTORY = Path("/input")
-OUTPUT_DIRECTORY = Path("/output")
-GROUNDTRUTH_DIRECTORY = Path("/opt/ml/input/data/ground_truth")
+INPUT_DIRECTORY = Path("/data/temporary/unicorn/debugging/evaluation/vision/task-10")
+OUTPUT_DIRECTORY = Path("/data/bodyct/experiments/lena_t10027/unicorn_internal_dev/")
+GROUNDTRUTH_DIRECTORY = Path("/data/temporary/unicorn/debugging/groundtruth/")
 
 
 ADAPTOR_SLUGS_DICT = {
@@ -193,6 +193,7 @@ def process(job):
     report += "\n"
 
     mapping = pd.read_csv(GROUNDTRUTH_DIRECTORY / "mapping.csv")
+    mapping.case_id = mapping.case_id.astype("str")
 
     image_name = None
     for slug_inputs in INPUT_SLUGS_DICT.values():

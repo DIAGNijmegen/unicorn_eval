@@ -12,35 +12,34 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 from __future__ import annotations
-import numpy as np
+
 import math
+from collections import defaultdict
+from typing import Iterable
+
+import numpy as np
+import SimpleITK as sitk
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from torch.utils.data import DataLoader, Dataset
-from torch.utils.data._utils.collate import default_collate
-
-from unicorn_eval.adaptors.base import PatchLevelTaskAdaptor
-
-from monai.losses import DiceLoss
-from unicorn_eval.adaptors.patch_extraction import extract_patches
-from collections import defaultdict
-import SimpleITK as sitk
-from tqdm import tqdm
-from monai.data import Dataset as dataset_monai
 from monai.data import DataLoader as dataloader_monai
-from typing import Iterable
-
+from monai.data import Dataset as dataset_monai
+from monai.losses import DiceLoss
+from monai.networks.blocks.upsample import UpSample
+from monai.networks.layers.factories import Act, Conv, Norm, split_args
 from monai.networks.nets.segresnet_ds import (
     SegResBlock,
     aniso_kernel,
     scales_for_resolution,
 )
-
-from monai.networks.blocks.upsample import UpSample
-from monai.networks.layers.factories import Act, Conv, Norm, split_args
 from monai.utils import has_option
+from torch.utils.data import DataLoader, Dataset
+from torch.utils.data._utils.collate import default_collate
+from tqdm import tqdm
+
+from unicorn_eval.adaptors.base import PatchLevelTaskAdaptor
+from unicorn_eval.adaptors.patch_extraction import extract_patches
 
 
 def compute_num_upsample_layers(initial_size, target_size):
@@ -221,7 +220,7 @@ def custom_collate(batch):
 def train_decoder(decoder, dataloader, num_epochs=200, lr=0.001):
     """Trains the decoder using the given data."""
 
-    device = torch.device("cpu")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     optimizer = optim.Adam(decoder.parameters(), lr=lr)
     criterion = nn.CrossEntropyLoss(
         ignore_index=0
@@ -255,7 +254,7 @@ def train_decoder(decoder, dataloader, num_epochs=200, lr=0.001):
 def inference(decoder, dataloader, patch_size, test_image_sizes=None):
     """Run inference on the test set and reconstruct into a single 2D array."""
     decoder.eval()
-    device = torch.device("cpu")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     with torch.no_grad():
         patch_predictions = []  # List to store the predictions from each patch
@@ -349,21 +348,21 @@ class SegmentationUpsampling(PatchLevelTaskAdaptor):
         input_dim = self.shot_features[0].shape[1]
         num_classes = max([np.max(label) for label in self.shot_labels]) + 1
 
-        train_data = construct_segmentation_labels(
+        shot_data = construct_segmentation_labels(
             self.shot_coordinates,
             self.shot_features,
             self.shot_names,
             labels=self.shot_labels,
             patch_size=self.patch_size,
         )
-        dataset = SegmentationDataset(preprocessed_data=train_data)
+        dataset = SegmentationDataset(preprocessed_data=shot_data)
         dataloader = DataLoader(
             dataset, batch_size=32, shuffle=True, collate_fn=custom_collate
         )
 
         self.decoder = SegmentationDecoder(
             input_dim=input_dim, patch_size=self.patch_size, num_classes=num_classes
-        ).to(torch.device("cpu"))
+        ).to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
         self.decoder = train_decoder(
             self.decoder, dataloader, num_epochs=self.num_epochs, lr=self.learning_rate
         )
@@ -779,16 +778,16 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
     4. At inference, apply the trained decoder to test patch features and reconstruct full-size predictions.
 
     Args:
-        train_feats : Patch-level feature embeddings for training.
-        train_coords : Patch coordinates corresponding to train_feats.
-        train_cases : Case identifiers for training patches.
-        train_labels : Full-resolution segmentation labels.
-        test_feats : Patch-level feature embeddings for testing.
-        test_coords : Patch coordinates corresponding to test_feats.
-        test_cases : Case identifiers for testing patches.
+        shot_features : Patch-level feature embeddings of few shots used for for training.
+        shot_labels : Full-resolution segmentation labels.
+        shot_coordinates : Patch coordinates corresponding to shot_features.
+        shot_names : Case identifiers for few shot patches.
+        test_features : Patch-level feature embeddings for testing.
+        test_coordinates : Patch coordinates corresponding to test_features.
+        test_names : Case identifiers for testing patches.
         test_image_sizes, test_image_origins, test_image_spacings, test_image_directions:
             Metadata for reconstructing full-size test predictions.
-        train_image_spacing, train_image_origins, train_image_directions:
+        shot_image_spacing, shot_image_origins, shot_image_directions:
             Metadata for extracting training labels at patch-level.
         patch_size : Size of each 3D patch.
         return_binary : Whether to threshold predictions to binary masks.
@@ -842,7 +841,7 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
             shot_extra_labels=None,  # not used here
         )
 
-        self.train_cases = train_cases
+        self.shot_names = train_cases
         self.test_cases = test_cases
         self.test_image_sizes = test_image_sizes
         self.test_image_origins = test_image_origins
@@ -861,7 +860,7 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
         train_data = construct_data_with_labels(
             coordinates=self.shot_coordinates,
             embeddings=self.shot_features,
-            cases=self.train_cases,
+            cases=self.shot_names,
             patch_size=self.patch_size,
             labels=self.shot_labels,
         )
@@ -876,7 +875,7 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
         )
 
         # set up device and model
-        self.device = torch.device("cpu")
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         decoder = Decoder3D(
             latent_dim=latent_dim,
             target_shape=target_shape,
