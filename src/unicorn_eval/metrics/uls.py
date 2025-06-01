@@ -4,6 +4,7 @@ from scipy.spatial.distance import pdist, squareform
 from scipy.ndimage import binary_erosion, label
 import itertools
 import SimpleITK as sitk
+from skimage.measure import regionprops
 
 
 def calculate_angle_between_lines(point1, point2, point3, point4):
@@ -68,61 +69,55 @@ def sape(y_true, y_pred):
 
 def long_and_short_axis_diameters(mask):
     """
-    Function to calculate the long- and short-axis diameters of a lesion from the segmentation mask.
-    Using skimage.measure.regionprops is more optimized but doesn't guarantee that both measurements
-    are perpendicular to each other.
+    Calculates the long- and short-axis diameters of a lesion from the 3D segmentation mask
+    by fitting an ellipse to each axial component and taking the largest major/minor lengths.
+    Returns:
+      long_axis_diameter, short_axis_diameter,
+      long_axis_points, short_axis_points
+    (Note: points are the centroids ± half‐axes in pixel coords; optional.)
     """
-    longest_z, longest_z_bp = None, None
-    long_axis_diameter, short_axis_diameter = 0, 0
-    long_axis_points, short_axis_points = None, None
-    for z, axial_slice in enumerate(mask):
-        if np.amax(axial_slice) > 0:
-            labeled_seg, num_features = label(axial_slice)
-            if num_features > 1:
-                # Remove all but largest component
-                largest_component = collections.Counter(
-                    x for x in labeled_seg.flatten() if x != 0
-                ).most_common(1)[0][0]
-                labeled_seg[labeled_seg != largest_component] = 0
-                labeled_seg[labeled_seg == largest_component] = 1
+    best_long, best_short = 0.0, 0.0
+    best_long_pts = None
+    best_short_pts = None
 
-            # Perform erosion and subtract from the original to get boundary points
-            eroded_shape = binary_erosion(labeled_seg)
-            boundary_mask = labeled_seg - eroded_shape
-            boundary_points = np.argwhere(boundary_mask == 1)
+    for z, slice_2d in enumerate(mask):
+        if slice_2d.max() == 0:
+            continue
 
-            # Compute all pairwise distances between boundary points
-            distances = pdist(boundary_points, metric="euclidean")
+        # keep only the largest connected component
+        lab, n = label(slice_2d)
+        if n > 1:
+            counts = collections.Counter(lab.flat)
+            bg, _ = counts.most_common(1)[0]
+            lab = np.where(lab == bg, 1, 0)
+        else:
+            lab = (lab > 0).astype(int)
 
-            # Convert the distances to a square form
-            distance_matrix = squareform(distances)
+        # use regionprops to fit ellipse & get axis lengths
+        props = regionprops(lab)[0]
+        long_diam  = props.major_axis_length
+        short_diam = props.minor_axis_length
 
-            # Find the maximum distance and the indices of the points forming the longest diameter
-            long_diameter = np.max(distance_matrix)
+        # optional: compute the two endpoints along each axis in pixel coords
+        cy, cx = props.centroid
+        orientation = props.orientation  # radians CCW from the horizontal
+        dy = np.sin(orientation) * (long_diam/2)
+        dx = np.cos(orientation) * (long_diam/2)
+        long_pts = [(cx - dx, cy - dy, z), (cx + dx, cy + dy, z)]
 
-            if long_diameter > long_axis_diameter:
-                longest_z = z
-                indices = np.unravel_index(
-                    np.argmax(distance_matrix), distance_matrix.shape
-                )
-                point1, point2 = (
-                    boundary_points[indices[0]],
-                    boundary_points[indices[1]],
-                )
-                longest_z_bp = boundary_points
+        dy2 = np.cos(orientation) * (short_diam/2)
+        dx2 = -np.sin(orientation) * (short_diam/2)
+        short_pts = [(cx - dx2, cy - dy2, z), (cx + dx2, cy + dy2, z)]
 
-                long_axis_diameter = long_diameter
-                long_axis_points = [np.append(point1, z), np.append(point2, z)]
+        # keep the slice with the maximum long axis
+        if long_diam > best_long:
+            best_long   = long_diam
+            best_short  = short_diam
+            best_long_pts  = long_pts
+            best_short_pts = short_pts
 
-    if longest_z != None:
-        # Now get the longest perpendicular short axis
-        short_diameter, point3, point4 = find_perpendicular_diameter(
-            point1, point2, longest_z_bp
-        )
-        short_axis_diameter = short_diameter
-        short_axis_points = [np.append(point3, longest_z), np.append(point4, longest_z)]
+    return best_long, best_short, best_long_pts, best_short_pts
 
-    return long_axis_diameter, short_axis_diameter, long_axis_points, short_axis_points
 
 
 def dice_coefficient(mask1, mask2):
@@ -140,6 +135,7 @@ def dice_coefficient(mask1, mask2):
 
 def compute_uls_score(gts, preds):
     uls_scores = 0
+    gts = [entry['label'] for entry in gts]
     for i, gt in enumerate(gts):
         pred = preds[i]
         gt_long, gt_short, _, _ = long_and_short_axis_diameters(gt)

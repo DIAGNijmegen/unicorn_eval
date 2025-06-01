@@ -123,6 +123,8 @@ def adapt_features(
     test_image_spacing=None,
     test_image_origins=None,
     test_image_directions=None,
+    test_labels=None,
+    shot_image_sizes=None,
     shot_image_spacing=None,
     shot_image_origins=None,
     shot_image_directions=None,
@@ -283,7 +285,9 @@ def adapt_features(
             test_image_origins=test_image_origins,
             test_image_spacings=test_image_spacing,
             test_image_directions=test_image_directions,
+            test_labels= test_labels,
             patch_size= patch_size,
+            train_image_sizes=shot_image_sizes,
             train_image_spacing=shot_image_spacing,
             train_image_origins=shot_image_origins,
             train_image_directions=shot_image_directions,
@@ -301,7 +305,9 @@ def adapt_features(
             test_image_origins=test_image_origins,
             test_image_spacings=test_image_spacing,
             test_image_directions=test_image_directions,
-            patch_size=patch_size,
+            test_labels= test_labels,
+            patch_size= patch_size,
+            train_image_sizes=shot_image_sizes,
             train_image_spacing=shot_image_spacing,
             train_image_origins=shot_image_origins,
             train_image_directions=shot_image_directions,
@@ -525,6 +531,7 @@ def extract_embeddings_and_labels(processed_results):
                 "shot_image_spacings": {},
                 "shot_image_origins": {},
                 "shot_image_directions": {},
+                "shot_image_sizes": {},
                 "shot_labels": [],
                 "shot_extra_labels": [],
                 "shot_ids": [],
@@ -546,6 +553,8 @@ def extract_embeddings_and_labels(processed_results):
             tasks[task_name]["shot_ids"].append(result["case_id"])
             tasks[task_name]["shot_coordinates"].append(result["coordinates"])
             shot_id = result["case_id"]
+            image_size = result["image_size"]
+            tasks[task_name]["shot_image_sizes"][shot_id] = image_size
             tasks[task_name]["shot_image_spacings"][shot_id] = result["image_spacing"]
             tasks[task_name]["shot_image_origins"][shot_id] = result["image_origin"]
             tasks[task_name]["shot_image_directions"][shot_id] = result["image_direction"]

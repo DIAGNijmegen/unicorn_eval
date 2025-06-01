@@ -292,7 +292,10 @@ def process(job):
         label = load_tif_file(location=label_path)
     elif label_path.suffix == ".mha":
         label_path = Path(str(label_path).replace("{case_id}", case_name))
-        label = load_mha_file(location=label_path)
+        if task_name in ['Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams', 'Task11_segmenting_three_anatomical_structures_in_lumbar_spine_mri']:
+            label = load_mha_file(location=label_path)
+        if task_name in ['Task10_segmenting_lesions_within_vois_in_ct']:
+            label = load_mha_file(location=label_path)
     else:
         raise ValueError(f"Unsupported file format: {label_path.suffix}")
 
@@ -418,11 +421,16 @@ def load_mha_file(*, location):
         pat_case = Sample(scans=[class_labels], lbl = class_labels, settings=PreprocessingSettings(spacing=[1,1,1], matrix_size=[16,256,256]))
         pat_case.preprocess()
         class_labels = pat_case.lbl
-    image_orientation = sitk.DICOMOrientImageFilter_GetOrientationFromDirectionCosines(class_labels.GetDirection())
-    if image_orientation != "SPL":
-        class_labels = sitk.DICOMOrient(class_labels, desiredCoordinateOrientation="SPL")
-    class_labels = sitk.GetArrayFromImage(class_labels)
-    return class_labels
+    class_labels_dict = {   
+        "label": sitk.GetArrayFromImage(class_labels),
+        "meta": {
+            "image-size": class_labels.GetSize(),
+            "image-origin": class_labels.GetOrigin(),
+            "image-spacing": class_labels.GetSpacing(),
+            "image-direction": class_labels.GetDirection(),
+        }
+    }
+    return class_labels_dict
 
 
 def write_metrics(*, metrics):
@@ -598,13 +606,14 @@ def main():
             shot_labels = results["shot_labels"]
             shot_extra_labels = results["shot_extra_labels"]
             shot_ids = results["shot_ids"]
+            shot_image_sizes = results["shot_image_sizes"]
             shot_image_spacings = results["shot_image_spacings"]
             shot_image_origins = results["shot_image_origins"]
             shot_image_directions = results["shot_image_directions"]
 
             case_embeddings = results["case_embeddings"]
             case_extra_labels = results["case_extra_labels"]
-            case_image_size = results["cases_image_sizes"]
+            case_image_sizes = results["cases_image_sizes"]
             case_image_spacings = results["cases_image_spacings"]
             case_image_origins = results["cases_image_origins"]
             case_image_directions = results["cases_image_directions"]
@@ -641,11 +650,13 @@ def main():
                 test_coordinates=results["cases_coordinates"],
                 test_names=case_ids,
                 patch_size=patch_size,
-                test_image_sizes=case_image_size,
+                test_image_sizes=case_image_sizes,
                 shot_extra_labels=shot_extra_labels,
                 test_image_spacing=case_image_spacings,
                 test_image_origins=case_image_origins,
                 test_image_directions=case_image_directions,
+                test_labels=case_labels,
+                shot_image_sizes=shot_image_sizes,
                 shot_image_spacing=shot_image_spacings,
                 shot_image_origins=shot_image_origins,
                 shot_image_directions=shot_image_directions,

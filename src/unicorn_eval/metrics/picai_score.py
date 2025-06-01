@@ -3,7 +3,7 @@ from picai_eval import evaluate
 
 
 def compute_picai_score(gts, preds):
-
+    gts = [entry['label'] for entry in gts]
     metrics = evaluate(
         y_det=preds,
         y_true=gts,
