@@ -122,9 +122,17 @@ def adapt_features(
     test_image_spacing=None,
     test_image_origins=None,
     test_image_directions=None,
+    test_label_sizes=None,
+    test_label_spacing=None,
+    test_label_origins=None,
+    test_label_directions=None,
+    shot_image_sizes=None,
     shot_image_spacing=None,
     shot_image_origins=None,
     shot_image_directions=None,
+    shot_label_spacing=None,
+    shot_label_origins=None,
+    shot_label_directions=None,
     shot_extra_labels=None,
     return_probabilities=False,
 ):
@@ -281,6 +289,9 @@ def adapt_features(
             shot_coordinates=shot_coordinates,
             shot_names=shot_names,
             shot_labels=shot_labels,
+            shot_label_spacing=shot_label_spacing,
+            shot_label_origins=shot_label_origins,
+            shot_label_directions=shot_label_directions,
             test_features=test_features,
             test_coordinates=test_coordinates,
             test_names=test_names, # try to remove this input
@@ -288,7 +299,12 @@ def adapt_features(
             test_image_origins=test_image_origins,
             test_image_spacings=test_image_spacing,
             test_image_directions=test_image_directions,
+            test_label_sizes=test_label_sizes,
+            test_label_spacing=test_label_spacing,
+            test_label_origins=test_label_origins,
+            test_label_directions=test_label_directions,
             patch_size=patch_size,
+            shot_image_sizes=shot_image_sizes,
             shot_image_spacing=shot_image_spacing,
             shot_image_origins=shot_image_origins,
             shot_image_directions=shot_image_directions,
@@ -299,18 +315,31 @@ def adapt_features(
             shot_features=shot_features,
             shot_coordinates=shot_coordinates,
             shot_names=shot_names,
+            shot_image_sizes=shot_image_sizes,
+            shot_image_spacing=shot_image_spacing,
+            shot_image_origins=shot_image_origins,
+            shot_image_directions=shot_image_directions,
             shot_labels=shot_labels,
+            shot_label_spacing=shot_label_spacing,
+            shot_label_origins=shot_label_origins,
+            shot_label_directions=shot_label_directions,
             test_features=test_features,
             test_coordinates=test_coordinates,
-            test_names=test_names, # try to remove this input
+            test_names=test_names,
             test_image_sizes=test_image_sizes,
             test_image_origins=test_image_origins,
             test_image_spacings=test_image_spacing,
             test_image_directions=test_image_directions,
             patch_size=patch_size,
+            shot_image_sizes=shot_image_sizes,
             shot_image_spacing=shot_image_spacing,
             shot_image_origins=shot_image_origins,
             shot_image_directions=shot_image_directions,
+            test_label_sizes=test_label_sizes,
+            test_label_spacing=test_label_spacing,
+            test_label_origins=test_label_origins,
+            test_label_directions=test_label_directions,
+            patch_size=patch_size,
             return_binary=False,
         )
 
@@ -481,7 +510,6 @@ def process_detection(data, task_name: str | None = None):
                             "name": p.get("name", f"case{case_id}_pt{idx}"),
                         }
                     )
-
             elif isinstance(case_extra, (list, np.ndarray)):
                 first_tuple = case_extra[0]
                 if len(first_tuple) >= 1:
@@ -530,6 +558,11 @@ def extract_embeddings_and_labels(processed_results):
                 "shot_image_spacings": {},
                 "shot_image_origins": {},
                 "shot_image_directions": {},
+                "shot_image_sizes": {},
+                "shot_label_sizes": {},
+                "shot_label_spacings": {},
+                "shot_label_origins": {},
+                "shot_label_directions": {},
                 "shot_labels": [],
                 "shot_extra_labels": [],
                 "shot_ids": [],
@@ -542,6 +575,10 @@ def extract_embeddings_and_labels(processed_results):
                 "cases_image_spacings": {},
                 "cases_image_origins": {},
                 "cases_image_directions": {},
+                "cases_label_sizes": {},
+                "cases_label_spacings": {},
+                "cases_label_origins": {},
+                "cases_label_directions": {},
             }
 
         if result["split"] == "shot":
@@ -551,9 +588,14 @@ def extract_embeddings_and_labels(processed_results):
             tasks[task_name]["shot_ids"].append(result["case_id"])
             tasks[task_name]["shot_coordinates"].append(result["coordinates"])
             shot_id = result["case_id"]
+            tasks[task_name]["shot_image_sizes"][shot_id] = result["image_size"]
             tasks[task_name]["shot_image_spacings"][shot_id] = result["image_spacing"]
             tasks[task_name]["shot_image_origins"][shot_id] = result["image_origin"]
             tasks[task_name]["shot_image_directions"][shot_id] = result["image_direction"]
+            tasks[task_name]["shot_label_spacings"][shot_id] = result["label_spacing"]
+            tasks[task_name]["shot_label_sizes"][shot_id] = result["label_size"]
+            tasks[task_name]["shot_label_origins"][shot_id] = result["label_origin"]
+            tasks[task_name]["shot_label_directions"][shot_id] = result["label_direction"]
         elif result["split"] == "case":
             tasks[task_name]["case_embeddings"].append(result["embeddings"])
             tasks[task_name]["case_labels"].append(result["label"])
@@ -562,12 +604,14 @@ def extract_embeddings_and_labels(processed_results):
             tasks[task_name]["case_ids"].append(result["case_id"])
             tasks[task_name]["cases_coordinates"].append(result["coordinates"])
             case_id = result["case_id"]
-            image_size = result["image_size"]
-            # record per-case image metadata
             tasks[task_name]["cases_image_spacings"][case_id] = result["image_spacing"]
-            tasks[task_name]["cases_image_sizes"][case_id] = image_size
+            tasks[task_name]["cases_image_sizes"][case_id] = result["image_size"]
             tasks[task_name]["cases_image_origins"][case_id] = result["image_origin"]
             tasks[task_name]["cases_image_directions"][case_id] = result["image_direction"]
+            tasks[task_name]["cases_label_spacings"][case_id] = result["label_spacing"]
+            tasks[task_name]["cases_label_sizes"][case_id] = result["label_size"]
+            tasks[task_name]["cases_label_origins"][case_id] = result["label_origin"]
+            tasks[task_name]["cases_label_directions"][case_id] = result["label_direction"]
 
     # now post-process each task
     for task_name, task_data in tasks.items():

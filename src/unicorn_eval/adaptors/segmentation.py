@@ -28,11 +28,8 @@ from monai.data import Dataset as dataset_monai
 from monai.losses import DiceLoss
 from monai.networks.blocks.upsample import UpSample
 from monai.networks.layers.factories import Act, Conv, Norm, split_args
-from monai.networks.nets.segresnet_ds import (
-    SegResBlock,
-    aniso_kernel,
-    scales_for_resolution,
-)
+from monai.networks.layers.utils import get_act_layer, get_norm_layer
+from monai.networks.nets.segresnet_ds import aniso_kernel, scales_for_resolution
 from monai.utils import has_option
 from torch.utils.data import DataLoader, Dataset
 from torch.utils.data._utils.collate import default_collate
@@ -429,23 +426,22 @@ class Decoder3D(nn.Module):
         x = self.vector_to_tensor(x)
         return self.decoder(x)
 
-
-def train_decoder3d(decoder, data_loader, device):
+def train_decoder3d(decoder, data_loader, device, num_epochs = 5):
     loss_fn = DiceLoss(sigmoid=True)
     optimizer = optim.Adam(decoder.parameters(), lr=1e-3)
 
     # Train decoder
-    num_epochs = 5
     for epoch in range(num_epochs):
         decoder.train()
         epoch_loss = 0
-        for idx, batch in enumerate(data_loader):
+        for batch in data_loader:
             patch_emb = batch["patch"].to(device)
             patch_label = batch["patch_label"].to(device)
             optimizer.zero_grad()
-            de_output = decoder(patch_emb)
 
+            de_output = decoder(patch_emb)
             loss = loss_fn(de_output.squeeze(1), patch_label)
+
             loss.backward()
             optimizer.step()
 
@@ -454,13 +450,11 @@ def train_decoder3d(decoder, data_loader, device):
 
     return decoder
 
-
 def world_to_voxel(coord, origin, spacing, inv_direction):
     relative = np.array(coord) - origin
     voxel = inv_direction @ relative
     voxel = voxel / spacing
     return np.round(voxel).astype(int)
-
 
 def create_grid(decoded_patches):
     grids = {}
@@ -483,7 +477,7 @@ def create_grid(decoded_patches):
         patch_size = (pZ, pY, pX)  # NumPy order
         padding = [(padded_shape[d] - image_size[d]) // 2 for d in range(3)]
         padding_mm = np.array(padding) * image_spacing
-        adjusted_origin = image_origin - inv_direction @ padding_mm
+        adjusted_origin = image_origin - direction @ padding_mm
         # Initialize grid
         pX, pY, pZ = padded_shape  # SITK order
         grid_shape = (pZ, pY, pX)  # NumPy order
@@ -506,17 +500,21 @@ def create_grid(decoded_patches):
         z_end = z_start + image_size[2]
         cropped = grid[z_start:z_end, y_start:y_end, x_start:x_end]
 
-        grids.update({idx: cropped})
+        pred_img = sitk.GetImageFromArray(cropped)
+        pred_img.SetOrigin(tuple(image_origin))
+        pred_img.SetSpacing(tuple(image_spacing))
+        pred_img.SetDirection(tuple(np.array(meta["image_direction"])))
+
+        grids.update({idx: pred_img})
     return grids
 
 
-def inference3d(decoder, data_loader, device, return_binary):
+def inference3d(decoder, data_loader, device, return_binary,  test_cases, test_label_sizes, test_label_spacing, test_label_origins, test_label_directions):
     decoder.eval()
     with torch.no_grad():
         grouped_predictions = defaultdict(lambda: defaultdict(list))
 
         for batch in data_loader:
-            unique_ids_in_batch = set(int(i) for i in batch["case_number"])
             inputs = batch["patch"].to(device)  # shape: [B, ...]
             coords = batch["coordinates"]  # list of 3 tensors
             image_idxs = batch["case_number"]
@@ -582,7 +580,29 @@ def inference3d(decoder, data_loader, device, return_binary):
                 )
 
         grids = create_grid(averaged_patches)
-        return [j for j in grids.values()]
+
+        aligned_preds = {}
+
+        for case_id, pred_msk in grids.items():
+            case = test_cases[case_id]
+            gt_size = test_label_sizes[case]
+            gt_spacing = test_label_spacing[case]
+            gt_origin = test_label_origins[case]
+            gt_direction = test_label_directions[case]
+
+            pred_on_gt = sitk.Resample(
+                pred_msk,
+                gt_size,
+                sitk.Transform(),
+                sitk.sitkNearestNeighbor,
+                gt_origin,
+                gt_spacing,
+                gt_direction
+            )
+
+            aligned_preds[case_id] = sitk.GetArrayFromImage(pred_on_gt)
+
+        return [j for j in aligned_preds.values()]
 
 
 def construct_data_with_labels(
@@ -655,7 +675,11 @@ def construct_data_with_labels(
 
 
 def extract_patch_labels(
-    image,
+    label,
+    label_spacing,
+    label_origin,
+    label_direction,
+    image_size,
     image_spacing,
     image_origin,
     image_direction,
@@ -676,20 +700,28 @@ def extract_patch_labels(
             ((x_start, x_end), (y_start, y_end), (z_start, z_end)).
         - features (list[float]): List of features extracted from the patch
     """
-    image = sitk.GetImageFromArray(image)
-    image.SetOrigin(image_origin)
-    image.SetSpacing(image_spacing)
-    image.SetDirection(image_direction)
+    label = sitk.GetImageFromArray(label)
+    label.SetOrigin(label_origin)
+    label.SetSpacing(label_spacing)
+    label.SetDirection(label_direction)
+
+    label = sitk.Resample(label,
+                          image_size,
+                          sitk.Transform(),
+                          sitk.sitkNearestNeighbor,
+                          image_origin,
+                          image_spacing,
+                          image_direction)
 
     patch_features = []
 
     patches, coordinates = extract_patches(
-        image=image,
+        image=label,
         patch_size=patch_size,
         spacing=patch_spacing,
     )
     if patch_spacing is None:
-        patch_spacing = image.GetSpacing()
+        patch_spacing = label.GetSpacing()
 
     for patch, coordinates in tqdm(
         zip(patches, coordinates), total=len(patches), desc="Extracting features"
@@ -706,17 +738,17 @@ def extract_patch_labels(
         patch_features=patch_features,
         patch_size=patch_size,
         patch_spacing=patch_spacing,
-        image_size=image.GetSize(),
-        image_origin=image.GetOrigin(),
-        image_spacing=image.GetSpacing(),
-        image_direction=image.GetDirection(),
+        image_size=label.GetSize(),
+        image_origin=label.GetOrigin(),
+        image_spacing=label.GetSpacing(),
+        image_direction=label.GetDirection(),
         title="patch_labels",
     )
 
     return patch_labels
 
 
-def load_patch_data(data_array: np.ndarray, batch_size: int = 4) -> DataLoader:
+def load_patch_data(data_array: np.ndarray, batch_size: int = 40) -> DataLoader:
     train_ds = dataset_monai(data=data_array)
     train_loader = dataloader_monai(train_ds, batch_size=batch_size, shuffle=False)
     return train_loader
@@ -755,9 +787,17 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
     def __init__(
         self,
         shot_features,
-        shot_labels,
         shot_coordinates,
         shot_names,
+        shot_labels,
+        shot_image_spacing,
+        shot_image_origins,
+        shot_image_directions,
+        shot_image_sizes,
+        shot_label_spacing,
+        shot_label_origins,
+        shot_label_directions,
+        shot_label_sizes,
         test_features,
         test_coordinates,
         test_names,
@@ -765,20 +805,25 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
         test_image_origins,
         test_image_spacings,
         test_image_directions,
-        shot_image_spacing,
-        shot_image_origins,
-        shot_image_directions,
+        test_label_sizes,
+        test_label_spacing,
+        test_label_origins,
+        test_label_directions,
         patch_size,
         return_binary=True,
     ):
         label_patch_features = []
-        for idx, patch in enumerate(shot_labels):
+        for idx, label in enumerate(shot_labels):
             label_feats = extract_patch_labels(
-                patch,
-                shot_image_spacing[shot_names[idx]],
-                shot_image_origins[shot_names[idx]],
-                shot_image_directions[shot_names[idx]],
-                patch_size,
+                label=label,
+                label_spacing=shot_label_spacing[shot_names[idx]],
+                label_origin=shot_label_origins[shot_names[idx]],
+                label_direction=shot_image_sizes[shot_names[idx]],
+                image_size=shot_label_directions[shot_names[idx]],
+                image_origin=shot_image_origins[shot_names[idx]],
+                image_spacing=shot_image_spacing[shot_names[idx]],
+                image_direction=shot_image_directions[shot_names[idx]],
+                patch_size=patch_size,
             )
             label_patch_features.append(label_feats)
         label_patch_features = np.array(label_patch_features, dtype=object)
@@ -801,23 +846,28 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
         self.shot_image_spacing = shot_image_spacing
         self.shot_image_origins = shot_image_origins
         self.shot_image_directions = shot_image_directions
+        self.test_label_sizes = test_label_sizes
+        self.test_label_spacing = test_label_spacing
+        self.test_label_origins = test_label_origins
+        self.test_label_directions = test_label_directions
         self.patch_size = patch_size
+        self.decoder = None
         self.return_binary = return_binary
 
     def fit(self):
         # build training data and loader
-        shot_data = construct_data_with_labels(
+        train_data = construct_data_with_labels(
             coordinates=self.shot_coordinates,
             embeddings=self.shot_features,
             cases=self.shot_names,
             patch_size=self.patch_size,
             labels=self.shot_labels,
         )
-        train_loader = load_patch_data(shot_data)
-
+        train_loader = load_patch_data(train_data)
+        latent_dim = len(self.shot_features[0][0])
         target_patch_size = tuple(int(j / 16) for j in self.patch_size)
         target_shape = (
-            512,
+            latent_dim,
             target_patch_size[2],
             target_patch_size[1],
             target_patch_size[0],
@@ -825,20 +875,22 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
 
         # set up device and model
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.decoder = Decoder3D(
-            latent_dim=512,
+        decoder = Decoder3D(
+            latent_dim=latent_dim,
             target_shape=target_shape,
             decoder_kwargs={
                 "spatial_dims": 3,
                 "init_filters": 32,
-                "latent_channels": 512,
+                "latent_channels": latent_dim,
                 "out_channels": 1,
                 "blocks_up": (1, 1, 1, 1),
                 "dsdepth": 1,
                 "upsample_mode": "deconv",
             },
-        ).to(self.device)
-        self.decoder = train_decoder3d(self.decoder, train_loader, self.device)
+        )
+
+        decoder.to(self.device)
+        self.decoder = train_decoder3d(decoder, train_loader, self.device)
 
     def predict(self) -> np.ndarray:
         # build test data and loader
@@ -855,7 +907,7 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
 
         test_loader = load_patch_data(test_data)
         # run inference using the trained decoder
-        return inference3d(self.decoder, test_loader, self.device, self.return_binary)
+        return inference3d(self.decoder, test_loader, self.device, self.return_binary, self.test_cases, self.test_label_sizes, self.test_label_spacing, self.test_label_origins, self.test_label_directions)
 
 
 class SegResNetDecoderOnly(nn.Module):
@@ -936,20 +988,24 @@ class SegResNetDecoderOnly(nn.Module):
                 bias=False,
                 align_corners=False,
             )
-            # Build a sequential block (repeat SegResBlock as many times as specified)
-            blocks = [
-                SegResBlock(
-                    spatial_dims=spatial_dims,
-                    in_channels=filters // 2,
-                    kernel_size=kernel_size,
-                    norm=norm,
-                    act=act,
-                )
-                for _ in range(blocks_up[i])
-            ]
-            level["blocks"] = nn.Sequential(*blocks)
 
-            # Add a deep supervision head if this level is within the last dsdepth levels.
+            lite_blocks = []
+            for _ in range(blocks_up[i]):
+                lite_blocks.append(
+                    nn.Sequential(
+                        Conv[Conv.CONV, spatial_dims](
+                            in_channels=filters // 2,
+                            out_channels=filters // 2,
+                            kernel_size=kernel_size,
+                            padding=kernel_size // 2,
+                            bias=False,
+                        ),
+                        get_norm_layer(name=norm, spatial_dims=spatial_dims, channels=filters // 2),
+                        get_act_layer(act)
+                    )
+                )
+            level["blocks"] = nn.Sequential(*lite_blocks)
+
             if i >= n_up - dsdepth:
                 level["head"] = Conv[Conv.CONV, spatial_dims](
                     in_channels=filters // 2,

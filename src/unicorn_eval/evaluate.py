@@ -286,6 +286,7 @@ def process(job):
     slug_label = LABEL_SLUG_DICT[task_name]
     label_path = case_specific_ground_truth_dir / slug_label
 
+    label_size, label_origin, label_spacing, label_direction = None, None, None, None
     if label_path.suffix == ".json":
         label = load_json_file(location=label_path)
     elif label_path.suffix == ".tif":
@@ -293,7 +294,7 @@ def process(job):
         label = load_tif_file(location=label_path)
     elif label_path.suffix == ".mha":
         label_path = Path(str(label_path).replace("{case_id}", case_name))
-        label = load_mha_file(location=label_path)
+        label, label_size, label_origin, label_spacing, label_direction = load_mha_file(location=label_path)
     else:
         raise ValueError(f"Unsupported file format: {label_path.suffix}")
 
@@ -327,6 +328,10 @@ def process(job):
     case_info_dict["prediction"] = prediction
     case_info_dict["label"] = label
     case_info_dict["extra_labels"] = extra_labels
+    case_info_dict["label_spacing"] = label_spacing
+    case_info_dict["label_size"] = label_size
+    case_info_dict["label_origin"] = label_origin
+    case_info_dict["label_direction"] = label_direction
 
     return case_info_dict
 
@@ -419,11 +424,7 @@ def load_mha_file(*, location):
         pat_case = Sample(scans=[class_labels], lbl = class_labels, settings=PreprocessingSettings(spacing=[1,1,1], matrix_size=[16,256,256]))
         pat_case.preprocess()
         class_labels = pat_case.lbl
-    image_orientation = sitk.DICOMOrientImageFilter_GetOrientationFromDirectionCosines(class_labels.GetDirection())
-    if image_orientation != "SPL":
-        class_labels = sitk.DICOMOrient(class_labels, desiredCoordinateOrientation="SPL")
-    class_labels = sitk.GetArrayFromImage(class_labels)
-    return class_labels
+    return sitk.GetArrayFromImage(class_labels), list(class_labels.GetSize()), list(class_labels.GetOrigin()), list(class_labels.GetSpacing()), list(class_labels.GetDirection())
 
 
 def write_metrics(*, metrics):
@@ -599,16 +600,24 @@ def main():
             shot_labels = results["shot_labels"]
             shot_extra_labels = results["shot_extra_labels"]
             shot_ids = results["shot_ids"]
+            shot_image_sizes = results["shot_image_sizes"]
             shot_image_spacings = results["shot_image_spacings"]
             shot_image_origins = results["shot_image_origins"]
             shot_image_directions = results["shot_image_directions"]
+            shot_label_spacings = results["shot_label_spacings"]
+            shot_label_origins = results["shot_label_origins"]
+            shot_label_directions = results["shot_label_directions"]
 
             case_embeddings = results["case_embeddings"]
             case_extra_labels = results["case_extra_labels"]
-            case_image_size = results["cases_image_sizes"]
+            case_image_sizes = results["cases_image_sizes"]
             case_image_spacings = results["cases_image_spacings"]
             case_image_origins = results["cases_image_origins"]
             case_image_directions = results["cases_image_directions"]
+            case_label_sizes = results["cases_label_sizes"]
+            case_label_spacings = results["cases_label_spacings"]
+            case_label_origins = results["cases_label_origins"]
+            case_label_directions = results["cases_label_directions"]
 
             if task_type in ["classification", "regression"]:
 
@@ -642,14 +651,22 @@ def main():
                 test_coordinates=results["cases_coordinates"],
                 test_names=case_ids,
                 patch_size=patch_size,
-                test_image_sizes=case_image_size,
+                test_image_sizes=case_image_sizes,
                 shot_extra_labels=shot_extra_labels,
                 test_image_spacing=case_image_spacings,
                 test_image_origins=case_image_origins,
                 test_image_directions=case_image_directions,
+                test_label_spacing=case_label_spacings,
+                test_label_origins=case_label_origins,
+                test_label_directions=case_label_directions,
+                test_label_sizes=case_label_sizes,
+                shot_image_sizes=shot_image_sizes,
                 shot_image_spacing=shot_image_spacings,
                 shot_image_origins=shot_image_origins,
                 shot_image_directions=shot_image_directions,
+                shot_label_spacing=shot_label_spacings,
+                shot_label_origins=shot_label_origins,
+                shot_label_directions=shot_label_directions,
                 return_probabilities=return_probabilities,
             )
 
