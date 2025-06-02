@@ -254,7 +254,7 @@ class Spider:
     def compute_metrics(self):
 
         metric_accumulator = []
-        gts = [entry['label'] for entry in self.ground_truths]
+        gts = self.ground_truths
         for i, gt in enumerate(gts):
             metric = self.score_case(
                 gt, self.inputs[i], self.spacings.get(self.case_ids[i])

@@ -135,7 +135,6 @@ def dice_coefficient(mask1, mask2):
 
 def compute_uls_score(gts, preds):
     uls_scores = 0
-    gts = [entry['label'] for entry in gts]
     for i, gt in enumerate(gts):
         pred = preds[i]
         gt_long, gt_short, _, _ = long_and_short_axis_diameters(gt)
