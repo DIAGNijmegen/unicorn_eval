@@ -509,7 +509,7 @@ def create_grid(decoded_patches):
     return grids
 
 
-def inference3d(decoder, data_loader, device, return_binary, test_labels):
+def inference3d(decoder, data_loader, device, return_binary,  test_cases, test_label_sizes, test_label_spacing, test_label_origins, test_label_directions):
     decoder.eval()
     with torch.no_grad():
         grouped_predictions = defaultdict(lambda: defaultdict(list))
@@ -581,20 +581,14 @@ def inference3d(decoder, data_loader, device, return_binary, test_labels):
 
         grids = create_grid(averaged_patches)
 
-        gt_meta_by_case = {
-            case_id: label_dict['meta']
-            for case_id, label_dict in enumerate(test_labels)
-        }
-
         aligned_preds = {}
 
         for case_id, pred_msk in grids.items():
-            meta = gt_meta_by_case[case_id]
-
-            gt_size= tuple(meta['image-size'])
-            gt_origin = tuple(meta['image-origin'])
-            gt_spacing = tuple(meta['image-spacing'])
-            gt_direction = tuple(meta['image-direction'])
+            case = test_cases[case_id]
+            gt_size = test_label_sizes[case]
+            gt_spacing = test_label_spacing[case]
+            gt_origin = test_label_origins[case]
+            gt_direction = test_label_directions[case]
 
             pred_on_gt = sitk.Resample(
                 pred_msk,
@@ -796,31 +790,36 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
         shot_coordinates,
         shot_names,
         shot_labels,
-        test_features,
-        test_coordinates,
-        test_names,
-        test_labels,
-        test_image_sizes,
-        test_image_origins,
-        test_image_spacings,
-        test_image_directions,
         shot_image_spacing,
         shot_image_origins,
         shot_image_directions,
         shot_image_sizes,
+        shot_label_spacing,
+        shot_label_origins,
+        shot_label_directions,
+        shot_label_sizes,
+        test_features,
+        test_coordinates,
+        test_names,
+        test_image_sizes,
+        test_image_origins,
+        test_image_spacings,
+        test_image_directions,
+        test_label_sizes,
+        test_label_spacing,
+        test_label_origins,
+        test_label_directions,
         patch_size,
         return_binary=True,
     ):
         label_patch_features = []
-        for idx, label_dict in enumerate(shot_labels):
-            lbl_arr=label_dict['label']
-            meta=label_dict['meta']
+        for idx, label in enumerate(shot_labels):
             label_feats = extract_patch_labels(
-                label=lbl_arr,
-                label_spacing=meta['image-spacing'],
-                label_origin=meta['image-origin'],
-                label_direction=meta['image-direction'],
-                image_size=shot_image_sizes[shot_names[idx]],
+                label=label,
+                label_spacing=shot_label_spacing[shot_names[idx]],
+                label_origin=shot_label_origins[shot_names[idx]],
+                label_direction=shot_image_sizes[shot_names[idx]],
+                image_size=shot_label_directions[shot_names[idx]],
                 image_origin=shot_image_origins[shot_names[idx]],
                 image_spacing=shot_image_spacing[shot_names[idx]],
                 image_direction=shot_image_directions[shot_names[idx]],
@@ -847,7 +846,10 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
         self.shot_image_spacing = shot_image_spacing
         self.shot_image_origins = shot_image_origins
         self.shot_image_directions = shot_image_directions
-        self.test_labels = test_labels
+        self.test_label_sizes = test_label_sizes
+        self.test_label_spacing = test_label_spacing
+        self.test_label_origins = test_label_origins
+        self.test_label_directions = test_label_directions
         self.patch_size = patch_size
         self.decoder = None
         self.return_binary = return_binary
@@ -905,7 +907,7 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
 
         test_loader = load_patch_data(test_data)
         # run inference using the trained decoder
-        return inference3d(self.decoder, test_loader, self.device, self.return_binary, self.test_labels)
+        return inference3d(self.decoder, test_loader, self.device, self.return_binary, self.test_cases, self.test_label_sizes, self.test_label_spacing, self.test_label_origins, self.test_label_directions)
 
 
 class SegResNetDecoderOnly(nn.Module):
