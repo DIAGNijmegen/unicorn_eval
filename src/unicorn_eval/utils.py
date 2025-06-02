@@ -130,7 +130,6 @@ def adapt_features(
     shot_image_spacing=None,
     shot_image_origins=None,
     shot_image_directions=None,
-    shot_label_sizes=None,
     shot_label_spacing=None,
     shot_label_origins=None,
     shot_label_directions=None,

@@ -604,7 +604,6 @@ def main():
             shot_image_spacings = results["shot_image_spacings"]
             shot_image_origins = results["shot_image_origins"]
             shot_image_directions = results["shot_image_directions"]
-            shot_label_sizes = results["shot_label_sizes"]
             shot_label_spacings = results["shot_label_spacings"]
             shot_label_origins = results["shot_label_origins"]
             shot_label_directions = results["shot_label_directions"]
@@ -668,7 +667,6 @@ def main():
                 shot_label_spacing=shot_label_spacings,
                 shot_label_origins=shot_label_origins,
                 shot_label_directions=shot_label_directions,
-                shot_label_sizes=shot_label_sizes,
                 return_probabilities=return_probabilities,
             )
 
