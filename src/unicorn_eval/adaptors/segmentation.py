@@ -28,11 +28,8 @@ from monai.data import Dataset as dataset_monai
 from monai.losses import DiceLoss
 from monai.networks.blocks.upsample import UpSample
 from monai.networks.layers.factories import Act, Conv, Norm, split_args
-from monai.networks.nets.segresnet_ds import (
-    aniso_kernel,
-    scales_for_resolution,
-)
 from monai.networks.layers.utils import get_act_layer, get_norm_layer
+from monai.networks.nets.segresnet_ds import aniso_kernel, scales_for_resolution
 from monai.utils import has_option
 from torch.utils.data import DataLoader, Dataset
 from torch.utils.data._utils.collate import default_collate
@@ -444,7 +441,7 @@ def train_decoder3d(decoder, data_loader, device, num_epochs = 5):
 
             de_output = decoder(patch_emb)
             loss = loss_fn(de_output.squeeze(1), patch_label)
-            
+
             loss.backward()
             optimizer.step()
 
@@ -505,7 +502,7 @@ def create_grid(decoded_patches):
 
         pred_img = sitk.GetImageFromArray(cropped)
         pred_img.SetOrigin(tuple(image_origin))
-        pred_img.SetSpacing(tuple(image_spacing)) 
+        pred_img.SetSpacing(tuple(image_spacing))
         pred_img.SetDirection(tuple(np.array(meta["image_direction"])))
 
         grids.update({idx: pred_img})
@@ -581,7 +578,7 @@ def inference3d(decoder, data_loader, device, return_binary, test_labels):
                         "image_direction": patches[0]["image_direction"],
                     }
                 )
-        
+
         grids = create_grid(averaged_patches)
 
         gt_meta_by_case = {
@@ -594,19 +591,19 @@ def inference3d(decoder, data_loader, device, return_binary, test_labels):
         for case_id, pred_msk in grids.items():
             meta = gt_meta_by_case[case_id]
 
-            gt_size= tuple(meta['image-size'])       
+            gt_size= tuple(meta['image-size'])
             gt_origin = tuple(meta['image-origin'])
             gt_spacing = tuple(meta['image-spacing'])
             gt_direction = tuple(meta['image-direction'])
 
             pred_on_gt = sitk.Resample(
-                pred_msk,                
-                gt_size,                 
-                sitk.Transform(),        
+                pred_msk,
+                gt_size,
+                sitk.Transform(),
                 sitk.sitkNearestNeighbor,
-                gt_origin,               
-                gt_spacing,             
-                gt_direction             
+                gt_origin,
+                gt_spacing,
+                gt_direction
             )
 
             aligned_preds[case_id] = sitk.GetArrayFromImage(pred_on_gt)
@@ -688,9 +685,9 @@ def extract_patch_labels(
     label_spacing,
     label_origin,
     label_direction,
-    image_size, 
+    image_size,
     image_spacing,
-    image_origin, 
+    image_origin,
     image_direction,
     patch_size: list[int] = [16, 256, 256],
     patch_spacing: list[float] | None = None,
@@ -721,7 +718,7 @@ def extract_patch_labels(
                           image_origin,
                           image_spacing,
                           image_direction)
-    
+
     patch_features = []
 
     patches, coordinates = extract_patches(
@@ -795,61 +792,61 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
 
     def __init__(
         self,
-        train_feats,
-        train_coords,
-        train_cases,
-        train_labels,
-        test_feats,
-        test_coords,
-        test_cases,
+        shot_features,
+        shot_coordinates,
+        shot_names,
+        shot_labels,
+        test_features,
+        test_coordinates,
+        test_names,
         test_labels,
         test_image_sizes,
         test_image_origins,
         test_image_spacings,
         test_image_directions,
-        train_image_spacing,
-        train_image_origins,
-        train_image_directions,
-        train_image_sizes,
+        shot_image_spacing,
+        shot_image_origins,
+        shot_image_directions,
+        shot_image_sizes,
         patch_size,
         return_binary=True,
     ):
         label_patch_features = []
-        for idx, label_dict in enumerate(train_labels):
+        for idx, label_dict in enumerate(shot_labels):
             lbl_arr=label_dict['label']
             meta=label_dict['meta']
             label_feats = extract_patch_labels(
-                label= lbl_arr,
+                label=lbl_arr,
                 label_spacing=meta['image-spacing'],
                 label_origin=meta['image-origin'],
                 label_direction=meta['image-direction'],
-                image_size= train_image_sizes[train_cases[idx]],
-                image_origin= train_image_origins[train_cases[idx]],
-                image_spacing= train_image_spacing[train_cases[idx]],
-                image_direction= train_image_directions[train_cases[idx]],
-                patch_size= patch_size,
+                image_size=shot_image_sizes[shot_names[idx]],
+                image_origin=shot_image_origins[shot_names[idx]],
+                image_spacing=shot_image_spacing[shot_names[idx]],
+                image_direction=shot_image_directions[shot_names[idx]],
+                patch_size=patch_size,
             )
             label_patch_features.append(label_feats)
         label_patch_features = np.array(label_patch_features, dtype=object)
 
         super().__init__(
-            shot_features=train_feats,
+            shot_features=shot_features,
             shot_labels=label_patch_features,
-            shot_coordinates=train_coords,
-            test_features=test_feats,
-            test_coordinates=test_coords,
+            shot_coordinates=shot_coordinates,
+            test_features=test_features,
+            test_coordinates=test_coordinates,
             shot_extra_labels=None,  # not used here
         )
 
-        self.shot_names = train_cases
-        self.test_cases = test_cases
+        self.shot_names = shot_names
+        self.test_cases = test_names
         self.test_image_sizes = test_image_sizes
         self.test_image_origins = test_image_origins
         self.test_image_spacings = test_image_spacings
         self.test_image_directions = test_image_directions
-        self.train_image_spacing = train_image_spacing
-        self.train_image_origins = train_image_origins
-        self.train_image_directions = train_image_directions
+        self.shot_image_spacing = shot_image_spacing
+        self.shot_image_origins = shot_image_origins
+        self.shot_image_directions = shot_image_directions
         self.test_labels = test_labels
         self.patch_size = patch_size
         self.decoder = None
@@ -989,7 +986,7 @@ class SegResNetDecoderOnly(nn.Module):
                 bias=False,
                 align_corners=False,
             )
-        
+
             lite_blocks = []
             for _ in range(blocks_up[i]):
                 lite_blocks.append(

@@ -33,7 +33,6 @@ from unicorn_eval.adaptors import (
     SegmentationUpsampling3D,
     WeightedKNN,
     WeightedKNNRegressor,
-    PatchNoduleRegressor,
 )
 from unicorn_eval.metrics.dice import compute_dice_score
 from unicorn_eval.metrics.f1_score import compute_f1
@@ -42,7 +41,6 @@ from unicorn_eval.metrics.sensitivity import compute_cpm
 from unicorn_eval.metrics.spider import compute_spider_score
 from unicorn_eval.metrics.uls import compute_uls_score
 from unicorn_eval.metrics.vision_language import compute_average_language_metric
-
 
 METRIC_DICT = {
     "Task01_classifying_he_prostate_biopsies_into_isup_scores": {
@@ -281,46 +279,24 @@ def adapt_features(
 
     elif adaptor_name == "segmentation-upsampling-3d":
         adaptor = SegmentationUpsampling3D(
-            train_feats=shot_features,
-            train_coords=shot_coordinates,
-            train_cases=shot_names,
-            train_labels=shot_labels,
-            test_feats =test_features,
-            test_coords=test_coordinates,
-            test_cases= test_names, # try to remove this input
+            shot_features=shot_features,
+            shot_coordinates=shot_coordinates,
+            shot_names=shot_names,
+            shot_labels=shot_labels,
+            test_features=test_features,
+            test_coordinates=test_coordinates,
+            test_names=test_names, # try to remove this input
             test_image_sizes=test_image_sizes,
             test_image_origins=test_image_origins,
             test_image_spacings=test_image_spacing,
             test_image_directions=test_image_directions,
-            test_labels= test_labels,
-            patch_size= patch_size,
-            train_image_sizes=shot_image_sizes,
-            train_image_spacing=shot_image_spacing,
-            train_image_origins=shot_image_origins,
-            train_image_directions=shot_image_directions,
+            test_labels=test_labels,
+            patch_size=patch_size,
+            shot_image_sizes=shot_image_sizes,
+            shot_image_spacing=shot_image_spacing,
+            shot_image_origins=shot_image_origins,
+            shot_image_directions=shot_image_directions,
         )
-    elif adaptor_name == "detection-by-segmentation-upsampling-3d":
-        adaptor = SegmentationUpsampling3D(
-            train_feats=shot_features,
-            train_coords=shot_coordinates,
-            train_cases=shot_names,
-            train_labels=shot_labels,
-            test_feats=test_features,
-            test_coords=test_coordinates,
-            test_cases=test_names, # try to remove this input
-            test_image_sizes=test_image_sizes,
-            test_image_origins=test_image_origins,
-            test_image_spacings=test_image_spacing,
-            test_image_directions=test_image_directions,
-            test_labels= test_labels,
-            patch_size= patch_size,
-            train_image_sizes=shot_image_sizes,
-            train_image_spacing=shot_image_spacing,
-            train_image_origins=shot_image_origins,
-            train_image_directions=shot_image_directions,
-            return_binary=False,
-        )
-
     elif adaptor_name == "detection-by-segmentation-upsampling-3d":
         adaptor = SegmentationUpsampling3D(
             shot_features=shot_features,
@@ -334,7 +310,9 @@ def adapt_features(
             test_image_origins=test_image_origins,
             test_image_spacings=test_image_spacing,
             test_image_directions=test_image_directions,
+            test_labels=test_labels,
             patch_size=patch_size,
+            shot_image_sizes=shot_image_sizes,
             shot_image_spacing=shot_image_spacing,
             shot_image_origins=shot_image_origins,
             shot_image_directions=shot_image_directions,
@@ -578,8 +556,7 @@ def extract_embeddings_and_labels(processed_results):
             tasks[task_name]["shot_ids"].append(result["case_id"])
             tasks[task_name]["shot_coordinates"].append(result["coordinates"])
             shot_id = result["case_id"]
-            image_size = result["image_size"]
-            tasks[task_name]["shot_image_sizes"][shot_id] = image_size
+            tasks[task_name]["shot_image_sizes"][shot_id] = result["image_size"]
             tasks[task_name]["shot_image_spacings"][shot_id] = result["image_spacing"]
             tasks[task_name]["shot_image_origins"][shot_id] = result["image_origin"]
             tasks[task_name]["shot_image_directions"][shot_id] = result["image_direction"]
@@ -591,10 +568,8 @@ def extract_embeddings_and_labels(processed_results):
             tasks[task_name]["case_ids"].append(result["case_id"])
             tasks[task_name]["cases_coordinates"].append(result["coordinates"])
             case_id = result["case_id"]
-            image_size = result["image_size"]
-            # record per-case image metadata
             tasks[task_name]["cases_image_spacings"][case_id] = result["image_spacing"]
-            tasks[task_name]["cases_image_sizes"][case_id] = image_size
+            tasks[task_name]["cases_image_sizes"][case_id] = result["image_size"]
             tasks[task_name]["cases_image_origins"][case_id] = result["image_origin"]
             tasks[task_name]["cases_image_directions"][case_id] = result["image_direction"]
 
