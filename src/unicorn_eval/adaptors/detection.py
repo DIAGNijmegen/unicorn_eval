@@ -211,7 +211,7 @@ def assign_cells_to_patches(cell_data, patch_coordinates, patch_size):
     """Assign ROI cell coordinates to the correct patch."""
     patch_cell_map = {i: [] for i in range(len(patch_coordinates))}
 
-    for x, y in cell_data:
+    for x, y, _ in cell_data:
         for i, (x_patch, y_patch) in enumerate(patch_coordinates):
             if (
                 x_patch <= x < x_patch + patch_size
