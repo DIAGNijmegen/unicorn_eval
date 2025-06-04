@@ -1,0 +1,4 @@
+case_id,task_name,task_type,domain,modality,split
+task-1-case-1,Task01_classifying_he_prostate_biopsies_into_isup_scores,classification,pathology,vision,shot
+task-1-case-2,Task01_classifying_he_prostate_biopsies_into_isup_scores,classification,pathology,vision,case
+task-1-case-3,Task01_classifying_he_prostate_biopsies_into_isup_scores,classification,pathology,vision,case

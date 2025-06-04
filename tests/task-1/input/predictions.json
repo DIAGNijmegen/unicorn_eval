@@ -1,0 +1,65 @@
+[
+  {
+    "pk": "14edd45a-d447-437f-8c4b-11f4633fbc0c",
+    "inputs": [
+      {
+        "image": {
+          "name": "task-1-case-1.tif"
+        },
+        "interface": {
+            "slug": "prostate-tissue-biopsy-whole-slide-image"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "image-neural-representation",
+          "relative_path": "image-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "cbea2c1f-e5e3-4d8e-93a2-dbf0fc3d5e0b",
+    "inputs": [
+      {
+        "image": {
+          "name": "task-1-case-2.tif"
+        },
+        "interface": {
+            "slug": "prostate-tissue-biopsy-whole-slide-image"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "image-neural-representation",
+          "relative_path": "image-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "b304fc2a-8c32-4f46-889d-c4ebc33e6aa3",
+    "inputs": [
+      {
+        "image": {
+          "name": "task-1-case-3.tif"
+        },
+        "interface": {
+            "slug": "prostate-tissue-biopsy-whole-slide-image"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "image-neural-representation",
+          "relative_path": "image-neural-representation.json"
+        }
+      }
+    ]
+  }
+]
