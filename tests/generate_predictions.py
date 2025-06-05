@@ -61,6 +61,39 @@ MODEL_OUTPUT_SLUG_DICT = {
     "Task11_segmenting_three_anatomical_structures_in_lumbar_spine_mri": "patch-neural-representation",
 }
 
+FILE_TYPE = {
+    "Task01_classifying_he_prostate_biopsies_into_isup_scores": 
+        ".tif",
+    "Task02_classifying_lung_nodule_malignancy_in_ct": 
+        ".mha",
+    "Task03_predicting_the_time_to_biochemical_recurrence_in_he_prostatectomies": 
+        ".tif",
+    "Task04_predicting_slide_level_tumor_proportion_score_in_ihc_stained_wsi": 
+        ".tif",
+    "Task05_detecting_signet_ring_cells_in_he_stained_wsi_of_gastric_cancer": 
+        ".tif",
+    "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams": 
+        ".mha",
+    "Task07_detecting_lung_nodules_in_thoracic_ct": 
+        ".mha",
+    "Task08_detecting_mitotic_figures_in_breast_cancer_wsis": 
+        ".tif",
+    "Task09_segmenting_rois_in_breast_cancer_wsis": 
+        ".tif",
+    "Task10_segmenting_lesions_within_vois_in_ct": 
+        ".mha",
+    "Task11_segmenting_three_anatomical_structures_in_lumbar_spine_mri": 
+        ".mha",
+}
+
+def append_suffix_to_name(name, slug, file_type): 
+    if slug.endswith("t2-prostate-mri"):
+        suffix = "t2w"
+    elif slug.endswith("hbv-prostate-mri"):
+        suffix = "hbv"
+    elif slug.endswith("adc-prostate-mri"):
+        suffix = "adc"
+    return f'{name}_{suffix}{file_type}'
 
 def generate_predictions_from_csv(csv_path: Path, output_path: Path):
     df = pd.read_csv(csv_path)
@@ -80,23 +113,47 @@ def generate_predictions_from_csv(csv_path: Path, output_path: Path):
 
         input_slugs = INPUT_SLUGS_DICT[task_name]
         output_slug = MODEL_OUTPUT_SLUG_DICT[task_name]
+        file_type = FILE_TYPE[task_name]
 
-        for _, row in group.iterrows():
-            name = row["case_id"]
-            pk = row["pk"] if use_custom_pk else name
-            predictions.append({
-                "pk": Path(pk).stem,
-                "inputs": [{
-                    "image": {"name": name},
-                    "interface": {"slug": input_slugs[0]}
-                }],
-                "outputs": [{
-                    "interface": {
-                        "slug": output_slug,
-                        "relative_path": f"{output_slug}.json"
-                    }
-                }]
-            })
+        if len(input_slugs) == 1:
+            for _, row in group.iterrows():
+                name = f'{row["case_id"]}{file_type}' 
+                pk = row["pk"] if use_custom_pk else name
+                predictions.append({
+                    "pk": Path(pk).stem,
+                    "inputs": [{
+                        "image": {"name": name},
+                        "interface": {"slug": input_slugs[0]}
+                    }],
+                    "outputs": [{
+                        "interface": {
+                            "slug": output_slug,
+                            "relative_path": f"{output_slug}.json"
+                        }
+                    }]
+                })
+        else: 
+            for _, row in group.iterrows():
+                name = row["case_id"]
+                pk = row["pk"] if use_custom_pk else name
+                inputs_list = [
+                        {
+                            "image": {"name": append_suffix_to_name(name, input_slug, file_type)},
+                            "interface": {"slug": input_slug}
+                        }
+                        for input_slug in input_slugs
+                    ]
+                predictions.append({
+                    "pk": Path(pk).stem,
+                    "inputs": inputs_list,
+                    "outputs": [{
+                        "interface": {
+                            "slug": output_slug,
+                            "relative_path": f"{output_slug}.json"
+                        }
+                    }]
+                })
+
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("w") as f:
