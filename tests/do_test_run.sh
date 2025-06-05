@@ -25,8 +25,6 @@ echo "=+= (Re)build the container"
 
 source "${SCRIPT_DIR}/do_build.sh" "$DOCKER_IMAGE_TAG"
 
-echo "DEBUG: Checking if output dir exists at: $OUTPUT_DIR"
-ls -ld "$OUTPUT_DIR" || echo "Output dir does not exist yet"
 cleanup() {
     echo "=+= Cleaning permissions ..."
     docker run --rm \
@@ -58,6 +56,5 @@ docker run --rm \
   --volume "$OUTPUT_DIR":/output \
   "$DOCKER_IMAGE_TAG" \
   python -m unicorn_eval
-
 
 echo "=+= Wrote results to ${OUTPUT_DIR}"
