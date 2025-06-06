@@ -6,13 +6,60 @@ Your input data, the output produced by the algorithm Docker container, should b
 
 ```
 input/
-├── case1/
+├── pk-value/
 │   └── output/
 │       └── patch-or-image-neural-representation.json
-├── case2/
+├── pk-value/
 │   └── output/
 │       └── patch-or-image-neural-representation.json
 ├── predictions.json
+├── adaptor.json 
+```
+
+The simplified `predictions.json` file contains the information about how to map the encoded features (image-neural-representations.json / patch-neural-representations.json) and groundtruth.
+```
+[
+  {
+    "pk": <pk-value>,       // pk-value is equivalent with case_id
+    "inputs": [
+      {
+        "image": {
+          "name": <case_id>
+        },
+        "interface": {
+          "slug": <input_slug>
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": <neural-representation-type>,       // either "image-neural-representation" or "patch-neural-representation"
+          "relative_path": <json-file-name>           // either "image-neural-representation.json" or "patch-neural-representation.json"
+        }
+      }
+    ]
+  }
+]
+```
+
+The `adaptor.json` file is a task specific file, that indicates which adaptor should be used. The `adaptor.json` (e.g. adaptor-pathology-classification.json) contains which adaptor that should be chosen for this task (e.g. "1-nn", "5-nn", "20-nn", "1-nn-weighted", "5-nn-weighted", "20-nn-weighted", "linear-probing" or "mlp").
+
+This file should follow this structure:
+```
+ADAPTOR_SLUGS_DICT = {
+    "Task01_classifying_he_prostate_biopsies_into_isup_scores": "adaptor-pathology-classification",
+    "Task02_classifying_lung_nodule_malignancy_in_ct": "adaptor-radiology-classification",
+    "Task03_predicting_the_time_to_biochemical_recurrence_in_he_prostatectomies": "adaptor-pathology-regression",
+    "Task04_predicting_slide_level_tumor_proportion_score_in_ihc_stained_wsi": "adaptor-pathology-classification",
+    "Task05_detecting_signet_ring_cells_in_he_stained_wsi_of_gastric_cancer": "adaptor-pathology-detection",
+    "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams": "adaptor-radiology-detection-segmentation",
+    "Task07_detecting_lung_nodules_in_thoracic_ct": "adaptor-radiology-detection-points",
+    "Task08_detecting_mitotic_figures_in_breast_cancer_wsis": "adaptor-pathology-detection",
+    "Task09_segmenting_rois_in_breast_cancer_wsis": "adaptor-pathology-segmentation",
+    "Task10_segmenting_lesions_within_vois_in_ct": "adaptor-radiology-segmentation",
+    "Task11_segmenting_three_anatomical_structures_in_lumbar_spine_mri": "adaptor-radiology-segmentation",
+}
 ```
 
 You can download `patch-neural-representation.json` or `image-neural-representation.json` from Grand Challenge after executing your algorithm on a leaderboard. Downloading these files will help you understand its structure. 
@@ -24,13 +71,19 @@ The evaluation also requires ground truth data, structured in the following way:
 
 ```
 /opt/ml/input/data/ground_truth/
-└── Task01_classifying_he_prostate_biopsies_into_isup_scores
-    ├── mapping.csv
-    └── case1/
-        └── isup-grade.json
+└── <task_name>. // e.g. Task01_classifying_he_prostate_biopsies_into_isup_scores
+│   ├── pk-value
+│   │   ├── label   // e.g. isup-grade.json
+├── mapping.csv
 ```
 - `mapping.csv` maps case IDs to relevant task metadata (such as modality, domain, and task type)
 - `isup-grade.json` contains ground truth annotations for Task01. The format may differ depending on the specific task. However, the evaluation container will handle reading this and doing the metric computation. 
+
+The mapping.csv file contains information to map the case to the specific task, domain and specifies if this case should be used as a training case (shot) or for testing (case).
+```
+case_id | task_name | task_type                        | domain           | modality | split
+<case_id>   <task_name>   classification/detection/segmentation   pathology/CT/MR   vision    shot (training) or case (testing)
+```
 
 **Important:** The `name` field in `predictions.json` must exactly match the case ID used in `mapping.csv`. If they don't align, the evaluation container will be unable to associate predictions with the correct ground truth data.
 
