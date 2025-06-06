@@ -25,6 +25,7 @@ input/
 * **`tests/task-1/input/adaptor-pathology-classification.json`**: Specifies which adaptor method to use, e.g., `"1-nn"`, `"linear-probing"`, `"mlp"`, etc.
 
 **Reference example files**
+
 You can find working examples of these files in the `tests` folder of this repository:
 * [`tests/task-1/input/predictions.json`](tests/task-1/input/predictions.json)
 * [`tests/task-1/input/adaptor-pathology-classification.json`](tests/task-1/input/adaptor-pathology-classification.json)
@@ -76,19 +77,17 @@ The evaluation also requires ground truth data, structured in the following way:
 * **`label`** is the ground truth as is shown on Zenodo.
 
 **Important:** The `name` field in `predictions.json` must exactly match the case ID used in `mapping.csv`. If they don't align, the evaluation container will be unable to associate predictions with the correct ground truth data.
-Example `mapping.csv` structure:
 
+To generate youw own `mapping.csv`, we provided [this script](tests/generate_mapping.py). An example of the `mapping.csv` structure can be found below:
 ```
 case_id,task_name,task_type,domain,modality,split
-000000,Task01_classifying_he_prostate_biopsies_into_isup_scores,classification,pathology,vision,shot
-000001,Task01_classifying_he_prostate_biopsies_into_isup_scores,classification,pathology,vision,case
+<case_id>,<task_name>,classification/detection/segmentation,pathology/CT/MR,vision,shot/case
 ```
 
-**Reference examples**
+**Reference example files**
 * [`tests/task-1/ground-truth/mapping.csv`](tests/task-1/ground-truth/mapping.csv)
 * [`tests/task-1/ground-truth/Task01_classifying_he_prostate_biopsies_into_isup_scores/0403dcc49b1420545299f692f7d8e270/isup-grade.json`](tests/task-1/ground-truth/Task01_classifying_he_prostate_biopsies_into_isup_scores/0403dcc49b1420545299f692f7d8e270/isup-grade.json)
 
-To generate youw own `mapping.csv`, we provided [this script](tests/generate_mapping.py)
 
 ## 3. Running the Evaluation Locally
 - Obtain the neural representation `JSON` files by either:
