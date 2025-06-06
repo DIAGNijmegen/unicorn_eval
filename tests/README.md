@@ -27,9 +27,9 @@ input/
 **Reference example files**
 
 You can find working examples of these files in the `tests` folder of this repository:
-* [`tests/task-1/input/predictions.json`](tests/task-1/input/predictions.json)
-* [`tests/task-1/input/adaptor-pathology-classification.json`](tests/task-1/input/adaptor-pathology-classification.json)
-* [`tests/task-1/input/0403dcc49b1420545299f692f7d8e270/output/image-neural-representation.json`](tests/task-1/input/0403dcc49b1420545299f692f7d8e270/output/image-neural-representation.json)
+* [`tests/task-1/input/predictions.json`](task-1/input/predictions.json)
+* [`tests/task-1/input/adaptor-pathology-classification.json`](task-1/input/adaptor-pathology-classification.json)
+* [`tests/task-1/input/0403dcc49b1420545299f692f7d8e270/output/image-neural-representation.json`](task-1/input/0403dcc49b1420545299f692f7d8e270/output/image-neural-representation.json)
 
 You can also download `patch-neural-representation.json` or `image-neural-representation.json` from Grand Challenge after executing your algorithm on a leaderboard. Downloading these files will help you understand its structure. Or, alternative, create them yourself by running your algorithm locally.
 
@@ -78,26 +78,26 @@ The evaluation also requires ground truth data, structured in the following way:
 
 **Important:** The `name` field in `predictions.json` must exactly match the case ID used in `mapping.csv`. If they don't align, the evaluation container will be unable to associate predictions with the correct ground truth data.
 
-To generate youw own `mapping.csv`, we provided [this script](tests/generate_mapping.py). An example of the `mapping.csv` structure can be found below:
+To generate youw own `mapping.csv`, we provided [this script](generate_mapping.py). An example of the `mapping.csv` structure can be found below:
 ```
 case_id,task_name,task_type,domain,modality,split
 <case_id>,<task_name>,classification/detection/segmentation,pathology/CT/MR,vision,shot/case
 ```
 
 **Reference example files**
-* [`tests/task-1/ground-truth/mapping.csv`](tests/task-1/ground-truth/mapping.csv)
-* [`tests/task-1/ground-truth/Task01_classifying_he_prostate_biopsies_into_isup_scores/0403dcc49b1420545299f692f7d8e270/isup-grade.json`](tests/task-1/ground-truth/Task01_classifying_he_prostate_biopsies_into_isup_scores/0403dcc49b1420545299f692f7d8e270/isup-grade.json)
+* [`tests/task-1/ground-truth/mapping.csv`](task-1/ground-truth/mapping.csv)
+* [`tests/task-1/ground-truth/Task01_classifying_he_prostate_biopsies_into_isup_scores/0403dcc49b1420545299f692f7d8e270/isup-grade.json`](task-1/ground-truth/Task01_classifying_he_prostate_biopsies_into_isup_scores/0403dcc49b1420545299f692f7d8e270/isup-grade.json)
 
 
 ## 3. Running the Evaluation Locally
 - Obtain the neural representation `JSON` files by either:
-  - Using the [task 1 examples from this repo](tests/task-1/input)  **or**
+  - Using the [task 1 examples from this repo](task-1/input)  **or**
   - Downloading them from Grand Challenge after running your algorithm on the leaderboard, **or**
   - Running your algorithm locally on public data from Zenodo ([baseline setup example](https://github.com/DIAGNijmegen/unicorn_baseline/blob/main/setup-docker.md)).
 - Ensure that:
   - The input folder structure matches the specification above.
   - Case IDs align exactly across `predictions.json`, `mapping.csv`, and folder names.
-- Use the evaluation container or provided scripts to run the evaluation locally and verify that everything works correctly. See the example run script:[tests/do_test_run.sh](tests/do_test_run.sh)
+- Use the evaluation container or provided scripts to run the evaluation locally and verify that everything works correctly. See the example run script:[tests/do_test_run.sh](do_test_run.sh)
 
 
 ## Example Data and Tips
