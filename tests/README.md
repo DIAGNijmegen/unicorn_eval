@@ -60,7 +60,7 @@ The simplified `predictions.json` file follows this structure, for local debuggi
 ]
 ```
 
-The `adaptor-task-file.json` file is a task-specific file that indicates which adaptor method to use. Its filename (e.g., adaptor-pathology-classification.json) can be retrieved from ADAPTOR_SLUGS_DICT (defined in [`evaluate.py`](src/unicorn_eval/evaluate.py)). The content of this file is the adaptor name, which can be selected when submitting to a task on Grand Challenge—such as "1-nn", "linear-probing", "mlp", ... .
+The `adaptor-task-file.json` file is a task-specific file that indicates which adaptor method to use. Its filename (e.g., adaptor-pathology-classification.json) can be retrieved from ADAPTOR_SLUGS_DICT (defined in [`evaluate.py`](../src/unicorn_eval/evaluate.py)). The content of this file is the adaptor name, which can be selected when submitting to a task on Grand Challenge—such as "1-nn", "linear-probing", "mlp", ... .
 
 ## 3. Ground Truth Setup
 The evaluation also requires ground truth data, structured in the following way:
