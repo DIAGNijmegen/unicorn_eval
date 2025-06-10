@@ -97,8 +97,15 @@ case_id,task_name,task_type,domain,modality,split
 - Ensure that:
   - The input folder structure matches the specification above.
   - Case IDs align exactly across `predictions.json`, `mapping.csv`, and folder names.
-- Use the evaluation container or provided scripts to run the evaluation locally and verify that everything works correctly. See the example run script:[tests/do_test_run.sh](do_test_run.sh)
+- Use the evaluation container or the provided ``do_test_run.sh`` script to run the evaluation locally and verify that everything works correctly. Usage:
+```
+./tests/do_test_run.sh <INPUT_FOLDER> <GROUND_TRUTH_FOLDER> <OUTPUT_FOLDER> [DOCKER_IMAGE_TAG]
+```
 
+    - INPUT_FOLDER: Path to the folder containing predictions (should follow structure above).
+    - GROUND_TRUTH_FOLDER: Folder containing mapping.csv and ground truth JSON files (should follow structure above).
+    - OUTPUT_FOLDER: Where evaluation results are saved.
+    - DOCKER_IMAGE_TAG: (optional) Defaults to unicorn_eval.
 
 ## Example Data and Tips
 - If you're using your own algorithm or working on a task other than Task 1, the [public few-shot example data on Zenodo](https://doi.org/10.5281/zenodo.14832502) is a great starting point. These datasets provide sample inputs and labels for multiple tasks, allowing you to set up and test your local environment effectively.
