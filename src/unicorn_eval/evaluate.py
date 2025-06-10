@@ -336,22 +336,6 @@ def process(job):
     return case_info_dict
 
 
-def get_cases_extra_labels_detection(cases_image_sizes, cases_image_spacings):
-    case_extra_labels = {}
-    for case_id, image_size in cases_image_sizes.items():
-        # grab image dimensions along first two axes  (works for both 2D and 3D images)
-        width, height = image_size[0], image_size[1]
-        # grab image spacings (in µm) along first two axes (works for both 2D and 3D images)
-        spacing = cases_image_spacings[case_id]
-        spacing_x_um, spacing_y_um = spacing[0], spacing[1]
-        spacing_x_mm = spacing_x_um / 1000.0
-        spacing_y_mm = spacing_y_um / 1000.0
-        pixel_area_mm2 = spacing_x_mm * spacing_y_mm
-        image_area_mm2 = width * height * pixel_area_mm2
-        case_extra_labels[case_id] = image_area_mm2
-    return case_extra_labels
-
-
 def print_directory_contents(path: Path | str):
     path = Path(path)
     for child in path.iterdir():
@@ -626,19 +610,6 @@ def main():
 
                 if len(case_embeddings.shape) > 2:
                     case_embeddings = case_embeddings.squeeze(1)
-
-            elif task_type == "detection":
-
-                if task_name not in [
-                    "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams",
-                    "Task07_detecting_lung_nodules_in_thoracic_ct",
-                ]:
-                    # compute image‐area extra‐labels for other detection tasks
-                    #TODO: add extra labels to the extra_labels array instead
-                    case_extra_labels = get_cases_extra_labels_detection(
-                        results["cases_image_sizes"],
-                        results["cases_image_spacings"],
-                    )
 
             predictions = adapt_features(
                 adaptor_name=adaptor_name,
