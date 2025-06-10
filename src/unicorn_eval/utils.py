@@ -458,10 +458,48 @@ def process_image_representation(data):
     return data
 
 
-def process_detection(
+def process_detection_pathology(
+        data,
+    ):
+    
+    def extract_points(labels):
+        """
+        Pull out coordinate tuples from a list of GT dictionaries.
+
+        * Keeps the first two coordinates when available.
+
+        Returns
+        -------
+        list[list[tuple]]
+            Two‑level list: ``[case_idx][pt_idx] -> tuple``.
+        """
+        pts_all = []
+        for gt in labels:
+            case_pts = []
+            for p in gt.get("points", []):
+                pt = p.get("point")
+                if pt is None:
+                    continue
+                case_pts.append(tuple(pt[:2]))
+            pts_all.append(case_pts)
+        return pts_all
+
+    data["shot_labels"] = extract_points(data["shot_labels"])
+    data["case_labels"] = extract_points(data["case_labels"])
+
+    extra_list = data.get("case_extra_labels")
+    if not extra_list or extra_list[0] is None:
+        data["case_extra_labels"] = None
+        return data
+    
+    data["case_extra_labels"] = np.concatenate(extra_list, axis=0)
+
+    return data
+
+
+def process_detection_radiology(
         data, 
-        task_name: str | None = None, 
-        task_domain: str | None = None
+        task_name: str | None = None
     ):
     
     def extract_points(labels):
@@ -483,10 +521,7 @@ def process_detection(
                 pt = p.get("point")
                 if pt is None:
                     continue
-                if task_domain == "pathology":
-                    case_pts.append(tuple(pt[:2]))
-                else:
-                    case_pts.append(tuple(pt[:3]) if len(pt) >= 3 else tuple(pt[:2]))
+                case_pts.append(tuple(pt[:3]) if len(pt) >= 3 else tuple(pt[:2]))
             pts_all.append(case_pts)
         return pts_all
 
@@ -624,8 +659,11 @@ def extract_embeddings_and_labels(processed_results):
         if task_type in ["classification", "regression"]:
             tasks[task_name] = process_image_representation(task_data)
         elif task_type == "detection":
-            if not task_name == "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams":
-                tasks[task_name] = process_detection(task_data, task_name, task_domain)
+            if task_domain == "pathology":
+                tasks[task_name] = process_detection_pathology(task_data)
+            elif task_domain == "radiology":
+                if not task_name == "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams":
+                    tasks[task_name] = process_detection_radiology(task_data, task_name)
     return tasks
 
 
