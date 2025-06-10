@@ -458,7 +458,12 @@ def process_image_representation(data):
     return data
 
 
-def process_detection(data, task_name: str | None = None):
+def process_detection(
+        data, 
+        task_name: str | None = None, 
+        task_domain: str | None = None
+    ):
+    
     def extract_points(labels):
         """
         Pull out coordinate tuples from a list of GT dictionaries.
@@ -478,7 +483,10 @@ def process_detection(data, task_name: str | None = None):
                 pt = p.get("point")
                 if pt is None:
                     continue
-                case_pts.append(tuple(pt[:3]) if len(pt) >= 3 else tuple(pt[:2]))
+                if task_domain == "pathology":
+                    case_pts.append(tuple(pt[:2]))
+                else:
+                    case_pts.append(tuple(pt[:3]) if len(pt) >= 3 else tuple(pt[:2]))
             pts_all.append(case_pts)
         return pts_all
 
@@ -545,6 +553,7 @@ def extract_embeddings_and_labels(processed_results):
             tasks[task_name] = {
                 "task_type": result["task_type"],
                 "modality": result["modality"],
+                "domain": result["domain"],
                 "spacing": result["spacing"],
                 "patch_size": result["patch_size"],
                 "prediction": [],
@@ -611,11 +620,12 @@ def extract_embeddings_and_labels(processed_results):
     # now post-process each task
     for task_name, task_data in tasks.items():
         task_type = task_data["task_type"]
+        task_domain = task_data["domain"]
         if task_type in ["classification", "regression"]:
             tasks[task_name] = process_image_representation(task_data)
         elif task_type == "detection":
             if not task_name == "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams":
-                tasks[task_name] = process_detection(task_data, task_name)
+                tasks[task_name] = process_detection(task_data, task_name, task_domain)
     return tasks
 
 
