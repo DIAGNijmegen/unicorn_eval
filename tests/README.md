@@ -92,7 +92,7 @@ case_id,task_name,task_type,domain,modality,split
 ## 3. Running the Evaluation Locally
 - Obtain the neural representation `JSON` files by either:
   - Using the [task 1 examples from this repo](task-1/input)  **or**
-  - Downloading them from Grand Challenge when navigating to `Submit` -> `Submissions` -> your algorithm run -> `Result` after running your algorithm on the leaderboard, **or**
+  - Downloading them from Grand Challenge when navigating to `Submit` -> `Submissions` -> your algorithm run -> `Result` or navigate to your algorithm page -> `Results` after running your algorithm on the leaderboard, **or**
   - Running your algorithm locally on public data from Zenodo ([baseline setup example](https://github.com/DIAGNijmegen/unicorn_baseline/blob/main/setup-docker.md)).
 - Ensure that:
   - The input folder structure matches the specification above.
