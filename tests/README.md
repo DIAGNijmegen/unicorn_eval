@@ -70,7 +70,8 @@ The evaluation also requires ground truth data, structured in the following way:
 └── <task_name>       // e.g. Task01_classifying_he_prostate_biopsies_into_isup_scores
     ├── mapping.csv
     └── pk-value
-        └── label       // e.g. isup-grade.json
+        └── label       // e.g. isup-grade.json 
+        └── (optional additional input)       // This input is needed for Task 3 (event.json, can be found on Zenodo) and Task 7 (will be added later)
 ├── mapping.csv
 ```
 * **`mapping.csv`** maps case IDs to relevant task metadata, such as task_name and domain, and specifies whether the case is used for training (“shot”) or testing (“case”).
@@ -78,7 +79,7 @@ The evaluation also requires ground truth data, structured in the following way:
 
 **Important:** The `name` field in `predictions.json` must exactly match the case ID used in `mapping.csv`. If they don't align, the evaluation container will be unable to associate predictions with the correct ground truth data.
 
-To generate youw own `mapping.csv`, we provided [this script](generate_mapping.py). An example of the `mapping.csv` structure can be found below:
+To generate your own `mapping.csv`, we provided [this script](generate_mapping.py). An example of the `mapping.csv` structure can be found below:
 ```
 case_id,task_name,task_type,domain,modality,split
 <case_id>,<task_name>,classification/detection/segmentation,pathology/CT/MR,vision,shot/case
@@ -92,7 +93,7 @@ case_id,task_name,task_type,domain,modality,split
 ## 3. Running the Evaluation Locally
 - Obtain the neural representation `JSON` files by either:
   - Using the [task 1 examples from this repo](task-1/input)  **or**
-  - Downloading them from Grand Challenge after running your algorithm on the leaderboard, **or**
+  - Downloading them from Grand Challenge when navigating to `Submit` -> `Submissions` -> your algorithm run -> `Result` after running your algorithm on the leaderboard, **or**
   - Running your algorithm locally on public data from Zenodo ([baseline setup example](https://github.com/DIAGNijmegen/unicorn_baseline/blob/main/setup-docker.md)).
 - Ensure that:
   - The input folder structure matches the specification above.
