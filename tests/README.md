@@ -68,7 +68,6 @@ The evaluation also requires ground truth data, structured in the following way:
 ``` 
 /opt/ml/input/data/ground_truth/
 └── <task_name>       // e.g. Task01_classifying_he_prostate_biopsies_into_isup_scores
-    ├── mapping.csv
     └── pk-value
         └── label       // e.g. isup-grade.json 
         └── (optional additional input)       // This input is needed for Task 3 (event.json, can be found on Zenodo) and Task 7 (will be added later)
