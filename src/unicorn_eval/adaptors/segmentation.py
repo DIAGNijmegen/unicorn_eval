@@ -16,7 +16,6 @@ from __future__ import annotations
 import math
 from collections import defaultdict
 from typing import Iterable
-import os
 
 import numpy as np
 import SimpleITK as sitk
@@ -756,7 +755,7 @@ def extract_patch_labels(
 
 def load_patch_data(data_array: np.ndarray, batch_size: int = 80) -> DataLoader:
     train_ds = dataset_monai(data=data_array)
-    train_loader = dataloader_monai(train_ds, batch_size=batch_size, shuffle=False,num_workers=4, pin_memory=False)
+    train_loader = dataloader_monai(train_ds, batch_size=batch_size, shuffle=False)
     return train_loader
 
 
