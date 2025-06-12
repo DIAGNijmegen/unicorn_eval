@@ -654,7 +654,6 @@ def main():
             test_predictions=predictions,
             test_labels=case_labels,
             test_extra_labels=case_extra_labels,
-            test_image_spacing=case_image_spacings,
         )
         task_metrics[task_name] = metrics
 

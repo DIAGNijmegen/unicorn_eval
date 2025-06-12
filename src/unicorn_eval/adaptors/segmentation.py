@@ -868,7 +868,7 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
             patch_size=self.patch_size,
             labels=self.shot_labels,
         )
-        train_loader = load_patch_data(train_data, batch_size=20)
+        train_loader = load_patch_data(train_data, batch_size=10)
         latent_dim = len(self.shot_features[0][0])
         target_patch_size = tuple(int(j / 16) for j in self.patch_size)
         target_shape = (
@@ -910,7 +910,7 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
             image_directions=self.test_image_directions,
         )
 
-        test_loader = load_patch_data(test_data, batch_size=40)
+        test_loader = load_patch_data(test_data, batch_size=20)
         # run inference using the trained decoder
         return inference3d(self.decoder, test_loader, self.device, self.return_binary, self.test_cases, self.test_label_sizes, self.test_label_spacing, self.test_label_origins, self.test_label_directions)
 
