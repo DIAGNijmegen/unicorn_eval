@@ -356,7 +356,7 @@ def convert_numpy_types(obj):
         return obj
 
 
-def evaluate_predictions(task_name, case_ids, test_predictions, test_labels, test_extra_labels=None, test_image_spacing=None):
+def evaluate_predictions(task_name, case_ids, test_predictions, test_labels, test_extra_labels=None):
 
     metrics = {
         "predictions": [],          # list to store individual case results
@@ -425,7 +425,7 @@ def evaluate_predictions(task_name, case_ids, test_predictions, test_labels, tes
         metric_value = metric_fn(test_labels, test_predictions)
         metric_dict[metric_name] = metric_value
     elif task_name == "Task11_segmenting_three_anatomical_structures_in_lumbar_spine_mri":
-        metric_value = metric_fn(test_labels, test_predictions, test_image_spacing, case_ids)
+        metric_value = metric_fn(test_labels, test_predictions, case_ids)
         metric_dict[metric_name] = metric_value
     elif task_name == "Task20_generating_caption_from_wsi":
         language_metric_dict = metric_fn(test_labels, test_predictions)  # a dictionary
@@ -661,7 +661,7 @@ def extract_embeddings_and_labels(processed_results):
         elif task_type == "detection":
             if task_domain == "pathology":
                 tasks[task_name] = process_detection_pathology(task_data)
-            elif task_domain == "radiology":
+            elif (task_domain == "CT") | (task_domain == "MR"):
                 if not task_name == "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams":
                     tasks[task_name] = process_detection_radiology(task_data, task_name)
     return tasks

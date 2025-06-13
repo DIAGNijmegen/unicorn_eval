@@ -426,19 +426,23 @@ class Decoder3D(nn.Module):
         x = self.vector_to_tensor(x)
         return self.decoder(x)
 
-def train_decoder3d(decoder, data_loader, device, num_epochs = 5):
+
+def train_decoder3d(decoder, data_loader, device, num_epochs = 3):
     loss_fn = DiceLoss(sigmoid=True)
     optimizer = optim.Adam(decoder.parameters(), lr=1e-3)
-
     # Train decoder
     for epoch in range(num_epochs):
         decoder.train()
         epoch_loss = 0
+
+        iteration_count = 0
         for batch in data_loader:
+            iteration_count += 1
+
             patch_emb = batch["patch"].to(device)
             patch_label = batch["patch_label"].to(device)
-            optimizer.zero_grad()
 
+            optimizer.zero_grad()
             de_output = decoder(patch_emb)
             loss = loss_fn(de_output.squeeze(1), patch_label)
 
@@ -446,7 +450,9 @@ def train_decoder3d(decoder, data_loader, device, num_epochs = 5):
             optimizer.step()
 
             epoch_loss += loss.item()
-        print(f"Epoch {epoch+1}, Loss: {loss / len(data_loader)}")
+
+        print(f"Avg total epoch loss = {epoch_loss / iteration_count:.4f}")
+
 
     return decoder
 
@@ -601,7 +607,6 @@ def inference3d(decoder, data_loader, device, return_binary,  test_cases, test_l
             )
 
             aligned_preds[case_id] = sitk.GetArrayFromImage(pred_on_gt)
-
         return [j for j in aligned_preds.values()]
 
 
@@ -748,7 +753,7 @@ def extract_patch_labels(
     return patch_labels
 
 
-def load_patch_data(data_array: np.ndarray, batch_size: int = 40) -> DataLoader:
+def load_patch_data(data_array: np.ndarray, batch_size: int = 80) -> DataLoader:
     train_ds = dataset_monai(data=data_array)
     train_loader = dataloader_monai(train_ds, batch_size=batch_size, shuffle=False)
     return train_loader
@@ -810,7 +815,7 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
         test_label_directions,
         patch_size,
         return_binary=True,
-    ):
+    ):   
         label_patch_features = []
         for idx, label in enumerate(shot_labels):
             label_feats = extract_patch_labels(
@@ -862,7 +867,7 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
             patch_size=self.patch_size,
             labels=self.shot_labels,
         )
-        train_loader = load_patch_data(train_data)
+        train_loader = load_patch_data(train_data, batch_size=10)
         latent_dim = len(self.shot_features[0][0])
         target_patch_size = tuple(int(j / 16) for j in self.patch_size)
         target_shape = (
@@ -904,7 +909,7 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
             image_directions=self.test_image_directions,
         )
 
-        test_loader = load_patch_data(test_data)
+        test_loader = load_patch_data(test_data, batch_size=20)
         # run inference using the trained decoder
         return inference3d(self.decoder, test_loader, self.device, self.return_binary, self.test_cases, self.test_label_sizes, self.test_label_spacing, self.test_label_origins, self.test_label_directions)
 
