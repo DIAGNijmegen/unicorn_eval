@@ -181,7 +181,7 @@ def inference(decoder, dataloader, heatmap_size=16, patch_size=224):
         zip(patch_predictions, patch_coordinates, roi_identifiers)
     ):
         x_local, y_local = heatmap_to_cells_using_maxima(
-            patch_pred, neighborhood_size=5
+            patch_pred, neighborhood_size=2
         )
         patch_top_left = patch_coord
 
@@ -199,7 +199,7 @@ def inference(decoder, dataloader, heatmap_size=16, patch_size=224):
 
             case_points.append([global_x, global_y])
 
-        test_predictions[case_index] = np.array(case_points)
+        test_predictions[case_index].extend(case_points)
 
     test_predictions = [
         np.array(case_points).tolist() for case_points in test_predictions
