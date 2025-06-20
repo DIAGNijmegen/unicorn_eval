@@ -28,18 +28,14 @@ INPUT_SLUGS_DICT = {
     "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams": [
         "transverse-t2-prostate-mri"
     ],
-    "Task07_detecting_lung_nodules_in_thoracic_ct": [
-        "chest-ct"
-    ],
+    "Task07_detecting_lung_nodules_in_thoracic_ct": ["chest-ct"],
     "Task08_detecting_mitotic_figures_in_breast_cancer_wsis": [
         "histopathology-region-of-interest-cropout"
     ],
     "Task09_segmenting_rois_in_breast_cancer_wsis": [
         "histopathology-region-of-interest-cropout"
     ],
-    "Task10_segmenting_lesions_within_vois_in_ct": [
-        "stacked-3d-ct-volumes-of-lesions"
-    ],
+    "Task10_segmenting_lesions_within_vois_in_ct": ["stacked-3d-ct-volumes-of-lesions"],
     "Task11_segmenting_three_anatomical_structures_in_lumbar_spine_mri": [
         "sagittal-spine-mri"
     ],
@@ -58,6 +54,7 @@ MODEL_OUTPUT_SLUG_DICT = {
     "Task10_segmenting_lesions_within_vois_in_ct": "patch-neural-representation",
     "Task11_segmenting_three_anatomical_structures_in_lumbar_spine_mri": "patch-neural-representation",
 }
+
 
 def generate_predictions_from_csv(csv_path: Path, output_path: Path):
     df = pd.read_csv(csv_path)
@@ -79,21 +76,24 @@ def generate_predictions_from_csv(csv_path: Path, output_path: Path):
         output_slug = MODEL_OUTPUT_SLUG_DICT[task_name]
 
         for _, row in group.iterrows():
-                name = row["case_id"]
-                pk = row["pk"] if use_custom_pk else name
-                predictions.append({
+            name = row["case_id"]
+            pk = row["pk"] if use_custom_pk else name
+            predictions.append(
+                {
                     "pk": Path(pk).stem,
-                    "inputs": [{
-                        "image": {"name": name},
-                        "interface": {"slug": input_slugs[0]}
-                    }],
-                    "outputs": [{
-                        "interface": {
-                            "slug": output_slug,
-                            "relative_path": f"{output_slug}.json"
+                    "inputs": [
+                        {"image": {"name": name}, "interface": {"slug": input_slugs[0]}}
+                    ],
+                    "outputs": [
+                        {
+                            "interface": {
+                                "slug": output_slug,
+                                "relative_path": f"{output_slug}.json",
+                            }
                         }
-                    }]
-                })
+                    ],
+                }
+            )
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("w") as f:
@@ -103,9 +103,15 @@ def generate_predictions_from_csv(csv_path: Path, output_path: Path):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Generate predictions.json from a CSV file.")
-    parser.add_argument("--csv", type=Path, required=True, help="Path to input CSV file")
-    parser.add_argument("--output", type=Path, required=True, help="Path to save predictions.json")
+    parser = argparse.ArgumentParser(
+        description="Generate predictions.json from a CSV file."
+    )
+    parser.add_argument(
+        "--csv", type=Path, required=True, help="Path to input CSV file"
+    )
+    parser.add_argument(
+        "--output", type=Path, required=True, help="Path to save predictions.json"
+    )
 
     args = parser.parse_args()
     generate_predictions_from_csv(args.csv, args.output)

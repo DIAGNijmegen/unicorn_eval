@@ -156,7 +156,6 @@ class WeightedKNN(CaseLevelTaskAdaptor):
         center_features=False,
         normalize_features=False,
         return_probabilities=False,
-        class_values=None,
     ):
         super().__init__(shot_features, shot_labels, test_features)
         self.k = k
@@ -164,7 +163,6 @@ class WeightedKNN(CaseLevelTaskAdaptor):
         self.center_features = center_features
         self.normalize_features = normalize_features
         self.return_probabilities = return_probabilities
-        self.class_values = class_values
         self.similarity_fn = None
         self.unique_classes = None
         self.class_to_idx = None
