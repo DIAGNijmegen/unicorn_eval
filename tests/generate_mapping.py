@@ -21,6 +21,7 @@ Root directory structure:
 │   ├── shots-public-labels
 """
 
+
 def generate_mapping(root_dir, n_shots, output_path="mapping.csv"):
     rows = []
 
@@ -63,10 +64,17 @@ def generate_mapping(root_dir, n_shots, output_path="mapping.csv"):
     df.to_csv(output_path, index=False)
     print(f"Mapping saved to {output_path}")
 
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Generate mapping.csv from unicorn folder structure")
-    parser.add_argument("--root_dir", help="Path to the root folder containing task folders")
-    parser.add_argument("--shots", type=int, default=12, help="Number of shot cases per task")
+    parser = argparse.ArgumentParser(
+        description="Generate mapping.csv from unicorn folder structure"
+    )
+    parser.add_argument(
+        "--root_dir", help="Path to the root folder containing task folders"
+    )
+    parser.add_argument(
+        "--shots", type=int, default=12, help="Number of shot cases per task"
+    )
     parser.add_argument("--output", default="mapping.csv", help="Output path for CSV")
 
     args = parser.parse_args()
