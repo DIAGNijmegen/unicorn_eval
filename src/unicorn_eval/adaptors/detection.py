@@ -23,6 +23,33 @@ from torch.utils.data._utils.collate import default_collate
 from typing import Sequence
 from unicorn_eval.adaptors.base import PatchLevelTaskAdaptor
 
+class DenseDetectionDecoder(nn.Module):
+    """MLP that maps vision encoder features to a dense density map."""
+
+    def __init__(self, token_dim, token_grid_size=(16,16), heatmap_size=16):
+        super().__init__()
+        self.token_grid_size = token_grid_size
+        self.heatmap_size = heatmap_size
+        
+        self.mlp = nn.Sequential(
+            nn.Conv2d(token_dim, 128, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.Conv2d(128, 1, kernel_size=1),
+            nn.Sigmoid(),
+        )
+
+        self.resize = nn.Upsample(size=(heatmap_size, heatmap_size), mode='bilinear', align_corners=False)
+
+    def forward(self, x):
+        B, N, C = x.shape # [32, 256, 1280]
+        H, W = self.token_grid_size # [16, 16]
+        assert N == H * W, f"Token count {N} does not match grid size {H}x{W}"
+
+        x = x.transpose(1, 2).view(B, C, H, W)  # [32, 1280, 16, 16]
+        x = self.mlp(x)                    # [32, 1, , ]
+        x = self.resize(x)                     # [32, 1, 16, 16]
+        return x.squeeze(1)                    # [32, 16, 16]
+    
 
 class DetectionDecoder(nn.Module):
     """MLP that maps vision encoder features to a density map."""
@@ -99,13 +126,20 @@ def heatmap_to_cells_using_maxima(heatmap, neighborhood_size=5, threshold=0.01):
     maxima = heatmap > threshold
 
     # Use maximum filter to detect local maxima (peaks in heatmap)
-    data_max = filters.maximum_filter(heatmap, neighborhood_size)
+    data_max = filters.maximum_filter(heatmap, neighborhood_size, mode='constant', cval=0)
     maxima = heatmap == data_max  # Only keep true maxima
 
     # Apply minimum filter to identify significant local differences
-    data_min = filters.minimum_filter(heatmap, neighborhood_size)
+    data_min = filters.minimum_filter(heatmap, neighborhood_size, mode='constant', cval=0)
     diff = (data_max - data_min) > threshold
     maxima[diff == 0] = 0  # Keep only significant maxima
+
+    # Suppress borders
+    border = neighborhood_size // 2
+    maxima[:border, :] = 0
+    maxima[-border:, :] = 0
+    maxima[:, :border] = 0
+    maxima[:, -border:] = 0
 
     # Label connected regions (objects) in the binary map
     labeled, num_objects = ndimage.label(maxima)
@@ -181,7 +215,7 @@ def inference(decoder, dataloader, heatmap_size=16, patch_size=224):
         zip(patch_predictions, patch_coordinates, roi_identifiers)
     ):
         x_local, y_local = heatmap_to_cells_using_maxima(
-            patch_pred, neighborhood_size=2
+            patch_pred, neighborhood_size=2, threshold=0.1
         )
         patch_top_left = patch_coord
 
@@ -296,7 +330,7 @@ class DensityMap(PatchLevelTaskAdaptor):
         test_names,
         patch_size=224,
         heatmap_size=16,
-        num_epochs=200,
+        num_epochs=2,
         learning_rate=1e-5,
     ):
         super().__init__(
@@ -316,6 +350,7 @@ class DensityMap(PatchLevelTaskAdaptor):
 
     def fit(self):
         input_dim = self.shot_features[0].shape[1]
+        input_dim_tokens = self.shot_features[0][0].shape[1]
 
         shot_data = construct_detection_labels(
             self.shot_coordinates,
@@ -331,8 +366,15 @@ class DensityMap(PatchLevelTaskAdaptor):
             dataset, batch_size=32, shuffle=True, collate_fn=custom_collate
         )
 
-        self.decoder = DetectionDecoder(
-            input_dim=input_dim, heatmap_size=self.heatmap_size
+        print(
+            f"Training decoder with input_dim={input_dim}, ")
+        print(f"heatmap_size={self.heatmap_size}, num_epochs={self.num_epochs}, lr={self.learning_rate}")
+        print(f"Number of training samples: {len(dataset)}")
+    #    self.decoder = DenseDetectionDecoder(
+    #        input_dim=input_dim, heatmap_size=self.heatmap_size
+    #    ).to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
+        self.decoder = DenseDetectionDecoder(
+            token_dim=input_dim_tokens, heatmap_size=self.heatmap_size
         ).to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
 
         self.decoder = train_decoder(

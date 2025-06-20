@@ -15,6 +15,46 @@
 import numpy as np
 from evalutils.evalutils import score_detection
 
+import os
+import numpy as np
+import matplotlib.pyplot as plt
+
+def visualize_detections(gt_coords, pred_coords, dist_thresh, save_dir="/output"):
+    for i, (gt, pred) in enumerate(zip(gt_coords, pred_coords)):
+        fig, ax = plt.subplots()
+
+        print(f"[ROI {i+1}] Ground Truths: {len(gt)}, Predictions: {len(pred)}")
+
+        if len(pred) == 0:
+            pred = np.array([[0, 1]])
+            
+        all_points = np.concatenate([gt, pred], axis=0) if len(gt) and len(pred) else (gt if len(gt) else pred)
+        if len(all_points) == 0:
+            plt.close()
+            continue
+
+        for (x, y) in gt:
+            ax.plot(x, y, 'bo', markersize=1)  # blue point
+            circle = plt.Circle((x, y), dist_thresh, color='red', fill=False, linewidth=1, zorder=10)
+            ax.add_patch(circle)
+
+        # Plot prediction points (green)
+        for (x, y) in pred:
+            ax.plot(x, y, 'go', markersize=1)  # green point
+
+        margin = dist_thresh + 10
+        min_x, max_x = np.min(all_points[:, 0]) - margin, np.max(all_points[:, 0]) + margin
+        min_y, max_y = np.min(all_points[:, 1]) - margin, np.max(all_points[:, 1]) + margin
+        ax.set_xlim(min_x, max_x)
+        ax.set_ylim(min_y, max_y)
+        ax.set_aspect('equal')
+        ax.invert_yaxis()  # (optional) matches image coordinates
+
+        ax.axis('off')
+        filename = os.path.join(save_dir, f"roi_{i+1}.jpg")
+        plt.savefig(filename, bbox_inches='tight', pad_inches=0.1)
+        plt.close()
+        print(f"Saved: {filename}")
 
 def score(gt_coords, pred_coords, dist_thresh):
     """
@@ -75,6 +115,7 @@ def do_prints(gts, preds_list):
 
 def compute_f1(gts, preds_list, dist_thresh):
     do_prints(gts, preds_list)
+    visualize_detections(gts, preds_list, dist_thresh, save_dir="/output")
 
     if not preds_list or np.sum([len(pr) for pr in preds_list]) == 0:
         print("[WARN] No predictions found!")

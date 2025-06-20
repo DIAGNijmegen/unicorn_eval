@@ -16,6 +16,68 @@ import numpy as np
 from pycm import ConfusionMatrix
 from sklearn.metrics import confusion_matrix
 
+import matplotlib.pyplot as plt
+from pathlib import Path
+
+def colorize_mask(mask, color_map):
+    """
+    Convert label mask to RGB image using class_map colors.
+    class_map: {label: (name, color)}
+    color is an RGB tuple/list, e.g. (255, 0, 0)
+    """
+    h, w = mask.shape
+    color_mask = np.zeros((h, w, 3), dtype=np.uint8)
+
+    for label, (_, color) in color_map.items():
+        color_mask[mask == label] = color
+
+    return color_mask
+
+from PIL import Image
+def plot_masks(gt_mask, pred_mask, color_map=None, title_suffix=""):
+    """
+    Plot ground truth and predicted masks side-by-side, and save colored masks as images.
+
+    gt_mask: 2D numpy array of ground truth labels
+    pred_mask: 2D numpy array of predicted labels
+    color_map: dict mapping class indices to RGB colors (optional)
+    title_suffix: additional string for plot titles and filenames
+    """
+    output_dir = Path("/output")
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    def save_mask_image(mask, filename):
+        if color_map:
+            colored = colorize_mask(mask, color_map)
+        else:
+            # If no color map, convert grayscale to RGB by stacking channels
+            colored = np.stack([mask]*3, axis=-1).astype(np.uint8)
+        Image.fromarray(colored).save(filename)
+        print(f"Saved colored mask JPG to: {filename}")
+
+    # Save ground truth mask image
+    gt_path = output_dir / f"{title_suffix}_gt.jpg"
+    save_mask_image(gt_mask, gt_path)
+
+    # Save prediction mask image
+    pred_path = output_dir / f"{title_suffix}_pred.jpg"
+    save_mask_image(pred_mask, pred_path)
+
+def colorize_mask(mask, class_map):
+    """
+    Convert label mask to RGB image using class_map colors.
+    class_map: {label: (name, color)}
+    color is an RGB tuple/list, e.g. (255, 0, 0)
+    """
+    h, w = mask.shape
+    color_mask = np.zeros((h, w, 3), dtype=np.uint8)
+
+    for label, (_, color) in class_map.items():
+        color_mask[mask == label] = color
+
+    return color_mask
+
+
 
 def list_not_in(lst1, lst2):
     """Returns values in lst1 not in lst2"""
@@ -120,6 +182,16 @@ class TigerSegmScorer(CmScorer):
 
 def compute_dice_score(gts, preds):
     scorer = TigerSegmScorer(incremental=True)
+
+    color_map = {
+        0: ("Background", [0, 0, 0]),
+        1: ("Tumor", [255, 0, 0]),
+        2: ("Stroma", [0, 255, 0]),
+        3: ("Other", [0, 0, 255]),
+    }
+    for i, (gt, pred) in enumerate(zip(gts, preds)):
+        plot_masks(gt, pred, color_map=color_map, title_suffix=f"Case_{i}")
+
 
     for i, gt in enumerate(gts):
         pred = preds[i]

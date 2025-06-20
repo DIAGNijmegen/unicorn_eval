@@ -22,6 +22,7 @@ from sksurv.metrics import concordance_index_censored
 from unicorn_eval.adaptors import (
     KNN,
     DensityMap,
+    DenseSegmentation,
     KNNRegressor,
     LinearProbing,
     LinearProbingRegressor,
@@ -270,6 +271,19 @@ def adapt_features(
             heatmap_size=16,
         )
 
+    elif adaptor_name == "fine-grained-segmenation":
+        adaptor = DenseSegmentation(
+            shot_features=shot_features,
+            shot_labels=shot_labels,
+            shot_coordinates=shot_coordinates,
+            shot_names=shot_names,
+            test_features=test_features,
+            test_coordinates=test_coordinates,
+            test_names=test_names,
+            test_image_sizes=test_image_sizes,
+            patch_size=patch_size[0],
+        )
+
     elif adaptor_name == "segmentation-upsampling":
         adaptor = SegmentationUpsampling(
             shot_features=shot_features,
@@ -407,7 +421,7 @@ def evaluate_predictions(task_name, case_ids, test_predictions, test_labels, tes
         metric_value = metric_fn(test_labels, test_predictions)
         metric_dict[metric_name] = metric_value
     elif task_name == "Task05_detecting_signet_ring_cells_in_he_stained_wsi_of_gastric_cancer":
-        metric_value = metric_fn(test_labels, test_predictions, 8)
+        metric_value = metric_fn(test_labels, test_predictions, 20) # distance threshold is 20 pixels which corresponds to 10 um @0.5 um/pixel
         metric_dict[metric_name] = metric_value
     elif task_name == "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams":
         metric_value = metric_fn(test_labels, test_predictions)
@@ -416,7 +430,7 @@ def evaluate_predictions(task_name, case_ids, test_predictions, test_labels, tes
         metric_value = metric_fn(case_ids, test_predictions, test_labels, test_extra_labels)
         metric_dict[metric_name] = metric_value
     elif task_name == "Task08_detecting_mitotic_figures_in_breast_cancer_wsis":
-        metric_value = metric_fn(test_labels, test_predictions, 16)
+        metric_value = metric_fn(test_labels, test_predictions, 30) # distance threshold is 30 pixels which corresponds to 7.5 um @0.25 um/pixel
         metric_dict[metric_name] = metric_value
     elif task_name == "Task09_segmenting_rois_in_breast_cancer_wsis":
         metric_value = metric_fn(test_labels, test_predictions)

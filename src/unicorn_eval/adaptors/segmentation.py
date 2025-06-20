@@ -38,6 +38,29 @@ from tqdm import tqdm
 from unicorn_eval.adaptors.base import PatchLevelTaskAdaptor
 from unicorn_eval.adaptors.patch_extraction import extract_patches
 
+from skimage.morphology import remove_small_objects, remove_small_holes, closing, disk
+from scipy.ndimage import binary_dilation, label
+import numpy as np
+
+def postprocess_mask(mask, merge_classes=[1], dilation_iters=10, closing_radius=5):
+    processed = mask.copy()
+    
+    for cls in merge_classes:
+        binary = (mask == cls).astype(np.uint8)
+        labeled_array, num_features = label(binary)
+
+        if num_features <= 1:
+            continue  # Already connected
+
+        # Combine fragments via dilation
+        combined = binary_dilation(binary, iterations=dilation_iters)
+        combined = closing(combined, disk(closing_radius))
+        combined = closing(combined, disk(20))
+
+        
+        processed[combined] = cls
+
+    return processed
 
 def compute_num_upsample_layers(initial_size, target_size):
     if isinstance(target_size, (tuple, list)):
@@ -82,6 +105,250 @@ def build_deconv_layers(self, in_channels, num_layers):
     )
 
     return nn.Sequential(*layers)
+
+
+class DenseDecoder(nn.Module):
+    def __init__(self, input_dim, patch_size, num_classes):
+        super().__init__()
+        self.spatial_dims = (32, 16, 16, 1280)
+        self.output_size = (patch_size, patch_size)
+        self.num_classes = num_classes
+  
+#        self.fc = nn.Linear(input_dim, np.prod(self.spatial_dims))
+
+        self.conv1 = nn.Conv2d(self.spatial_dims[3], 512, kernel_size=3, padding=1)
+        self.conv2 = nn.Conv2d(512, self.num_classes, kernel_size=1)
+
+        #self._init_weights()
+
+    def _init_weights(self):
+        nn.init.kaiming_normal_(self.fc.weight)
+        nn.init.zeros_(self.fc.bias)
+
+        for m in self.deconv_layers:
+            if isinstance(m, nn.ConvTranspose2d):
+                nn.init.kaiming_normal_(m.weight)
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
+
+    def forward(self, x):
+      #  x = self.fc(x)  # Expand embedding
+      #  x = x.view(-1, *self.spatial_dims)  # Reshape into spatial format.
+     #   print(f"Forward pass with input shape: {x.shape}")
+     #   x = x.view(-1, *self.spatial_dims)#.permute(0, 3, 1, 2)
+     #   x = nn.functional.relu(self.conv1(x))
+     #   x = self.conv2(x)
+     #   x = F.interpolate(
+     #       x, size=self.output_size, mode="bilinear", align_corners=False
+     #   )  # Ensure exact size
+     #   return x
+    
+        print(f"Forward pass with input shape: {x.shape}")  # Should be [B, 256, 1280]
+        B, T, C = x.shape
+        H, W = 16, 16  # You expect 16x16 spatial tokens
+        assert T == H * W, f"Expected {H*W} tokens, got {T}"
+        
+        # Reshape to [B, H, W, C] → [B, C, H, W]
+        x = x.view(B, H, W, C).permute(0, 3, 1, 2)  # [B, C, H, W]
+
+        x = F.relu(self.conv1(x))  # [B, 512, H, W]
+        x = self.conv2(x)          # [B, num_classes, H, W]
+        x = F.interpolate(x, size=self.output_size, mode="bilinear", align_corners=False)
+        return x
+
+class ConvBlock(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super().__init__()
+        self.block = nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, 3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(out_channels, out_channels, 3, padding=1),
+            nn.ReLU(inplace=True)
+        )
+
+    def forward(self, x):
+        return self.block(x)
+
+"""
+class DenseDecoderUNet(nn.Module):
+    def __init__(self, input_dim, patch_size, num_classes):
+        super().__init__()
+        self.H = self.W = 16  # token layout (16x16 = 256 tokens)
+        self.C = input_dim    # 1280 typically from encoder
+        self.output_size = (patch_size, patch_size)
+
+        # Decoder structure (UNet-style)
+        self.enc1 = ConvBlock(self.C, 512)
+        self.pool1 = nn.MaxPool2d(2)
+        self.enc2 = ConvBlock(512, 1024)
+
+        self.up1 = nn.ConvTranspose2d(1024, 512, kernel_size=2, stride=2)
+        self.dec1 = ConvBlock(1024, 512)
+
+        self.final_conv = nn.Conv2d(512, num_classes, kernel_size=1)
+
+    def forward(self, x):
+        B, T, C = x.shape
+        assert T == self.H * self.W, f"Expected {self.H*self.W} tokens, got {T}"
+
+        # Reshape tokens to image grid
+        x = x.view(B, self.H, self.W, C).permute(0, 3, 1, 2)  # [B, C, H, W]
+
+        # Encoder
+        e1 = self.enc1(x)        # [B, 512, 16, 16]
+        e2 = self.enc2(self.pool1(e1))  # [B, 1024, 8, 8]
+
+        # Decoder
+        d1 = self.up1(e2)        # [B, 512, 16, 16]
+        d1 = torch.cat([d1, e1], dim=1)  # [B, 1024, 16, 16]
+        d1 = self.dec1(d1)       # [B, 512, 16, 16]
+
+        out = self.final_conv(d1)  # [B, num_classes, 16, 16]
+        out = F.interpolate(out, size=self.output_size, mode="bilinear", align_corners=False)
+        return out
+    
+
+
+class UpBlock(nn.Module):
+    def __init__(self, in_channels, skip_channels, out_channels):
+        super().__init__()
+        self.up = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False)
+        self.conv = ConvBlock(in_channels + skip_channels, out_channels)
+
+    def forward(self, x, skip):
+        x = self.up(x)
+        x = torch.cat([x, skip], dim=1)
+        return self.conv(x)
+
+class UNetDecoder(nn.Module):
+    def __init__(self, input_dim, patch_size, num_classes):
+        super().__init__()
+        self.H, self.W = 16, 16  # Input is 16x16 patches
+        self.output_size = (patch_size, patch_size)
+
+        self.enc1 = ConvBlock(input_dim, 512)
+        self.enc2 = ConvBlock(512, 256)
+        self.pool = nn.MaxPool2d(2)
+
+        self.middle = ConvBlock(256, 256)
+
+        self.up1 = UpBlock(256, 256, 256)
+        self.up2 = UpBlock(256, 512, 128)
+
+        self.final = nn.Conv2d(128, num_classes, kernel_size=1)
+
+    def forward(self, x):
+        B, T, C = x.shape
+        assert T == self.H * self.W, f"Expected {self.H * self.W} tokens, got {T}"
+        x = x.view(B, self.H, self.W, C).permute(0, 3, 1, 2)  # [B, C, H, W]
+
+        e1 = self.enc1(x)        # [B, 512, 16, 16]
+        e2 = self.enc2(self.pool(e1))  # [B, 256, 8, 8]
+        m = self.middle(self.pool(e2))  # [B, 256, 4, 4]
+
+        d1 = self.up1(m, e2)     # [B, 256, 8, 8]
+        d2 = self.up2(d1, e1)    # [B, 128, 16, 16]
+
+        out = self.final(d2)     # [B, num_classes, 16, 16]
+        out = F.interpolate(out, size=self.output_size, mode='bilinear', align_corners=False)
+        return out
+"""
+class DenseSegmentation(PatchLevelTaskAdaptor):
+    def __init__(
+        self,
+        shot_features,
+        shot_labels,
+        shot_coordinates,
+        shot_names,
+        test_features,
+        test_coordinates,
+        test_names,
+        test_image_sizes,
+        patch_size,
+        num_epochs=20,
+        learning_rate=1e-5,
+    ):
+        super().__init__(
+            shot_features,
+            shot_labels,
+            shot_coordinates,
+            test_features,
+            test_coordinates,
+        )
+        self.shot_names = shot_names
+        self.test_names = test_names
+        self.test_image_sizes = test_image_sizes
+        self.patch_size = patch_size
+        self.num_epochs = num_epochs
+        self.learning_rate = learning_rate
+        self.decoder = None
+
+    def fit(self):
+        input_dim = self.shot_features[0].shape[1]
+        input_dim_features = self.shot_features[0][0].shape[1]
+        num_classes = max([np.max(label) for label in self.shot_labels]) + 1
+        
+        print(f"Constructing segmentation labels with input_dim: {input_dim}, num_classes: {num_classes}")
+        shot_data = construct_segmentation_labels(
+            self.shot_coordinates,
+            self.shot_features,
+            self.shot_names,
+            labels=self.shot_labels,
+            patch_size=self.patch_size,
+        )
+        print(f"Constructed {len(shot_data)} patches for training.")
+
+        dataset = SegmentationDataset(preprocessed_data=shot_data)
+        dataloader = DataLoader(
+            dataset, batch_size=32, shuffle=True, collate_fn=custom_collate
+        )
+
+        print("Initializing SegmentationDecoder...")
+        print(f"Input dimension: {input_dim}, input_dim_features {input_dim_features}, Patch size: {self.patch_size}, Number of classes: {num_classes}")
+        self.decoder = DenseDecoder(
+            input_dim=input_dim, patch_size=self.patch_size, num_classes=num_classes
+        ).to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
+    #    self.decoder = UNetDecoder(
+    #        input_dim=input_dim_features, patch_size=self.patch_size, num_classes=num_classes
+    #    ).to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
+        self.decoder = train_decoder(
+            self.decoder, dataloader, num_epochs=self.num_epochs, lr=self.learning_rate
+        )
+
+    def predict(self) -> list:
+        test_data = construct_segmentation_labels(
+            self.test_coordinates,
+            self.test_features,
+            self.test_names,
+            patch_size=self.patch_size,
+            is_train=False,
+        )
+        test_dataset = SegmentationDataset(preprocessed_data=test_data)
+        test_dataloader = DataLoader(
+            test_dataset, batch_size=1, shuffle=False, collate_fn=custom_collate
+        )
+
+        predicted_masks = inference(
+            self.decoder,
+            test_dataloader,
+            patch_size=self.patch_size,
+            test_image_sizes=self.test_image_sizes,
+        )
+        #return predicted_masks
+
+
+        postprocessed_masks = []
+        for mask in predicted_masks:
+            if torch.is_tensor(mask):
+                mask = mask.cpu().numpy()
+            if mask.ndim == 3:
+                mask = np.argmax(mask, axis=0)  # If output is logits or probabilities
+
+            processed = postprocess_mask(mask)
+            postprocessed_masks.append(processed)
+
+        return postprocessed_masks
+
 
 
 class SegmentationDecoder(nn.Module):
