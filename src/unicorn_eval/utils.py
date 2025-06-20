@@ -71,7 +71,7 @@ METRIC_DICT = {
     "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams": {
         "name": "picai",
         "fn": compute_picai_score,
-        "range": (0,1),
+        "range": (0, 1),
     },
     "Task07_detecting_lung_nodules_in_thoracic_ct": {
         "name": "sensitivity",
@@ -96,7 +96,7 @@ METRIC_DICT = {
     "Task11_segmenting_three_anatomical_structures_in_lumbar_spine_mri": {
         "name": "spider_score",
         "fn": compute_spider_score,
-        "range": (0,1),
+        "range": (0, 1),
     },
     "Task20_generating_caption_from_wsi": {
         "name": "average_language_metric",
@@ -171,7 +171,7 @@ def adapt_features(
                     shot_features=shot_features,
                     shot_labels=shot_labels,
                     test_features=test_features,
-                    k=k
+                    k=k,
                 )
 
     elif adaptor_name == "logistic-regression":
@@ -295,7 +295,7 @@ def adapt_features(
             shot_label_directions=shot_label_directions,
             test_features=test_features,
             test_coordinates=test_coordinates,
-            test_names=test_names, # try to remove this input
+            test_names=test_names,  # try to remove this input
             test_image_sizes=test_image_sizes,
             test_image_origins=test_image_origins,
             test_image_spacings=test_image_spacing,
@@ -357,12 +357,14 @@ def convert_numpy_types(obj):
         return obj
 
 
-def evaluate_predictions(task_name, case_ids, test_predictions, test_labels, test_extra_labels=None):
+def evaluate_predictions(
+    task_name, case_ids, test_predictions, test_labels, test_extra_labels=None
+):
 
     metrics = {
-        "predictions": [],          # list to store individual case results
-        "metrics": {},              # dictionary to store main metric
-        "additional_metrics": {},   # dictionary to store additional metrics
+        "predictions": [],  # list to store individual case results
+        "metrics": {},  # dictionary to store main metric
+        "additional_metrics": {},  # dictionary to store additional metrics
     }
 
     # To get all nodule predictions for Task 7
@@ -397,24 +399,38 @@ def evaluate_predictions(task_name, case_ids, test_predictions, test_labels, tes
         metric_value = metric_fn(test_labels, test_predictions)
         metric_dict[metric_name] = metric_value
     elif task_name == "Task02_classifying_lung_nodule_malignancy_in_ct":
-        malignancy_risk = test_predictions[:,1]
+        malignancy_risk = test_predictions[:, 1]
         metric_value = metric_fn(test_labels, malignancy_risk)
         metric_dict[metric_name] = metric_value
-    elif task_name == "Task03_predicting_the_time_to_biochemical_recurrence_in_he_prostatectomies":
+    elif (
+        task_name
+        == "Task03_predicting_the_time_to_biochemical_recurrence_in_he_prostatectomies"
+    ):
         events = test_extra_labels["event"].astype(bool)
         metric_value = metric_fn(events, test_labels, -test_predictions)[0]
         metric_dict[metric_name] = metric_value
-    elif task_name == "Task04_predicting_slide_level_tumor_proportion_score_in_ihc_stained_wsi":
+    elif (
+        task_name
+        == "Task04_predicting_slide_level_tumor_proportion_score_in_ihc_stained_wsi"
+    ):
         metric_value = metric_fn(test_labels, test_predictions)
         metric_dict[metric_name] = metric_value
-    elif task_name == "Task05_detecting_signet_ring_cells_in_he_stained_wsi_of_gastric_cancer":
+    elif (
+        task_name
+        == "Task05_detecting_signet_ring_cells_in_he_stained_wsi_of_gastric_cancer"
+    ):
         metric_value = metric_fn(test_labels, test_predictions, 8)
         metric_dict[metric_name] = metric_value
-    elif task_name == "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams":
+    elif (
+        task_name
+        == "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams"
+    ):
         metric_value = metric_fn(test_labels, test_predictions)
         metric_dict[metric_name] = metric_value
     elif task_name == "Task07_detecting_lung_nodules_in_thoracic_ct":
-        metric_value = metric_fn(case_ids, test_predictions, test_labels, test_extra_labels)
+        metric_value = metric_fn(
+            case_ids, test_predictions, test_labels, test_extra_labels
+        )
         metric_dict[metric_name] = metric_value
     elif task_name == "Task08_detecting_mitotic_figures_in_breast_cancer_wsis":
         metric_value = metric_fn(test_labels, test_predictions, 16)
@@ -425,7 +441,9 @@ def evaluate_predictions(task_name, case_ids, test_predictions, test_labels, tes
     elif task_name == "Task10_segmenting_lesions_within_vois_in_ct":
         metric_value = metric_fn(test_labels, test_predictions)
         metric_dict[metric_name] = metric_value
-    elif task_name == "Task11_segmenting_three_anatomical_structures_in_lumbar_spine_mri":
+    elif (
+        task_name == "Task11_segmenting_three_anatomical_structures_in_lumbar_spine_mri"
+    ):
         metric_value = metric_fn(test_labels, test_predictions, case_ids)
         metric_dict[metric_name] = metric_value
     elif task_name == "Task20_generating_caption_from_wsi":
@@ -460,9 +478,9 @@ def process_image_representation(data):
 
 
 def process_detection_pathology(
-        data,
-    ):
-    
+    data,
+):
+
     def extract_points(labels):
         """
         Pull out coordinate tuples from a list of GT dictionaries.
@@ -492,17 +510,14 @@ def process_detection_pathology(
     if not extra_list or extra_list[0] is None:
         data["case_extra_labels"] = None
         return data
-    
+
     data["case_extra_labels"] = np.concatenate(extra_list, axis=0)
 
     return data
 
 
-def process_detection_radiology(
-        data, 
-        task_name: str | None = None
-    ):
-    
+def process_detection_radiology(data, task_name: str | None = None):
+
     def extract_points(labels):
         """
         Pull out coordinate tuples from a list of GT dictionaries.
@@ -558,14 +573,22 @@ def process_detection_radiology(
                         print("nothing to process in this case (got [(None,)])")
 
                     elif isinstance(element, dict):
-                        for idx, d in enumerate(element.get('points')):
+                        for idx, d in enumerate(element.get("points")):
                             diameter_records.append(
-                                    {"point": None, "diameter": float(d.get('diameter')), "name": f"case{case_id}_pt{idx}"}
+                                {
+                                    "point": None,
+                                    "diameter": float(d.get("diameter")),
+                                    "name": f"case{case_id}_pt{idx}",
+                                }
                             )
 
             elif isinstance(case_extra, (int, float)):
                 diameter_records.append(
-                    {"point": None, "diameter": float(case_extra), "name": f"case{case_id}"}
+                    {
+                        "point": None,
+                        "diameter": float(case_extra),
+                        "name": f"case{case_id}",
+                    }
                 )
 
             else:
@@ -631,11 +654,15 @@ def extract_embeddings_and_labels(processed_results):
             tasks[task_name]["shot_image_sizes"][shot_id] = result["image_size"]
             tasks[task_name]["shot_image_spacings"][shot_id] = result["image_spacing"]
             tasks[task_name]["shot_image_origins"][shot_id] = result["image_origin"]
-            tasks[task_name]["shot_image_directions"][shot_id] = result["image_direction"]
+            tasks[task_name]["shot_image_directions"][shot_id] = result[
+                "image_direction"
+            ]
             tasks[task_name]["shot_label_spacings"][shot_id] = result["label_spacing"]
             tasks[task_name]["shot_label_sizes"][shot_id] = result["label_size"]
             tasks[task_name]["shot_label_origins"][shot_id] = result["label_origin"]
-            tasks[task_name]["shot_label_directions"][shot_id] = result["label_direction"]
+            tasks[task_name]["shot_label_directions"][shot_id] = result[
+                "label_direction"
+            ]
         elif result["split"] == "case":
             tasks[task_name]["case_embeddings"].append(result["embeddings"])
             tasks[task_name]["case_labels"].append(result["label"])
@@ -647,11 +674,15 @@ def extract_embeddings_and_labels(processed_results):
             tasks[task_name]["cases_image_spacings"][case_id] = result["image_spacing"]
             tasks[task_name]["cases_image_sizes"][case_id] = result["image_size"]
             tasks[task_name]["cases_image_origins"][case_id] = result["image_origin"]
-            tasks[task_name]["cases_image_directions"][case_id] = result["image_direction"]
+            tasks[task_name]["cases_image_directions"][case_id] = result[
+                "image_direction"
+            ]
             tasks[task_name]["cases_label_spacings"][case_id] = result["label_spacing"]
             tasks[task_name]["cases_label_sizes"][case_id] = result["label_size"]
             tasks[task_name]["cases_label_origins"][case_id] = result["label_origin"]
-            tasks[task_name]["cases_label_directions"][case_id] = result["label_direction"]
+            tasks[task_name]["cases_label_directions"][case_id] = result[
+                "label_direction"
+            ]
 
     # now post-process each task
     for task_name, task_data in tasks.items():
@@ -663,7 +694,10 @@ def extract_embeddings_and_labels(processed_results):
             if task_domain == "pathology":
                 tasks[task_name] = process_detection_pathology(task_data)
             elif (task_domain == "CT") | (task_domain == "MR"):
-                if not task_name == "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams":
+                if (
+                    not task_name
+                    == "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams"
+                ):
                     tasks[task_name] = process_detection_radiology(task_data, task_name)
     return tasks
 
@@ -684,7 +718,16 @@ def extract_data(patch_neural_representation):
     features = np.array([p["features"] for p in patches]).astype(np.float32)
     coordinates = np.array([p["coordinates"] for p in patches])
 
-    return features, coordinates, spacing, patch_size, image_size, image_spacing, image_origin, image_direction
+    return (
+        features,
+        coordinates,
+        spacing,
+        patch_size,
+        image_size,
+        image_spacing,
+        image_origin,
+        image_direction,
+    )
 
 
 def normalize_metric(task_name, metric_value):
@@ -702,7 +745,19 @@ def sanitize_json_content(obj):
         return obj
     elif isinstance(obj, (np.float16, np.float32, np.float64)):
         return float(obj)
-    elif isinstance(obj, (np.uint8, np.uint16, np.uint32, np.uint64, np.int8, np.int16, np.int32, np.int64)):
+    elif isinstance(
+        obj,
+        (
+            np.uint8,
+            np.uint16,
+            np.uint32,
+            np.uint64,
+            np.int8,
+            np.int16,
+            np.int32,
+            np.int64,
+        ),
+    ):
         return int(obj)
     else:
         return obj.__repr__()

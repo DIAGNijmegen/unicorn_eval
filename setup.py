@@ -12,7 +12,9 @@ if __name__ == "__main__":
         project_urls={
             "Bug Tracker": "https://github.com/DIAGNijmegen/unicorn_eval/issues"
         },
-        package_dir={"": "src"},  # our packages live under src, but src is not a package itself
+        package_dir={
+            "": "src"
+        },  # our packages live under src, but src is not a package itself
         packages=setuptools.find_packages("src", exclude=["tests"]),
         exclude_package_data={"": ["tests"]},
         entry_points={

@@ -97,15 +97,11 @@ INPUT_SLUGS_DICT = {
     "Task09_segmenting_rois_in_breast_cancer_wsis": [
         "histopathology-region-of-interest-cropout"
     ],
-    "Task10_segmenting_lesions_within_vois_in_ct": [
-        "stacked-3d-ct-volumes-of-lesions"
-    ],
+    "Task10_segmenting_lesions_within_vois_in_ct": ["stacked-3d-ct-volumes-of-lesions"],
     "Task11_segmenting_three_anatomical_structures_in_lumbar_spine_mri": [
         "sagittal-spine-mri"
     ],
-    "Task20_generating_caption_from_wsi": [
-        "he-staining"
-    ]
+    "Task20_generating_caption_from_wsi": ["he-staining"],
 }
 
 MODEL_OUTPUT_SLUG_DICT = {
@@ -142,9 +138,7 @@ EXTRA_LABEL_SLUG_DICT = {
     "Task03_predicting_the_time_to_biochemical_recurrence_in_he_prostatectomies": [
         "event.json"
     ],
-    "Task07_detecting_lung_nodules_in_thoracic_ct": [
-        "diameter.json"
-    ]
+    "Task07_detecting_lung_nodules_in_thoracic_ct": ["diameter.json"],
 }
 
 LANGUAGE_TASK_NAMES = [
@@ -242,7 +236,15 @@ def process(job):
                 feature = np.array(feature).astype(np.float32)
                 features.append(feature)
             embeddings = np.concatenate(features)
-            coordinates, spacing, patch_size, image_size, image_spacing, image_origin, image_direction = None, None, None, None, None, None, None
+            (
+                coordinates,
+                spacing,
+                patch_size,
+                image_size,
+                image_spacing,
+                image_origin,
+                image_direction,
+            ) = (None, None, None, None, None, None, None)
 
         elif slug_embedding == "patch-neural-representation":
             # TODO: better handle the case when there are multiple encoded inputs for a case
@@ -250,9 +252,16 @@ def process(job):
             # and use the first coordinates, spacing, patch_size, image_size, and image_spacing
             first = True
             for neural_representation in neural_representations:
-                feature, curr_coordinates, curr_spacing, curr_patch_size, curr_image_size, curr_image_spacing, curr_image_origin, curr_image_direction = (
-                    extract_data(neural_representation)
-                )
+                (
+                    feature,
+                    curr_coordinates,
+                    curr_spacing,
+                    curr_patch_size,
+                    curr_image_size,
+                    curr_image_spacing,
+                    curr_image_origin,
+                    curr_image_direction,
+                ) = extract_data(neural_representation)
                 features.append(feature)
                 if first:
                     coordinates = curr_coordinates
@@ -294,7 +303,9 @@ def process(job):
         label = load_tif_file(location=label_path)
     elif label_path.suffix == ".mha":
         label_path = Path(str(label_path).replace("{case_id}", case_name))
-        label, label_size, label_origin, label_spacing, label_direction = load_mha_file(location=label_path)
+        label, label_size, label_origin, label_spacing, label_direction = load_mha_file(
+            location=label_path
+        )
     else:
         raise ValueError(f"Unsupported file format: {label_path.suffix}")
 
@@ -405,10 +416,22 @@ def load_tif_file(*, location):
 def load_mha_file(*, location):
     class_labels = sitk.ReadImage(location)
     if "transverse-cspca-label" in str(location):
-        pat_case = Sample(scans=[class_labels], lbl = class_labels, settings=PreprocessingSettings(spacing=[1,1,1], matrix_size=[16,256,256]))
+        pat_case = Sample(
+            scans=[class_labels],
+            lbl=class_labels,
+            settings=PreprocessingSettings(
+                spacing=[1, 1, 1], matrix_size=[16, 256, 256]
+            ),
+        )
         pat_case.preprocess()
         class_labels = pat_case.lbl
-    return sitk.GetArrayFromImage(class_labels), list(class_labels.GetSize()), list(class_labels.GetOrigin()), list(class_labels.GetSpacing()), list(class_labels.GetDirection())
+    return (
+        sitk.GetArrayFromImage(class_labels),
+        list(class_labels.GetSize()),
+        list(class_labels.GetOrigin()),
+        list(class_labels.GetSpacing()),
+        list(class_labels.GetDirection()),
+    )
 
 
 def write_metrics(*, metrics):
@@ -417,7 +440,9 @@ def write_metrics(*, metrics):
         f.write(json.dumps(metrics, indent=4))
 
 
-def write_combined_metrics(*, metric_dict: dict[dict], save_predictions: bool = True) -> None:
+def write_combined_metrics(
+    *, metric_dict: dict[dict], save_predictions: bool = True
+) -> None:
     metrics = {"metrics": {}, "normalized_metrics": {}}
     predictions = {"predictions": []}
 
