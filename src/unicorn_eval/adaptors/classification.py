@@ -85,12 +85,14 @@ class KNN(CaseLevelTaskAdaptor):
         num_workers=8,
         center_features=False,
         normalize_features=False,
+        return_probabilities=False,
     ):
         super().__init__(shot_features, shot_labels, test_features)
         self.k = k
         self.num_workers = num_workers
         self.center_features = center_features
         self.normalize_features = normalize_features
+        self.return_probabilities = return_probabilities
         self.model = None
 
     def fit(self):
@@ -117,6 +119,8 @@ class KNN(CaseLevelTaskAdaptor):
                 "Model has not been fitted yet. Call `fit` before `predict`."
             )
 
+        if self.return_probabilities:
+            return self.model.predict_proba(processed_test_features)
         return self.model.predict(processed_test_features)
 
 

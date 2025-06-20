@@ -163,7 +163,8 @@ def adapt_features(
                     shot_features=shot_features,
                     shot_labels=shot_labels,
                     test_features=test_features,
-                    k=k
+                    k=k,
+                    return_probabilities=return_probabilities,
                 )
             elif task_type == "regression":
                 adaptor = KNNRegressor(
