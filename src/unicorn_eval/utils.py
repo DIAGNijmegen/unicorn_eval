@@ -606,6 +606,11 @@ def extract_embeddings_and_labels(processed_results):
     tasks = {}
 
     for result in processed_results:
+
+        if result is None:
+            # skip language tasks
+            continue
+
         task_name = result["task_name"]
 
         if task_name not in tasks:
