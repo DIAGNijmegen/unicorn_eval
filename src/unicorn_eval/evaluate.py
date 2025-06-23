@@ -16,14 +16,14 @@ import json
 from multiprocessing import Pool
 from pathlib import Path
 from pprint import pformat
-from picai_prep.preprocessing import Sample, PreprocessingSettings
 
 import numpy as np
 import openslide
 import pandas as pd
+import SimpleITK as sitk
 from dragon_eval import DragonEval
 from dragon_eval.evaluation import REGRESSION_EPSILON, TASK_TYPE, EvalType
-import SimpleITK as sitk
+from picai_prep.preprocessing import PreprocessingSettings, Sample
 
 from unicorn_eval.helpers import get_max_workers
 from unicorn_eval.utils import (
@@ -34,7 +34,6 @@ from unicorn_eval.utils import (
     normalize_metric,
     write_json_file,
 )
-
 
 INPUT_DIRECTORY = Path("/input")
 OUTPUT_DIRECTORY = Path("/output")
@@ -499,7 +498,7 @@ def prepare_predictions_language(input_dir: Path, output_dir: Path, gt_dir: Path
             task_uids[matched_task] = uids
 
     # Match the predictions with the correct ground truth file
-    for pred_file in input_dir.rglob("*/output/nlp-predictions-dataset/*.json"):
+    for pred_file in input_dir.rglob("*/output/nlp-predictions-dataset.json"):
         if pred_file.name in ["predictions.json", "inputs.json"]:
             continue
 
