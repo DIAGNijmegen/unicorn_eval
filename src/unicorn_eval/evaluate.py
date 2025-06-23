@@ -420,7 +420,7 @@ def load_mha_file(*, location):
             scans=[class_labels],
             lbl=class_labels,
             settings=PreprocessingSettings(
-                spacing=[1, 1, 1], matrix_size=[16, 256, 256]
+                spacing=[3, 1.5, 1.5], matrix_size=[16, 256, 256]
             ),
         )
         pat_case.preprocess()
