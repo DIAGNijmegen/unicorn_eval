@@ -199,7 +199,11 @@ def process(job):
             except Exception as e:
                 continue
 
-    assert image_name is not None, "No image found in predictions.json"
+    if image_name is None:
+        # if no image_name is found, it corresponds to a pure language task
+        # for which we already have written the metrics
+        return None
+
     case_name = Path(image_name).stem
 
     # remove suffixes "_adc", "_t2w", and "_hbv" from the case name if present
