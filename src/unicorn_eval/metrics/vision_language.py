@@ -51,14 +51,14 @@ def compute_cider_score(references, predictions):
 
 def compute_bleu_score(reports_true, reports_pred):
     """
-    Calculate average machine translation metrics (BLEU-1, BLEU-2, BLEU-3, BLEU-4, ROUGE-L, METEOR).
+    Compute the average BLEU score between reference and predicted reports.
 
     Args:
         reports_true (list of str): List of reference texts.
         reports_pred (list of str): List of hypothesis texts.
 
     Returns:
-        dict: Dictionary containing averaged scores for BLEU, ROUGE-L, and METEOR.
+        float: The average BLEU score across all report pairs.
     """
     # Initialize scorers
     scorer_b = Bleu(4)
@@ -78,14 +78,14 @@ def compute_bleu_score(reports_true, reports_pred):
 
 def compute_rouge_score(reports_true, reports_pred):
     """
-    Calculate average machine translation metrics (BLEU-1, BLEU-2, BLEU-3, BLEU-4, ROUGE-L, METEOR).
+    Compute the average ROUGE-L score between reference and predicted reports.
 
     Args:
         reports_true (list of str): List of reference texts.
         reports_pred (list of str): List of hypothesis texts.
 
     Returns:
-        dict: Dictionary containing averaged scores for BLEU, ROUGE-L, and METEOR.
+        float: The average ROUGE-L score across all report pairs.
     """
     # Initialize scorers
     scorer_r = Rouge()
@@ -105,14 +105,14 @@ def compute_rouge_score(reports_true, reports_pred):
 
 def compute_meteor_score(reports_true, reports_pred):
     """
-    Calculate average machine translation metrics (BLEU-1, BLEU-2, BLEU-3, BLEU-4, ROUGE-L, METEOR).
+    Compute the average METEOR score between reference and predicted reports.
 
     Args:
         reports_true (list of str): List of reference texts.
         reports_pred (list of str): List of hypothesis texts.
 
     Returns:
-        dict: Dictionary containing averaged scores for BLEU, ROUGE-L, and METEOR.
+        float: The average METEOR score across all report pairs.
     """
     # Initialize scorers
     scorer_m = Meteor()
