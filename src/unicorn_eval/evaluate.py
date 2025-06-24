@@ -498,11 +498,15 @@ def reformat_language_metrics(metrics: dict) -> dict:
     """
     Reformat the language metrics to match the expected format for write_combined_metrics.
     """
-    return {
-        task: {"metrics": {task: values["mean"]}}
-        for task, values in metrics["aggregates"].items()
-        if task != "overall"
-    }
+    # If empty, return an empty dictionary
+    if not metrics:
+        return {}
+    else:
+        return {
+            task: {"metrics": {task: values["mean"]}}
+            for task, values in metrics["aggregates"].items()
+            if task != "overall"
+        }
 
 
 def prepare_predictions_language(input_dir: Path, output_dir: Path, gt_dir: Path):
