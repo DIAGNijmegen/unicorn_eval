@@ -12,7 +12,7 @@ evalutils==0.3.1
 openslide-python
 openslide-bin
 pycm
-dragon_eval==0.2.10
+dragon_eval==0.2.11
 monai
 picai_prep>=2.1.13
 report_guided_annotation

@@ -98,6 +98,46 @@ METRIC_DICT = {
         "fn": compute_spider_score,
         "range": (0, 1),
     },
+    "Task12_predicting_histopathology_sample_origin": {
+        "name": "unweighted-kappa",
+        "fn": "dragon_eval",
+        "range": (-1, 1),
+    },
+    "Task13_classifying_pulmonary_nodule_presence": {
+        "name": "auc",
+        "fn": "dragon_eval",
+        "range": (0, 1),
+    },
+    "Task14_classifying_kidney_abnormality": {
+        "name": "auc",
+        "fn": "dragon_eval",
+        "range": (0, 1),
+    },
+    "Task15_hip_kellgren_lawrence_score": {
+        "name": "unweighted-kappa",
+        "fn": "dragon_eval",
+        "range": (-1, 1),
+    },
+    "Task16_classifying_colon_histopathology_diagnosis": {
+        "name": "macro-auc",
+        "fn": "dragon_eval",
+        "range": (0, 1),
+    },
+    "Task17_predicting_lesion_size_measurements": {
+        "name": "rsmape",
+        "fn": "dragon_eval",
+        "range": (0, 1),
+    },
+    "Task18_predicting_prostate_volume_psa_and_psa_density": {
+        "name": "rsmape",
+        "fn": "dragon_eval",
+        "range": (0, 1),
+    },
+    "Task19_anonymizing_report": {
+        "name": "redaction_score",
+        "fn": "dragon_eval",
+        "range": (0, 1),
+    },
     "Task20_generating_caption_from_wsi": {
         "name": "average_language_metric",
         "fn": compute_average_language_metric,
