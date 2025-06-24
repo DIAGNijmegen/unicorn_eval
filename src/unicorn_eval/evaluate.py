@@ -188,7 +188,11 @@ def process(job):
     try:
         mapping = pd.read_csv(GROUNDTRUTH_DIRECTORY / "mapping.csv")
     except FileNotFoundError:
+        # if the mapping file is not found, we assume that the evaluation is for a language task
+        # and we do not need the mapping
+        print("No mapping.csv found, assuming language only task(s).")
         return None
+
     mapping.case_id = mapping.case_id.astype("str")
 
     image_name = None
