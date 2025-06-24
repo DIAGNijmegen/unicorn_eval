@@ -185,7 +185,14 @@ def process(job):
     report += pformat(job)
     report += "\n"
 
-    mapping = pd.read_csv(GROUNDTRUTH_DIRECTORY / "mapping.csv")
+    try:
+        mapping = pd.read_csv(GROUNDTRUTH_DIRECTORY / "mapping.csv")
+    except FileNotFoundError:
+        # if the mapping file is not found, we assume that the evaluation is for a language task
+        # and we do not need the mapping
+        print("No mapping.csv found, assuming language only task(s).")
+        return None
+
     mapping.case_id = mapping.case_id.astype("str")
 
     image_name = None
@@ -457,7 +464,9 @@ def write_combined_metrics(
                 normalize_metric(task_name, metric_value)
             )
 
-        for metric_name, metric_value in task_metrics["additional_metrics"].items():
+        for metric_name, metric_value in task_metrics.get(
+            "additional_metrics", {}
+        ).items():
             task_identifier = task_name.split("_")[0]
             metrics["metrics"][f"{task_identifier}_{metric_name}"] = metric_value
 
@@ -483,6 +492,17 @@ def write_combined_metrics(
             location=OUTPUT_DIRECTORY / "predictions.json",
             content=predictions,
         )
+
+
+def reformat_language_metrics(metrics: dict) -> dict:
+    """
+    Reformat the language metrics to match the expected format for write_combined_metrics.
+    """
+    return {
+        task: {"metrics": {task: values["mean"]}}
+        for task, values in metrics["aggregates"].items()
+        if task != "overall"
+    }
 
 
 def prepare_predictions_language(input_dir: Path, output_dir: Path, gt_dir: Path):
@@ -577,7 +597,7 @@ def main():
     print("=+=" * 10)
 
     print("evaluating language predictions")
-    task_metrics = evaluate_language_predictions()
+    task_metrics = reformat_language_metrics(evaluate_language_predictions())
     print("=+=" * 10)
 
     metrics = {}
