@@ -211,6 +211,18 @@ def adapt_features(
                 learning_rate=0.001,
             )
 
+    elif "linear-classification" in adaptor_name:
+        assert task_type == "classification", "Linear classification is only supported for classification tasks."
+        adaptor = LinearProbing(
+            shot_features=shot_features,
+            shot_labels=shot_labels,
+            shot_extra_labels=shot_extra_labels,
+            test_features=test_features,
+            num_epochs=100,
+            learning_rate=0.001,
+            return_probabilities=return_probabilities,
+        )
+
     elif "mlp" in adaptor_name:
         if task_type == "classification":
             adaptor = MultiLayerPerceptron(
