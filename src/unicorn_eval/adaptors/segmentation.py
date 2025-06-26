@@ -909,7 +909,7 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
             image_directions=self.test_image_directions,
         )
 
-        test_loader = load_patch_data(test_data, batch_size=20)
+        test_loader = load_patch_data(test_data, batch_size=10)
         # run inference using the trained decoder
         return inference3d(self.decoder, test_loader, self.device, self.return_binary, self.test_cases, self.test_label_sizes, self.test_label_spacing, self.test_label_origins, self.test_label_directions)
 
