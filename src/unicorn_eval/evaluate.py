@@ -26,6 +26,7 @@ from dragon_eval.evaluation import REGRESSION_EPSILON, TASK_TYPE, EvalType
 from picai_prep.preprocessing import PreprocessingSettings, Sample
 
 from unicorn_eval.helpers import get_max_workers
+import gc
 from unicorn_eval.utils import (
     adapt_features,
     evaluate_predictions,
@@ -656,10 +657,8 @@ def main():
             case_label_directions = results["cases_label_directions"]
 
             if task_type in ["classification", "regression"]:
-
                 if len(shot_embeddings.shape) > 2:
                     shot_embeddings = shot_embeddings.squeeze(1)
-
                 if len(case_embeddings.shape) > 2:
                     case_embeddings = case_embeddings.squeeze(1)
 
@@ -693,6 +692,17 @@ def main():
                 return_probabilities=return_probabilities,
             )
 
+            # delete arrays and run garbage collection
+            del (
+                shot_embeddings, case_embeddings, shot_labels, shot_extra_labels,
+                shot_ids, shot_image_sizes, shot_image_spacings, shot_image_origins,
+                shot_image_directions, shot_label_spacings, shot_label_origins,
+                shot_label_directions, case_image_sizes, case_image_spacings,
+                case_image_origins, case_image_directions, case_label_sizes,
+                case_label_spacings, case_label_origins, case_label_directions
+            )
+            gc.collect()
+
         elif modality == "vision-language":
             predictions = [pred["text"] for pred in results["prediction"]]
             case_labels = [
@@ -708,6 +718,10 @@ def main():
             test_extra_labels=case_extra_labels,
         )
         task_metrics[task_name] = metrics
+
+        # Free up memory for results and predictions
+        del results, predictions, case_labels, case_ids
+        gc.collect()
 
     if task_type == "segmentation" or task_type == "detection":
         write_combined_metrics(metric_dict=task_metrics, save_predictions=False)
