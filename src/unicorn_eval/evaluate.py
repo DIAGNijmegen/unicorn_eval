@@ -727,7 +727,7 @@ def main():
         del results, predictions, case_labels, case_ids
         gc.collect()
 
-    write_combined_metrics(metric_dict=task_metrics, save_predictions=save_predictions)
+    write_combined_metrics(metric_dict=task_metrics, save_predictions=False)
     return 0
 
 
