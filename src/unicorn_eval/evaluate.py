@@ -619,6 +619,8 @@ def main():
         processed_results = pool.map(process, predictions)
     task_values = extract_embeddings_and_labels(processed_results)
 
+    save_predictions = False
+
     for task_name, results in task_values.items():
 
         modality = results["modality"]
@@ -657,6 +659,7 @@ def main():
             case_label_directions = results["cases_label_directions"]
 
             if task_type in ["classification", "regression"]:
+                save_predictions = True
                 if len(shot_embeddings.shape) > 2:
                     shot_embeddings = shot_embeddings.squeeze(1)
                 if len(case_embeddings.shape) > 2:
@@ -716,6 +719,7 @@ def main():
             test_predictions=predictions,
             test_labels=case_labels,
             test_extra_labels=case_extra_labels,
+            save_predictions=save_predictions
         )
         task_metrics[task_name] = metrics
 
@@ -723,10 +727,7 @@ def main():
         del results, predictions, case_labels, case_ids
         gc.collect()
 
-    if task_type == "segmentation" or task_type == "detection":
-        write_combined_metrics(metric_dict=task_metrics, save_predictions=False)
-    else:
-        write_combined_metrics(metric_dict=task_metrics)
+    write_combined_metrics(metric_dict=task_metrics, save_predictions=save_predictions)
     return 0
 
 
