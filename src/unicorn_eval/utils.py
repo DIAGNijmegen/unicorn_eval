@@ -411,27 +411,25 @@ def evaluate_predictions(
         "additional_metrics": {},  # dictionary to store additional metrics
     }
 
-    # To get all nodule predictions for Task 7
-    if task_name == "Task07_detecting_lung_nodules_in_thoracic_ct":
-        # One entry containing the full arrays
-        prediction_entry = {
-            "case_id": convert_numpy_types(case_ids),
-            "ground_truth": convert_numpy_types(test_labels),
-            "prediction": convert_numpy_types(test_predictions),
-        }
-        if save_predictions:
+    if save_predictions:
+        if task_name == "Task07_detecting_lung_nodules_in_thoracic_ct":
+            # Only store references, not copies
+            prediction_entry = {
+                "case_id": convert_numpy_types(case_ids),
+                "ground_truth": convert_numpy_types(test_labels),
+                "prediction": convert_numpy_types(test_predictions),
+            }
             metrics["predictions"].append(prediction_entry)
-    else:
-        iterable = zip(case_ids, test_predictions, test_labels)
-        for case_id, prediction, ground_truth in iterable:
-            ground_truth = convert_numpy_types(ground_truth)
-            prediction = convert_numpy_types(prediction)
-            if save_predictions:
+        else:
+            # Use generator to avoid building a large list in memory
+            for case_id, prediction, ground_truth in zip(case_ids, test_predictions, test_labels):
+                ground_truth = convert_numpy_types(ground_truth)
+                prediction = convert_numpy_types(prediction)
                 metrics["predictions"].append(
                     {
                         "case_id": case_id,
-                        "ground_truth": ground_truth,
-                        "prediction": prediction,
+                        "ground_truth": convert_numpy_types(ground_truth),
+                        "prediction": convert_numpy_types(prediction),
                     }
                 )
 
