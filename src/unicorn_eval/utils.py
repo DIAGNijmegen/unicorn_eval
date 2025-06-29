@@ -402,7 +402,7 @@ def convert_numpy_types(obj):
 
 
 def evaluate_predictions(
-    task_name, case_ids, test_predictions, test_labels, test_extra_labels=None
+    task_name, case_ids, test_predictions, test_labels, test_extra_labels=None, save_predictions: bool = False
 ):
 
     metrics = {
@@ -414,25 +414,26 @@ def evaluate_predictions(
     # To get all nodule predictions for Task 7
     if task_name == "Task07_detecting_lung_nodules_in_thoracic_ct":
         # One entry containing the full arrays
-        metrics["predictions"].append(
-            {
-                "case_id": convert_numpy_types(case_ids),
-                "ground_truth": convert_numpy_types(test_labels),
-                "prediction": convert_numpy_types(test_predictions),
-            }
-        )
+        prediction_entry = {
+            "case_id": convert_numpy_types(case_ids),
+            "ground_truth": convert_numpy_types(test_labels),
+            "prediction": convert_numpy_types(test_predictions),
+        }
+        if save_predictions:
+            metrics["predictions"].append(prediction_entry)
     else:
         iterable = zip(case_ids, test_predictions, test_labels)
         for case_id, prediction, ground_truth in iterable:
             ground_truth = convert_numpy_types(ground_truth)
             prediction = convert_numpy_types(prediction)
-            metrics["predictions"].append(
-                {
-                    "case_id": case_id,
-                    "ground_truth": ground_truth,
-                    "prediction": prediction,
-                }
-            )
+            if save_predictions:
+                metrics["predictions"].append(
+                    {
+                        "case_id": case_id,
+                        "ground_truth": ground_truth,
+                        "prediction": prediction,
+                    }
+                )
 
     # handle metric computation based on task_name
     metric_name = METRIC_DICT[task_name]["name"]
