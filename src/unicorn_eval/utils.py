@@ -29,6 +29,7 @@ from unicorn_eval.adaptors import (
     MultiLayerPerceptron,
     MultiLayerPerceptronRegressor,
     PatchNoduleRegressor,
+    ScanLevelNoduleDetector,
     SegmentationUpsampling,
     SegmentationUpsampling3D,
     WeightedKNN,
@@ -257,6 +258,27 @@ def adapt_features(
             lr=0.001,
         )
 
+    elif adaptor_name == "scanLevelnoduledetector":
+        adaptor = ScanLevelNoduleDetector(
+            shot_features=shot_features,
+            shot_labels=shot_labels,
+            shot_coordinates=shot_coordinates,
+            shot_ids=shot_names,
+            test_features=test_features,
+            test_coordinates=test_coordinates,
+            test_ids=test_names,
+            test_image_origins=test_image_origins,
+            test_image_spacings=test_image_spacing,
+            test_image_directions=test_image_directions,
+            shot_image_origins=shot_image_origins,
+            shot_image_spacings=shot_image_spacing,
+            shot_image_directions=shot_image_directions,
+            patch_size=patch_size,
+            feature_size=shot_features[0][0].shape[0],  # auto-detect feature dim
+            num_queries=5,
+            num_epochs=30,
+            lr=1e-3,
+        )
     elif adaptor_name == "density-map":
         adaptor = DensityMap(
             shot_features=shot_features,

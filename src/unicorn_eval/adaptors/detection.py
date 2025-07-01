@@ -22,6 +22,7 @@ from torch.utils.data import DataLoader, Dataset
 from torch.utils.data._utils.collate import default_collate
 from typing import Sequence
 from unicorn_eval.adaptors.base import PatchLevelTaskAdaptor
+import monai
 
 
 class DetectionDecoder(nn.Module):
@@ -603,3 +604,240 @@ class PatchNoduleRegressor(PatchLevelTaskAdaptor):
         )
 
         return preds
+    
+class ScanLevelNoduleDetector(PatchLevelTaskAdaptor):
+    """
+    Few-shot 3D scan-level nodule detector using MONAI-style class-token interaction.
+    Predicts [x, y, z, p] nodule detections per scan.
+    """
+
+    def __init__(
+        self,
+        shot_features,
+        shot_coordinates,
+        shot_ids,
+        shot_labels,
+        test_features,
+        test_coordinates,
+        test_ids,
+        test_image_origins,
+        test_image_spacings,
+        test_image_directions,
+        shot_image_origins,
+        shot_image_spacings,
+        shot_image_directions,
+        test_image_sizes,
+        test_label_sizes,
+        test_label_spacing,
+        test_label_origins,
+        test_label_directions,
+        shot_image_sizes,
+        shot_label_spacing,
+        shot_label_origins,
+        shot_label_directions,
+        patch_size,
+        num_queries=5,
+        use_mlp=True,
+        num_epochs=30,
+        lr=1e-3,
+    ):
+        super().__init__(
+            shot_features=shot_features,
+            shot_coordinates=shot_coordinates,
+            shot_labels=shot_labels,
+            test_features=test_features,
+            test_coordinates=test_coordinates,
+            shot_extra_labels=None,
+        )
+
+        self.shot_ids = shot_ids
+        self.test_ids = test_ids
+
+        self.shot_features = shot_features
+        self.test_features = test_features
+
+        self.shot_image_origins = shot_image_origins
+        self.shot_image_spacings = shot_image_spacings
+        self.shot_image_directions = shot_image_directions
+
+        self.test_image_origins = test_image_origins
+        self.test_image_spacings = test_image_spacings
+        self.test_image_directions = test_image_directions
+
+        self.test_image_sizes = test_image_sizes
+        self.test_label_sizes = test_label_sizes
+        self.test_label_spacing = test_label_spacing
+        self.test_label_origins = test_label_origins
+        self.test_label_directions = test_label_directions
+
+        self.shot_image_sizes = shot_image_sizes
+        self.shot_label_spacing = shot_label_spacing
+        self.shot_label_origins = shot_label_origins
+        self.shot_label_directions = shot_label_directions
+
+        self.patch_size = patch_size
+        self.feature_size = shot_features[0][0].shape[0]
+        self.num_queries = num_queries
+        self.num_epochs = num_epochs
+        self.lr = lr
+
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+        self.model = NoduleClassDecoder(
+            n_queries=self.num_queries,
+            feature_size=self.feature_size,
+            use_mlp=use_mlp,
+        ).to(self.device)
+
+    def fit(self):
+        print("==== Few-Shot Training ====")
+        self.model.train()
+        optimizer = optim.Adam(self.model.parameters(), lr=self.lr)
+        loss_fn = nn.BCEWithLogitsLoss()
+
+        for feats_case, coords_case, labels_case, case_id in zip(
+            self.shot_features, self.shot_coordinates, self.shot_labels, self.shot_ids
+        ):
+            print(f"\n[SHOT] Case ID: {case_id}")
+            print(f"  # Patches: {len(coords_case)}")
+            print(f"  Example patch index: {coords_case[0]}")
+            print(f"  Nodule GT Locations (mm): {labels_case}")
+
+            feat_vol, dims, patch_idx_offset = self._build_feature_volume(
+                feats_case, coords_case
+            )
+            gt_mask = self._build_gt_mask(dims, coords_case, labels_case, patch_idx_offset, case_id)
+
+            feat_vol = feat_vol.unsqueeze(0).to(self.device)  # [1, C, D, H, W]
+            gt_mask = gt_mask.unsqueeze(0).repeat(self.num_queries, 1, 1, 1)  # [Q, D, H, W]
+
+            for epoch in range(self.num_epochs):
+                optimizer.zero_grad()
+                out_logits, _ = self.model(feat_vol, torch.arange(self.num_queries).to(self.device))
+                out_logits = out_logits.squeeze(0)
+                loss = loss_fn(out_logits, gt_mask.to(self.device))
+                loss.backward()
+                optimizer.step()
+
+    @torch.no_grad()
+    def predict(self) -> np.ndarray:
+        print("\n==== Inference ====")
+        self.model.eval()
+        predictions = []
+
+        for features_case, coords_case, case_id in zip(
+            self.test_features, self.test_coordinates, self.test_ids
+        ):
+            print(f"\n[TEST] Case ID: {case_id}")
+            print(f"  # Patches: {len(coords_case)}")
+            print(f"  Example patch index: {coords_case[0]}")
+
+            origin = np.array(self.test_image_origins[case_id])
+            spacing = np.array(self.test_image_spacings[case_id])
+            direction = np.array(self.test_image_directions[case_id]).reshape(3, 3)
+
+            feat_vol, dims, patch_idx_offset = self._build_feature_volume(
+                features_case, coords_case
+            )
+            feat_vol = feat_vol.unsqueeze(0).to(self.device)  # [1, C, D, H, W]
+            masks, _ = self.model(feat_vol, torch.arange(self.num_queries).to(self.device))
+            masks = torch.sigmoid(masks).squeeze(0)
+
+            for i in range(self.num_queries):
+                mask = masks[i]
+                conf = mask.max().item()
+                if conf < 0.9:
+                    continue
+                z, y, x = np.unravel_index(torch.argmax(mask).item(), mask.shape)
+                patch_idx = np.array([x, y, z])
+                world_coord = self._compute_world_coordinate(patch_idx, spacing, origin, direction)
+                print(f"  Detected [x,y,z]: {world_coord}, confidence: {conf:.3f}")
+                predictions.append([case_id, *world_coord, conf])
+
+        return np.array(predictions, dtype=object)
+
+    def _build_feature_volume(self, feats, coords):
+        coords = np.array(coords, dtype=int)
+        feats = np.array(feats)
+        mins = coords.min(axis=0)
+        maxs = coords.max(axis=0) + 1
+        dims = maxs - mins
+        grid = np.zeros((self.feature_size, dims[2], dims[1], dims[0]), dtype=np.float32)
+        for feat, idx in zip(feats, coords):
+            x, y, z = idx - mins
+            grid[:, z, y, x] = feat
+        return torch.tensor(grid, dtype=torch.float32), dims, mins
+
+    def _build_gt_mask(self, dims, patch_coords, nodule_list, offset, case_id):
+        mask = torch.zeros(dims[2], dims[1], dims[0])
+        if not nodule_list:
+            return mask
+        centers = np.array(nodule_list)
+        for patch_idx in patch_coords:
+            world_coord = self._compute_world_coordinate(
+                patch_idx,
+                spacing=[1.0, 1.0, 1.0],
+                origin=[0.0, 0.0, 0.0],
+                direction=np.eye(3),
+            )
+            dists = np.linalg.norm(centers - world_coord, axis=1)
+            nearest_dist = dists.min()
+            print(f"  [Case: {case_id}] Patch idx: {patch_idx}, world: {world_coord}, nearest GT dist: {nearest_dist:.2f}")
+            if nearest_dist < 10.0:
+                px, py, pz = patch_idx - offset
+                mask[pz, py, px] = 1.0
+        return mask
+
+    def _compute_world_coordinate(self, patch_idx, spacing, origin, direction):
+        v_mm = (np.array(patch_idx) + 0.5) * np.array(spacing)
+        return origin + direction.dot(v_mm)
+
+
+class NoduleClassDecoder(nn.Module):
+    def __init__(self, n_queries, feature_size, use_mlp=False):
+        super().__init__()
+        self.use_mlp = use_mlp
+        self.class_embeddings = nn.Embedding(n_queries, feature_size)
+        self.image_post_mapping = nn.Sequential(
+            monai.networks.blocks.UnetrBasicBlock(
+                spatial_dims=3,
+                in_channels=feature_size,
+                out_channels=feature_size,
+                kernel_size=3,
+                stride=1,
+                norm_name="instance",
+                res_block=True,
+            ),
+            monai.networks.blocks.UnetrBasicBlock(
+                spatial_dims=3,
+                in_channels=feature_size,
+                out_channels=feature_size,
+                kernel_size=3,
+                stride=1,
+                norm_name="instance",
+                res_block=True,
+            ),
+        )
+        if use_mlp:
+            self.mlp = nn.Sequential(
+                nn.Linear(feature_size, feature_size),
+                nn.InstanceNorm1d(1),
+                nn.GELU(),
+                nn.Linear(feature_size, feature_size),
+            )
+
+    def forward(self, src, class_vector):
+        b, c, d, h, w = src.shape
+        src = self.image_post_mapping(src)
+        class_embedding = self.class_embeddings(class_vector)
+        if self.use_mlp:
+            class_embedding = self.mlp(class_embedding)
+
+        masks = []
+        for i in range(b):
+            feat_flat = src[i].view(c, -1)
+            mask = (class_embedding @ feat_flat).view(-1, d, h, w)
+            masks.append(mask)
+
+        return torch.stack(masks, dim=0), class_embedding
+
