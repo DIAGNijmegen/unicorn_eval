@@ -12,10 +12,12 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import gc
 import json
 from multiprocessing import Pool
 from pathlib import Path
 from pprint import pformat
+from collections import defaultdict
 
 import numpy as np
 import openslide
@@ -26,7 +28,6 @@ from dragon_eval.evaluation import REGRESSION_EPSILON, TASK_TYPE, EvalType
 from picai_prep.preprocessing import PreprocessingSettings, Sample
 
 from unicorn_eval.helpers import get_max_workers
-import gc
 from unicorn_eval.utils import (
     adapt_features,
     evaluate_predictions,
@@ -186,15 +187,15 @@ def process(job):
     report += pformat(job)
     report += "\n"
 
+    mapping_path = GROUNDTRUTH_DIRECTORY / "mapping.csv"
     try:
-        mapping = pd.read_csv(GROUNDTRUTH_DIRECTORY / "mapping.csv")
+        mapping = pd.read_csv(mapping_path)
+        mapping.case_id = mapping.case_id.astype("str")
     except FileNotFoundError:
         # if the mapping file is not found, we assume that the evaluation is for a language task
         # and we do not need the mapping
-        print("No mapping.csv found, assuming language only task(s).")
-        return None
-
-    mapping.case_id = mapping.case_id.astype("str")
+        print(f"{mapping_path} not found, cannot group by task.")
+        return {}
 
     image_name = None
     for slug_inputs in INPUT_SLUGS_DICT.values():
@@ -593,15 +594,59 @@ def evaluate_language_predictions():
         return {}
 
 
+def group_predictions_by_task(predictions):
+    """Group predictions by task to process them independently and save memory."""
+    predictions_by_task = defaultdict(list)
+
+    # we need to look at the mapping.csv to determine which task each prediction belongs to
+    mapping_path = GROUNDTRUTH_DIRECTORY / "mapping.csv"
+    try:
+        mapping = pd.read_csv(mapping_path)
+        mapping.case_id = mapping.case_id.astype("str")
+    except FileNotFoundError:
+        # if the mapping file is not found, we assume that the evaluation is for a language task
+        print(f"{mapping_path} not found, cannot group by task.")
+        return {}
+
+    for prediction in predictions:
+        # extract case name from prediction to match with mapping
+        case_name = None
+        for slug_inputs in INPUT_SLUGS_DICT.values():
+            for slug_input in slug_inputs:
+                try:
+                    image_name = get_image_name(values=prediction["inputs"], slug=slug_input)
+                    case_name = Path(image_name).stem
+                    # remove suffixes "_adc", "_t2w", and "_hbv" from the case name if present
+                    for suffix in ["_adc", "_t2w", "_hbv"]:
+                        if case_name.endswith(suffix):
+                            case_name = case_name[: -len(suffix)]
+                    break
+                except Exception:
+                    continue
+            if case_name:
+                break
+
+        if case_name is None:
+            # skip if we can't determine case name (language task)
+            continue
+
+        # retrieve case information from mapping
+        case_info = mapping[mapping.case_id == case_name]
+        task_name = case_info.task_name.values[0]
+        predictions_by_task[task_name].append(prediction)
+
+    return predictions_by_task
+
+
 def main():
-    print("input folder contents:")
+    print("Input folder contents:")
     print_directory_contents(INPUT_DIRECTORY)
     print("=+=" * 10)
-    print("grountruth folder contents:")
+    print("Grountruth folder contents:")
     print_directory_contents(GROUNDTRUTH_DIRECTORY)
     print("=+=" * 10)
 
-    print("evaluating language predictions")
+    print("Evaluating language predictions")
     task_metrics = reformat_language_metrics(evaluate_language_predictions())
     print("=+=" * 10)
 
@@ -609,54 +654,67 @@ def main():
     adaptors = read_adaptors()
     predictions = read_predictions()
 
-    # We now process each algorithm job for this submission
-    # Note that the jobs are not in any order!
-    # We work that out from predictions.json
-
-    # use concurrent workers to process the predictions more efficiently
-    max_workers = get_max_workers()
-    with Pool(processes=max_workers) as pool:
-        processed_results = pool.map(process, predictions)
-    task_values = extract_embeddings_and_labels(processed_results)
+    # group predictions by task to process them independently
+    predictions_by_task = group_predictions_by_task(predictions)
 
     save_predictions = False
+    max_workers = get_max_workers()
 
-    for task_name, results in task_values.items():
+    # process task sequentially and manage memory
+    for task_name, task_predictions in list(predictions_by_task.items()):
+        print(f"Processing task: {task_name}")
 
-        modality = results["modality"]
-        case_labels = results["case_labels"]
-        case_ids = results["case_ids"]
-        task_type = results["task_type"]
+        max_workers = get_max_workers()
+        with Pool(processes=max_workers) as pool:
+            processed_results = pool.map(process, task_predictions)
+
+        # extract embeddings and labels for the current task
+        task_results = extract_embeddings_and_labels(processed_results, task_name)
+
+        # free memory
+        del task_predictions
+        del predictions_by_task[task_name]
+        del processed_results
+        gc.collect()
+
+        if task_results is None:
+            # skip if no valid results (e.g., language-only task)
+            continue
+
+        modality = task_results["modality"]
+        case_labels = task_results["case_labels"]
+        case_ids = task_results["case_ids"]
+        task_type = task_results["task_type"]
 
         if modality == "vision":
 
             adaptor_name = adaptors[task_name]
             return_probabilities = REQUIRES_PROBABILITIES_DICT[task_name]
 
-            patch_size = results["patch_size"]
+            patch_size = task_results["patch_size"]
 
-            shot_embeddings = results["shot_embeddings"]
-            shot_labels = results["shot_labels"]
-            shot_extra_labels = results["shot_extra_labels"]
-            shot_ids = results["shot_ids"]
-            shot_image_sizes = results["shot_image_sizes"]
-            shot_image_spacings = results["shot_image_spacings"]
-            shot_image_origins = results["shot_image_origins"]
-            shot_image_directions = results["shot_image_directions"]
-            shot_label_spacings = results["shot_label_spacings"]
-            shot_label_origins = results["shot_label_origins"]
-            shot_label_directions = results["shot_label_directions"]
+            shot_embeddings = task_results["shot_embeddings"]
+            shot_labels = task_results["shot_labels"]
+            shot_extra_labels = task_results["shot_extra_labels"]
+            shot_ids = task_results["shot_ids"]
+            shot_image_sizes = task_results["shot_image_sizes"]
+            shot_image_spacings = task_results["shot_image_spacings"]
+            shot_image_origins = task_results["shot_image_origins"]
+            shot_image_directions = task_results["shot_image_directions"]
+            shot_label_spacings = task_results["shot_label_spacings"]
+            shot_label_origins = task_results["shot_label_origins"]
+            shot_label_directions = task_results["shot_label_directions"]
 
-            case_embeddings = results["case_embeddings"]
-            case_extra_labels = results["case_extra_labels"]
-            case_image_sizes = results["cases_image_sizes"]
-            case_image_spacings = results["cases_image_spacings"]
-            case_image_origins = results["cases_image_origins"]
-            case_image_directions = results["cases_image_directions"]
-            case_label_sizes = results["cases_label_sizes"]
-            case_label_spacings = results["cases_label_spacings"]
-            case_label_origins = results["cases_label_origins"]
-            case_label_directions = results["cases_label_directions"]
+            case_embeddings = task_results["case_embeddings"]
+            case_extra_labels = task_results["case_extra_labels"]
+            case_image_sizes = task_results["cases_image_sizes"]
+            case_image_spacings = task_results["cases_image_spacings"]
+            case_image_origins = task_results["cases_image_origins"]
+            case_image_directions = task_results["cases_image_directions"]
+            case_label_sizes = task_results["cases_label_sizes"]
+            case_label_spacings = task_results["cases_label_spacings"]
+            case_label_origins = task_results["cases_label_origins"]
+            case_label_directions = task_results["cases_label_directions"]
 
             if task_type in ["classification", "regression"]:
                 save_predictions = True
@@ -672,8 +730,8 @@ def main():
                 shot_names=shot_ids,
                 shot_labels=shot_labels,
                 test_features=case_embeddings,
-                shot_coordinates=results["shot_coordinates"],
-                test_coordinates=results["cases_coordinates"],
+                shot_coordinates=task_results["shot_coordinates"],
+                test_coordinates=task_results["cases_coordinates"],
                 test_names=case_ids,
                 patch_size=patch_size,
                 test_image_sizes=case_image_sizes,
@@ -707,9 +765,9 @@ def main():
             gc.collect()
 
         elif modality == "vision-language":
-            predictions = [pred["text"] for pred in results["prediction"]]
+            predictions = [pred["text"] for pred in task_results["prediction"]]
             case_labels = [
-                label["text"] for case in results["case_labels"] for label in case
+                label["text"] for case in task_results["case_labels"] for label in case
             ]
             case_extra_labels = None
 
@@ -723,11 +781,22 @@ def main():
         )
         task_metrics[task_name] = metrics
 
-        # Free up memory for results and predictions
-        del results, predictions, case_labels, case_ids
+        # free up memory
+        del task_results, predictions, case_labels, case_ids
+        if 'case_extra_labels' in locals():
+            del case_extra_labels
         gc.collect()
 
+        print(f"Completed processing task: {task_name}")
+        print("=+=" * 10)
+
+    # clean up any remaining memory
+    del predictions_by_task, predictions
+    gc.collect()
+
+    print(f"Writing metrics for {len(task_metrics)} tasks...")
     write_combined_metrics(metric_dict=task_metrics, save_predictions=False)
+    print("Metrics written successfully.")
     return 0
 
 
