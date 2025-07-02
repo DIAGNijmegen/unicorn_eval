@@ -652,10 +652,10 @@ def main():
 
     metrics = {}
     adaptors = read_adaptors()
-    predictions = read_predictions()
+    predictions_all = read_predictions()
 
     # group predictions by task to process them independently
-    predictions_by_task = group_predictions_by_task(predictions)
+    predictions_by_task = group_predictions_by_task(predictions_all)
 
     save_predictions = False
     max_workers = get_max_workers()
@@ -791,7 +791,7 @@ def main():
         print("=+=" * 10)
 
     # clean up any remaining memory
-    del predictions_by_task, predictions
+    del predictions_by_task, predictions_all
     gc.collect()
 
     print(f"Writing metrics for {len(task_metrics)} tasks...")
