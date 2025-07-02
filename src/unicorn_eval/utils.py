@@ -645,109 +645,113 @@ def process_detection_radiology(data, task_name: str | None = None):
     return data
 
 
-def extract_embeddings_and_labels(processed_results):
-    tasks = {}
+def extract_embeddings_and_labels(processed_results, task_name):
+    """Extract embeddings and labels for a given task."""
+    task_data = {
+        "task_type": None,
+        "modality": None,
+        "domain": None,
+        "spacing": None,
+        "patch_size": None,
+        "prediction": [],
+        "shot_embeddings": [],
+        "shot_coordinates": [],
+        "shot_image_spacings": {},
+        "shot_image_origins": {},
+        "shot_image_directions": {},
+        "shot_image_sizes": {},
+        "shot_label_sizes": {},
+        "shot_label_spacings": {},
+        "shot_label_origins": {},
+        "shot_label_directions": {},
+        "shot_labels": [],
+        "shot_extra_labels": [],
+        "shot_ids": [],
+        "case_embeddings": [],
+        "cases_coordinates": [],
+        "case_labels": [],
+        "case_extra_labels": [],
+        "case_ids": [],
+        "cases_image_sizes": {},
+        "cases_image_spacings": {},
+        "cases_image_origins": {},
+        "cases_image_directions": {},
+        "cases_label_sizes": {},
+        "cases_label_spacings": {},
+        "cases_label_origins": {},
+        "cases_label_directions": {},
+    }
+
+    valid_results_found = False
 
     for result in processed_results:
-
         if result is None:
             # skip language tasks
             continue
 
-        task_name = result["task_name"]
+        # only process results for this specific task
+        if result["task_name"] != task_name:
+            continue
 
-        if task_name not in tasks:
-            tasks[task_name] = {
-                "task_type": result["task_type"],
-                "modality": result["modality"],
-                "domain": result["domain"],
-                "spacing": result["spacing"],
-                "patch_size": result["patch_size"],
-                "prediction": [],
-                "shot_embeddings": [],
-                "shot_coordinates": [],
-                "shot_image_spacings": {},
-                "shot_image_origins": {},
-                "shot_image_directions": {},
-                "shot_image_sizes": {},
-                "shot_label_sizes": {},
-                "shot_label_spacings": {},
-                "shot_label_origins": {},
-                "shot_label_directions": {},
-                "shot_labels": [],
-                "shot_extra_labels": [],
-                "shot_ids": [],
-                "case_embeddings": [],
-                "cases_coordinates": [],
-                "case_labels": [],
-                "case_extra_labels": [],
-                "case_ids": [],
-                "cases_image_sizes": {},
-                "cases_image_spacings": {},
-                "cases_image_origins": {},
-                "cases_image_directions": {},
-                "cases_label_sizes": {},
-                "cases_label_spacings": {},
-                "cases_label_origins": {},
-                "cases_label_directions": {},
-            }
+        valid_results_found = True
+
+        # initialize task data with first valid result
+        if task_data["task_type"] is None:
+            task_data["task_type"] = result["task_type"]
+            task_data["modality"] = result["modality"]
+            task_data["domain"] = result["domain"]
+            task_data["spacing"] = result["spacing"]
+            task_data["patch_size"] = result["patch_size"]
 
         if result["split"] == "shot":
-            tasks[task_name]["shot_embeddings"].append(result["embeddings"])
-            tasks[task_name]["shot_labels"].append(result["label"])
-            tasks[task_name]["shot_extra_labels"].append(result.get("extra_labels"))
-            tasks[task_name]["shot_ids"].append(result["case_id"])
-            tasks[task_name]["shot_coordinates"].append(result["coordinates"])
+            task_data["shot_embeddings"].append(result["embeddings"])
+            task_data["shot_labels"].append(result["label"])
+            task_data["shot_extra_labels"].append(result.get("extra_labels"))
+            task_data["shot_ids"].append(result["case_id"])
+            task_data["shot_coordinates"].append(result["coordinates"])
             shot_id = result["case_id"]
-            tasks[task_name]["shot_image_sizes"][shot_id] = result["image_size"]
-            tasks[task_name]["shot_image_spacings"][shot_id] = result["image_spacing"]
-            tasks[task_name]["shot_image_origins"][shot_id] = result["image_origin"]
-            tasks[task_name]["shot_image_directions"][shot_id] = result[
-                "image_direction"
-            ]
-            tasks[task_name]["shot_label_spacings"][shot_id] = result["label_spacing"]
-            tasks[task_name]["shot_label_sizes"][shot_id] = result["label_size"]
-            tasks[task_name]["shot_label_origins"][shot_id] = result["label_origin"]
-            tasks[task_name]["shot_label_directions"][shot_id] = result[
-                "label_direction"
-            ]
+            task_data["shot_image_sizes"][shot_id] = result["image_size"]
+            task_data["shot_image_spacings"][shot_id] = result["image_spacing"]
+            task_data["shot_image_origins"][shot_id] = result["image_origin"]
+            task_data["shot_image_directions"][shot_id] = result["image_direction"]
+            task_data["shot_label_spacings"][shot_id] = result["label_spacing"]
+            task_data["shot_label_sizes"][shot_id] = result["label_size"]
+            task_data["shot_label_origins"][shot_id] = result["label_origin"]
+            task_data["shot_label_directions"][shot_id] = result["label_direction"]
         elif result["split"] == "case":
-            tasks[task_name]["case_embeddings"].append(result["embeddings"])
-            tasks[task_name]["case_labels"].append(result["label"])
-            tasks[task_name]["case_extra_labels"].append(result.get("extra_labels"))
-            tasks[task_name]["prediction"].append(result.get("prediction"))
-            tasks[task_name]["case_ids"].append(result["case_id"])
-            tasks[task_name]["cases_coordinates"].append(result["coordinates"])
+            task_data["case_embeddings"].append(result["embeddings"])
+            task_data["case_labels"].append(result["label"])
+            task_data["case_extra_labels"].append(result.get("extra_labels"))
+            task_data["prediction"].append(result.get("prediction"))
+            task_data["case_ids"].append(result["case_id"])
+            task_data["cases_coordinates"].append(result["coordinates"])
             case_id = result["case_id"]
-            tasks[task_name]["cases_image_spacings"][case_id] = result["image_spacing"]
-            tasks[task_name]["cases_image_sizes"][case_id] = result["image_size"]
-            tasks[task_name]["cases_image_origins"][case_id] = result["image_origin"]
-            tasks[task_name]["cases_image_directions"][case_id] = result[
-                "image_direction"
-            ]
-            tasks[task_name]["cases_label_spacings"][case_id] = result["label_spacing"]
-            tasks[task_name]["cases_label_sizes"][case_id] = result["label_size"]
-            tasks[task_name]["cases_label_origins"][case_id] = result["label_origin"]
-            tasks[task_name]["cases_label_directions"][case_id] = result[
-                "label_direction"
-            ]
+            task_data["cases_image_spacings"][case_id] = result["image_spacing"]
+            task_data["cases_image_sizes"][case_id] = result["image_size"]
+            task_data["cases_image_origins"][case_id] = result["image_origin"]
+            task_data["cases_image_directions"][case_id] = result["image_direction"]
+            task_data["cases_label_spacings"][case_id] = result["label_spacing"]
+            task_data["cases_label_sizes"][case_id] = result["label_size"]
+            task_data["cases_label_origins"][case_id] = result["label_origin"]
+            task_data["cases_label_directions"][case_id] = result["label_direction"]
 
-    # now post-process each task
-    for task_name, task_data in tasks.items():
-        task_type = task_data["task_type"]
-        task_domain = task_data["domain"]
-        if task_type in ["classification", "regression"]:
-            tasks[task_name] = process_image_representation(task_data)
-        elif task_type == "detection":
-            if task_domain == "pathology":
-                tasks[task_name] = process_detection_pathology(task_data)
-            elif (task_domain == "CT") | (task_domain == "MR"):
-                if (
-                    not task_name
-                    == "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams"
-                ):
-                    tasks[task_name] = process_detection_radiology(task_data, task_name)
-    return tasks
+    if not valid_results_found:
+        return None
+
+    # post-process the task data
+    task_type = task_data["task_type"]
+    task_domain = task_data["domain"]
+
+    if task_type in ["classification", "regression"]:
+        task_data = process_image_representation(task_data)
+    elif task_type == "detection":
+        if task_domain == "pathology":
+            task_data = process_detection_pathology(task_data)
+        elif (task_domain == "CT") | (task_domain == "MR"):
+            if task_name != "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams":
+                task_data = process_detection_radiology(task_data, task_name)
+
+    return task_data
 
 
 def extract_data(patch_neural_representation):
