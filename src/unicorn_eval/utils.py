@@ -33,6 +33,7 @@ from unicorn_eval.adaptors import (
     SegmentationUpsampling3D,
     WeightedKNN,
     WeightedKNNRegressor,
+    ScanLevelNoduleDetector
 )
 from unicorn_eval.metrics.dice import compute_dice_score
 from unicorn_eval.metrics.f1_score import compute_f1
@@ -301,6 +302,28 @@ def adapt_features(
             num_epochs=50,
             lr=0.001,
         )
+
+    elif adaptor_name == "scanLevelnoduledetector":
+        adaptor = ScanLevelNoduleDetector(
+            shot_features=shot_features,
+            shot_coordinates=shot_coordinates,
+            shot_ids=shot_names,
+            shot_labels=shot_labels,
+            test_features=test_features,
+            test_coordinates=test_coordinates,
+            test_ids=test_names,
+            test_image_origins=test_image_origins,
+            test_image_spacings=test_image_spacing,
+            test_image_directions=test_image_directions,
+            shot_image_origins=shot_image_origins,
+            shot_image_spacings=shot_image_spacing,
+            shot_image_directions=shot_image_directions,
+            patch_size=patch_size,
+            num_queries=5,
+            num_epochs=10,
+            lr=1e-4,
+        )
+    
 
     elif adaptor_name == "density-map":
         adaptor = DensityMap(

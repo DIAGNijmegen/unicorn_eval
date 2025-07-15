@@ -17,6 +17,7 @@ import scipy.ndimage as ndimage
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import torch.nn.functional as F 
 from scipy.ndimage import filters, gaussian_filter
 from torch.utils.data import DataLoader, Dataset
 from torch.utils.data._utils.collate import default_collate
@@ -603,3 +604,387 @@ class PatchNoduleRegressor(PatchLevelTaskAdaptor):
         )
 
         return preds
+
+class ScanLevelNoduleDetector(PatchLevelTaskAdaptor):
+    """
+    Few-shot 3D scan-level nodule detector using light class-token interaction.
+    - **Query-based detection**  
+  Instead of sliding windows or fully convolutional heads, we allocate a fixed number (`num_queries`) of “query tokens” (via `nn.Embedding`).  Each token learns to attend to one nodule, enabling variable‐count predictions by ranking token confidences.
+
+- **Optional MLP on query tokens**  
+  You can toggle an extra two-layer MLP (`use_mlp`) on the class embeddings.  If your base features are highly expressive, turning it off saves compute; if you need more capacity, it adds non-linear transform before matching to the feature volume.
+
+- **Sparse 3D volume construction**  
+  `_build_feature_volume` takes an unordered list of patch embeddings + their real-world centers and scatters them into a compact dense tensor of shape `[1, C, D, H, W]`.  It 
+  1. normalizes world-space coords to `[0,1]`,  
+  2. scales to a user-defined `max_dim`,  
+  3. floors to integer grid indices (collapsing zero-range dims),  
+  4. and places each patch’s feature vector at its voxel.  
+  This lets the decoder head operate on a fixed-shape input regardless of case complexity.
+
+- **Grid ↔ world coordinate mapping**  
+  `_grid_to_world_coordinate` inverts the above scatter, converting an integer voxel index back to its approximate real-world center.  This is used both for debug prints and for final world-space outputs.
+
+- **Ground-truth mask generation**  
+  `_build_gt_mask` creates a soft 3D “heatmap” of where nodules lie.  Patches closest to any GT center get intensity 1.0, with an exponential fall-off to neighbors.  This mask drives a proximity-weighted focal + Dice + count-regression loss that strongly emphasizes near-GT voxels.
+
+- **Training loop (`fit`)**  
+  - **Few-shot per-case episodes**: each “epoch” iterates over one case’s patches.  
+  - **Count-regression**: besides voxel-level losses, we predict how many nodules are present (by thresholding each query’s max confidence) and penalize deviation from the true count.  
+  - **Plateau LR scheduler**: uses `ReduceLROnPlateau` on the case loss so the learning rate only decays when the model truly stalls.  
+  - **Early stopping** after 10 non-improving iterations prevents overfitting on hard cases.
+
+- **Inference (`predict`)**  
+  1. Reconstruct feature volume.  
+  2. Dot-product each query token with the volume to produce a stack of probability masks.  
+  3. Estimate the number of nodules by counting how many queries exceed a confidence threshold.  
+  4. Select only the top-`pred_count` queries, find local maxima in each mask, and convert those voxel indices back to real-world coordinates.  
+  5. **Hard cap of 7 detections** per scan by ranking all candidates by confidence and discarding the rest.  
+  6. Print a final list of `(case_id, x, y, z, confidence)` for downstream evaluation.
+
+
+    """
+    class NoduleClassDecoder(nn.Module):
+        def __init__(self, n_queries, feature_size, use_mlp=False):
+            super().__init__()  # initialize base nn.Module
+            self.use_mlp = use_mlp  # store whether to use MLP on class embeddings
+            self.class_embeddings = nn.Embedding(n_queries, feature_size)  # embedding for each query token
+            self.image_post_mapping = nn.Identity()  # identity mapping placeholder
+            if use_mlp:
+                # define a small MLP for class embeddings if requested
+                self.mlp = nn.Sequential(
+                    nn.Linear(feature_size, feature_size),  # linear layer
+                    nn.GELU(),  # nonlinearity
+                    nn.Linear(feature_size, feature_size),  # linear layer
+                )
+        def forward(self, src, class_vector):
+            b, c, d, h, w = src.shape  # batch, channels, depth, height, width
+            src = self.image_post_mapping(src)  # apply post mapping
+            class_embedding = self.class_embeddings(class_vector)  # lookup embeddings
+            if self.use_mlp:
+                class_embedding = self.mlp(class_embedding)  # optionally transform embeddings
+            masks = []  # list to collect per-batch masks
+            for i in range(b):
+                feat_flat = src[i].view(c, -1)  # flatten spatial dims
+                mask = (class_embedding @ feat_flat).view(-1, d, h, w)  # compute dot product then reshape
+                masks.append(mask)  # append mask for this batch item
+            return torch.stack(masks, dim=0), class_embedding  # return stacked masks and embeddings
+
+    def __init__(
+        self,
+        shot_features, shot_coordinates, shot_ids, shot_labels,
+        test_features, test_coordinates, test_ids,
+        test_image_origins, test_image_spacings, test_image_directions,
+        shot_image_origins, shot_image_spacings, shot_image_directions,
+        patch_size, num_queries=7, use_mlp=True, num_epochs=50, lr=1e-4,
+    ):
+        super().__init__(  # initialize parent adaptor
+            shot_features=shot_features,
+            shot_coordinates=shot_coordinates,
+            shot_labels=shot_labels,
+            test_features=test_features,
+            test_coordinates=test_coordinates,
+            shot_extra_labels=None,
+        )
+        self.shot_ids = shot_ids  
+        self.test_ids = test_ids  
+        self.shot_image_origins = shot_image_origins  
+        self.shot_image_spacings = shot_image_spacings  
+        self.shot_image_directions = shot_image_directions  
+        self.test_image_origins = test_image_origins  
+        self.test_image_spacings = test_image_spacings  
+        self.test_image_directions = test_image_directions  
+        self.patch_size = patch_size  
+
+        # determine feature size from first non-empty shot_features
+        feature_size = next(
+            (case_feats[0].shape[0] for case_feats in shot_features if len(case_feats) > 0),
+            None
+        )
+        if feature_size is None or feature_size <= 0:
+            raise ValueError("Invalid or empty features; cannot determine feature size.")  # error if no features
+        self.feature_size = feature_size  # store feature size
+
+        self.num_queries = num_queries  # number of query slots
+        self.num_epochs = num_epochs  # training epochs
+        self.lr = lr  # learning rate
+
+        # instantiate the decoder model
+        self.model = self.NoduleClassDecoder(
+            n_queries=self.num_queries,
+            feature_size=self.feature_size,
+            use_mlp=use_mlp,
+        )
+
+    def _build_feature_volume(self, feats, world_coords, max_dim=64):
+        if len(feats) == 0 or len(world_coords) == 0:
+            raise ValueError("Cannot build feature volume: empty inputs.")
+        DEBUG_PATCH_IDX = 3  # <— change this to the patch index you want to inspect
+        world_coords = np.array(world_coords)
+        feats = np.array(feats)
+        if feats.ndim > 2:
+            feats = feats.reshape(len(feats), -1)
+        if feats.shape[1] != self.feature_size:
+            raise ValueError(f"Feature dimension mismatch: expected {self.feature_size}, got {feats.shape[1]}")
+        mins = world_coords.min(axis=0)
+        maxs = world_coords.max(axis=0)
+        ranges = maxs - mins
+        scale_factor = max_dim / ranges.max() if ranges.max() > 0 else 1.0
+        dims = np.ceil(ranges * scale_factor).astype(int)
+        dims = np.minimum(np.maximum(dims, 1), max_dim)
+        dims[ranges == 0] = 1
+        grid = np.zeros((self.feature_size, dims[2], dims[1], dims[0]), dtype=np.float32)
+        for i, (feat, wc) in enumerate(zip(feats, world_coords)):
+            normalized = np.where(ranges == 0, 0.5, (wc - mins) / ranges)
+            coord = np.clip((normalized * (dims - 1)).astype(int), 0, dims - 1)
+            x, y, z = coord
+            grid[:, z, y, x] = feat
+            # ------ DEBUG BLOCK ------
+            if i == DEBUG_PATCH_IDX:
+                # back-project the voxel center to world coords
+                wc_back = self._grid_to_world_coordinate(coord, mins, ranges, dims)
+                print(f"[DEBUG] Patch {i} — original wc: {wc}, grid_idx: {coord}, back-projected wc_back: {wc_back}")
+            # -------------------------
+        return torch.from_numpy(grid).unsqueeze(0), dims, mins, ranges
+
+    @torch.no_grad()
+    def predict(self) -> np.ndarray:
+        print("\n==== Inference ====")  # inference header
+        self.model.eval()  # set eval mode
+        predictions = []  # list to collect predictions
+
+        for features_case, coords_case, case_id in zip(
+            self.test_features, self.test_coordinates, self.test_ids
+        ):
+            print(f"\n[TEST] Case ID: {case_id}")  # case ID
+
+            try:
+                feat_vol, dims, coord_mins, coord_ranges = self._build_feature_volume(
+                    features_case, coords_case
+                )
+            except ValueError:
+                continue  # skip if volume build fails
+
+            masks, _ = self.model(feat_vol, torch.arange(self.num_queries))  # get raw masks
+            masks = torch.sigmoid(masks).squeeze(0)  # to probabilities
+
+            # Predict number of nodules by counting queries above confidence threshold
+            flat = masks.view(self.num_queries, -1)  # flatten spatial dims
+            confidences = flat.max(dim=1).values  # max score per query
+            pred_count = int((confidences > 0.5).sum().item())  # threshold at 0.5
+            pred_count = max(1, min(pred_count, self.num_queries))  # clamp to [1, num_queries]
+            top_queries = confidences.topk(pred_count).indices.tolist()  # select top queries
+            print(f"     - Predicted nodule count: {pred_count}, using queries {top_queries}")
+
+            # Detect peaks for each selected query
+            for i in top_queries:
+                mask = masks[i]
+                thr = 0.15
+                if mask.max().item() < thr:
+                    continue
+
+                from scipy.ndimage import maximum_filter, label as sp_label, center_of_mass
+                mask_np = mask.cpu().numpy()
+                local_max = (mask_np == maximum_filter(mask_np, size=3)) & (mask_np > thr)
+                labels, num = sp_label(local_max)
+
+                for lid in range(1, num + 1):
+                    coords = np.where(labels == lid)
+                    if not coords[0].size:
+                        continue
+                    component = (labels == lid)
+                    masked = mask_np * component
+                    flat_idx = masked.argmax()
+                    zc, yc, xc = np.unravel_index(flat_idx, masked.shape)
+                    world = self._grid_to_world_coordinate([xc, yc, zc], coord_mins, coord_ranges, dims)
+
+                    # 2) snap to the nearest original patch center
+                    orig = np.array(coords_case)                        # shape [N,3]
+                    world = np.array(world)                             # convert to numpy array
+                    dists = np.linalg.norm(orig - world[None,:], axis=1)
+                    best = orig[dists.argmin()]                         # one of your input coords
+
+                    # 3) store that instead
+                    conf  = mask[int(zc), int(yc), int(xc)].item()
+                    predictions.append([case_id, *best.tolist(), conf])
+
+            # --- limit to top 7 by confidence for this case ---
+            case_preds = [p for p in predictions if p[0] == case_id]
+            if len(case_preds) > 7:
+                # sort by confidence (element 4) descending
+                sorted_case = sorted(case_preds, key=lambda x: x[4], reverse=True)
+                top7 = set(tuple(x) for x in sorted_case[:7])
+                # keep only top7 for this case
+                predictions = [p for p in predictions
+                               if not (p[0] == case_id and tuple(p) not in top7)]
+            # -------------------------------------------------------
+
+            print(
+                f"     - Total detections for case {case_id}: "
+                f"{len([p for p in predictions if p[0] == case_id])}"
+            )  # per-case count
+
+        if predictions:  # summary if any
+            case_counts = {}
+            for pred in predictions:
+                cid = pred[0]
+                case_counts[cid] = case_counts.get(cid, 0) + 1
+            print(f"\n==== Detection Summary ====")
+            print(f"Predictions per case: {case_counts}")
+            print(f"Total detections: {sum(case_counts.values())}")
+        else:
+            print("No predictions made for any case.")
+
+        # print all final predictions
+        print("\n==== Final raw prediction coordinates (case_id, x, y, z, conf) ====")
+        for row in predictions:
+            print(row)
+
+        return np.array(predictions, dtype=object)
+    def _build_gt_mask(self, dims, patch_world_coords, nodule_list, coord_mins, coord_ranges, case_id):
+        mask = torch.zeros(dims[2], dims[1], dims[0])  # init GT mask
+        if not nodule_list:
+            return mask  # empty if no nodules
+        nloc = np.array(nodule_list)  # array of GT coords
+        for pwc in patch_world_coords:  # for each patch
+            normalized = np.where(coord_ranges == 0, 0.5, (pwc - coord_mins) / coord_ranges)  # normalize
+            gx, gy, gz = np.clip((normalized * (dims - 1)).astype(int), 0, dims - 1)  # grid idx
+            dists = np.linalg.norm(nloc - pwc, axis=1)  # distances to nodules
+            weight = np.exp(-(dists.min()**2) / (40.0**2))  # falloff weight
+            mask[gz, gy, gx] = max(mask[gz, gy, gx], weight)  # assign max weight
+        return mask  # return GT mask
+
+    def _grid_to_world_coordinate(self, grid_idx, coord_mins, coord_ranges, dims):
+        """
+        Convert a grid index [x, y, z] back to world coordinates (mm),
+        handling collapsed dimensions where coord_ranges == 0.
+        """
+        grid_idx = np.array(grid_idx)                            # to array
+        normalized = grid_idx / (dims - 1)                        # back to [0,1]
+        # if a dimension was collapsed (range==0), just use the original min
+        world = np.where(
+            coord_ranges == 0,
+            coord_mins,
+            coord_mins + normalized * coord_ranges
+        )
+        return world.tolist()
+
+    def fit(self):
+        print("==== Few-Shot Training ====")  # training header
+        self.model.train()  # set train mode
+
+        # use a smaller initial LR
+        optimizer = optim.Adam(self.model.parameters(), lr=self.lr * 0.3)
+
+        # switch to a plateau-based LR scheduler
+        scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+            optimizer,
+            mode="min",        # we want to minimize the loss
+            factor=0.5,        # LR ← LR * 0.5 when triggered
+            patience=5,        # wait 5 epochs of no improvement
+            min_lr=1e-6        # floor on LR
+        )
+
+        first = False  # flag for one-time verification print
+
+        for feats_case, coords_case, labels_case, case_id in zip(
+            self.shot_features, self.shot_coordinates, self.shot_labels, self.shot_ids
+        ):
+            print(f"\n[SHOT] Case ID: {case_id}")  # case being trained
+
+            feat_vol, dims, coord_mins, coord_ranges = self._build_feature_volume(feats_case, coords_case)
+
+            if not first and labels_case:
+                # verify mapping once at the start
+                self._print_patch_coordinate_verification(
+                    coords_case, labels_case, case_id, coord_mins, coord_ranges, dims
+                )
+                first = True
+
+            gt_mask = self._build_gt_mask(dims, coords_case, labels_case, coord_mins, coord_ranges, case_id)
+            gt_mask = gt_mask.unsqueeze(0).repeat(self.num_queries, 1, 1, 1)  # repeat for each query
+
+            best_loss = float('inf')
+            stale = 0
+            true_count = len(labels_case)
+
+            for epoch in range(self.num_epochs):
+                optimizer.zero_grad()  # clear grads
+                out_logits, _ = self.model(feat_vol, torch.arange(self.num_queries))  # forward pass
+                loss, stats = self._improved_loss_function(out_logits.squeeze(0), gt_mask, true_count)
+                loss.backward()  # backpropagate
+                torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)  # clip grads
+                optimizer.step()  # optimizer step
+
+                # let the scheduler observe the loss for plateau detection
+                scheduler.step(loss)
+
+                # track best loss for early stopping
+                current = loss.item()
+                if current < best_loss:
+                    best_loss = current
+                    stale = 0
+                else:
+                    stale += 1
+
+                # periodic logging with current LR
+                if epoch % 5 == 0 or epoch == self.num_epochs - 1:
+                    lr = optimizer.param_groups[0]['lr']
+                    print(
+                        f"     - Case {case_id}, Epoch {epoch+1}/{self.num_epochs}: "
+                        f"Loss={current:.6f}, LR={lr:.1e}"
+                    )
+
+                if stale >= 10:
+                    print(f"     - Early stopping at epoch {epoch+1} (no improvement for 10 epochs)")
+                    break
+
+    def _print_patch_coordinate_verification(self, coords_case, labels_case, case_id, coord_mins, coord_ranges, dims):
+        """
+        Print patch coordinates that contain ground truth nodules for verification.
+        This shows the mapping after aggregation step to verify correctness.
+        """
+        print(f"\n==== Patch Coordinate Verification for Case {case_id} ====")  # header
+        print(f"Grid dimensions: {dims}")  # dims
+        print(f"Coordinate mins: {coord_mins}")  # mins
+        print(f"Coordinate ranges: {coord_ranges}")  # ranges
+
+    def _create_diverse_class_embeddings(self):
+        nn.init.xavier_uniform_(self.model.class_embeddings.weight)  # init embeddings
+        with torch.no_grad():
+            self.model.class_embeddings.weight += torch.randn_like(self.model.class_embeddings.weight) * 0.01  # add noise
+
+    def _improved_loss_function(self, pred_logits, gt_mask, true_count):
+        """
+        Improved loss function with focal + dice loss and count regularization.
+        """
+        pred_probs = torch.sigmoid(pred_logits)  # to probabilities
+        # boost focus on near-GT voxels even more
+        proximity = 1.0 + 4.0 * gt_mask  # up to 5× weight on closest patches
+        ce = F.binary_cross_entropy(pred_probs, gt_mask, reduction='none')  # per-voxel CE
+        p_t = pred_probs * gt_mask + (1 - pred_probs) * (1 - gt_mask)  # for focal
+        alpha_t = 0.25 * gt_mask + 0.75 * (1 - gt_mask)  # class weights
+        focal = alpha_t * (1 - p_t) ** 2 * ce  # focal loss
+        weighted_focal = (focal * proximity).mean()  # apply proximity
+
+        # dice loss
+        inter = (pred_probs * gt_mask * proximity).sum()
+        dice = 1 - (2 * inter + 1) / ((pred_probs * proximity).sum() + (gt_mask * proximity).sum() + 1)
+
+        # count regularization: count predicted queries above 0.5
+        confidences = pred_probs.view(self.num_queries, -1).max(dim=1).values  # max per query
+        pred_count = (confidences > 0.5).float().sum()  # predicted nodule count
+        count_loss = F.mse_loss(pred_count, torch.tensor(float(true_count), device=pred_probs.device))  # MSE vs true
+
+        total = weighted_focal + 0.3 * dice + 0.1 * count_loss  # combine with small weight on count
+
+        # compute some stats
+        high_acc = ((pred_probs > 0.5) == (gt_mask > 0.5))[gt_mask > 0.8].float().mean() if (gt_mask > 0.8).any() else 0.0
+
+        return total, {
+            'focal_loss': weighted_focal.item(),  # focal component
+            'dice_loss': dice.item(),  # dice component
+            'count_loss': count_loss.item(),  # count reg component
+            'pos_ratio': (gt_mask > 0).float().mean().item(),  # fraction positive
+            'high_priority_acc': high_acc.item() if isinstance(high_acc, torch.Tensor) else high_acc,  # high-priority accuracy
+        }
