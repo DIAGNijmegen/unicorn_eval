@@ -462,7 +462,7 @@ def evaluate_predictions(
         task_name
         == "Task05_detecting_signet_ring_cells_in_he_stained_wsi_of_gastric_cancer"
     ):
-        metric_value = metric_fn(test_labels, test_predictions, 8)
+        metric_value = metric_fn(test_labels, test_predictions, 20) # Data at 0.5um/px, 10um distance
         metric_dict[metric_name] = metric_value
     elif (
         task_name
@@ -476,7 +476,7 @@ def evaluate_predictions(
         )
         metric_dict[metric_name] = metric_value
     elif task_name == "Task08_detecting_mitotic_figures_in_breast_cancer_wsis":
-        metric_value = metric_fn(test_labels, test_predictions, 16)
+        metric_value = metric_fn(test_labels, test_predictions, 30) # Data at 0.25um/px, 7.5um distance
         metric_dict[metric_name] = metric_value
     elif task_name == "Task09_segmenting_rois_in_breast_cancer_wsis":
         metric_value = metric_fn(test_labels, test_predictions)
