@@ -223,7 +223,9 @@ def assign_cells_to_patches(cell_data, patch_coordinates, patch_size):
     return patch_cell_map
 
 
-def coordinates_to_heatmap(cell_coords, patch_size=224, heatmap_size=16, sigma=1.0):
+def coordinates_to_heatmap(
+    cell_coords, patch_size=224, heatmap_size=16, sigma: float | None = 1.0
+):
     """Convert local cell coordinates into density heatmap."""
     heatmap = np.zeros((heatmap_size, heatmap_size), dtype=np.float32)
     scale = heatmap_size / patch_size
@@ -234,8 +236,9 @@ def coordinates_to_heatmap(cell_coords, patch_size=224, heatmap_size=16, sigma=1
         hm_x, hm_y = np.clip([hm_x, hm_y], 0, heatmap_size - 1)
         heatmap[hm_y, hm_x] += 1.0
 
-    # ensure the output remains float32
-    heatmap = gaussian_filter(heatmap, sigma=sigma).astype(np.float32)
+    if sigma is not None:
+        # ensure the output remains float32
+        heatmap = gaussian_filter(heatmap, sigma=sigma).astype(np.float32)
     return heatmap
 
 
@@ -365,6 +368,128 @@ class DensityMap(PatchLevelTaskAdaptor):
         )
 
         return predicted_points
+
+
+class ConvStack(nn.Module):
+    def __init__(self, channels: int):
+        super().__init__()
+        self.channels = channels
+        self.conv = nn.Conv2d(
+            in_channels=channels,
+            out_channels=channels,
+            kernel_size=3,
+            stride=1,
+            padding=1,
+            padding_mode="replicate",
+        )
+        self.norm = nn.GroupNorm(num_groups=1, num_channels=channels)
+        self.activation = nn.GELU()
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = self.norm(x)
+        x = self.activation(x)
+        x = self.conv(x)
+        return x
+
+
+class ConvDetectionDecoder(nn.Module):
+
+    def __init__(self, input_dim_flat: int, heatmap_size: int):
+        super().__init__()
+        self.heatmap_size = heatmap_size
+        output_size = heatmap_size * heatmap_size
+        self.spatial_dim = input_dim_flat // (heatmap_size**2)
+        print(f"{self.spatial_dim=}, {output_size=}")
+        self.convs = nn.ModuleList(
+            [ConvStack(channels=self.spatial_dim) for _ in range(2)]
+        )
+        self.conv1x1 = nn.Conv2d(
+            in_channels=self.spatial_dim,
+            out_channels=1,
+            kernel_size=1,
+        )
+
+    def forward(self, x, for_inference: bool = True):
+        out = x.view(-1, self.spatial_dim, self.heatmap_size, self.heatmap_size)
+        for conv in self.convs:
+            out = conv(out)
+        logits = self.conv1x1(out).squeeze(1)  # [B, H, W]
+        if for_inference:
+            return logits.sigmoid()
+        else:
+            return logits
+
+
+class ConvDetector(DensityMap):
+    def __init__(
+        self,
+        shot_features,
+        shot_labels,
+        shot_coordinates,
+        shot_names,
+        test_features,
+        test_coordinates,
+        test_names,
+        patch_size: int,
+    ):
+        assert patch_size == 224
+        heatmap_size = 32
+        num_epochs = 200
+        learning_rate = 0.00001
+        super().__init__(
+            shot_features,
+            shot_labels,
+            shot_coordinates,
+            shot_names,
+            test_features,
+            test_coordinates,
+            test_names,
+            patch_size,
+            heatmap_size,
+            num_epochs,
+            learning_rate,
+        )
+
+    def fit(self):
+        input_dim = self.shot_features[0].shape[1]
+
+        shot_data = construct_detection_labels(
+            self.shot_coordinates,
+            self.shot_features,
+            self.shot_names,
+            labels=self.shot_labels,
+            patch_size=self.patch_size,
+            heatmap_size=self.heatmap_size,
+            sigma=None,  # Scale heatmap values to [0, 1] for better training stability with BCEWithLogitsLoss
+        )
+
+        dataset = DetectionDataset(preprocessed_data=shot_data)
+        dataloader = DataLoader(
+            dataset, batch_size=32, shuffle=True, collate_fn=custom_collate
+        )
+
+        self.decoder = ConvDetectionDecoder(
+            input_dim_flat=input_dim, heatmap_size=self.heatmap_size
+        ).to(device := torch.device("cuda" if torch.cuda.is_available() else "cpu"))
+
+        optimizer = optim.Adam(self.decoder.parameters(), lr=self.learning_rate)
+        loss_fn = nn.BCEWithLogitsLoss()
+
+        for epoch in range(self.num_epochs):
+            total_loss = 0
+            for patch_emb, target_heatmap, patch_coordinates, case in dataloader:
+                patch_emb = patch_emb.to(device)
+                target_heatmap = target_heatmap.to(device)
+                optimizer.zero_grad()
+                pred_heatmap = self.decoder(patch_emb, for_inference=False)
+
+                loss = loss_fn(pred_heatmap, target_heatmap)
+                loss.backward()
+                optimizer.step()
+
+                total_loss += loss.item()
+
+            print(f"Epoch {epoch+1}, Loss: {total_loss / len(dataloader)}")
 
 
 class TwoLayerPerceptron(nn.Module):

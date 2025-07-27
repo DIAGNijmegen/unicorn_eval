@@ -22,6 +22,7 @@ from sksurv.metrics import concordance_index_censored
 from unicorn_eval.adaptors import (
     KNN,
     DensityMap,
+    ConvDetector,
     KNNRegressor,
     LinearProbing,
     LinearProbingRegressor,
@@ -313,6 +314,18 @@ def adapt_features(
             test_names=test_names,
             patch_size=patch_size[0],
             heatmap_size=16,
+        )
+
+    elif adaptor_name == "conv-detector":
+        adaptor = ConvDetector(
+            shot_features=shot_features,
+            shot_labels=shot_labels,
+            shot_coordinates=shot_coordinates,
+            shot_names=shot_names,
+            test_features=test_features,
+            test_coordinates=test_coordinates,
+            test_names=test_names,
+            patch_size=patch_size[0]
         )
 
     elif adaptor_name == "segmentation-upsampling":
