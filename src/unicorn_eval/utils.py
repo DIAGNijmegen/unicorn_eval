@@ -325,7 +325,7 @@ def adapt_features(
             test_features=test_features,
             test_coordinates=test_coordinates,
             test_names=test_names,
-            patch_size=patch_size[0]
+            patch_sizes=patch_size,
         )
 
     elif adaptor_name == "segmentation-upsampling":

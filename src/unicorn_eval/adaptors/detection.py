@@ -399,7 +399,7 @@ class ConvDetectionDecoder(nn.Module):
         self.heatmap_size = heatmap_size
         output_size = heatmap_size * heatmap_size
         self.spatial_dim = input_dim_flat // (heatmap_size**2)
-        print(f"{self.spatial_dim=}, {output_size=}")
+        print(f"{self.spatial_dim=}, {output_size=}, {heatmap_size=}")
         self.convs = nn.ModuleList(
             [ConvStack(channels=self.spatial_dim) for _ in range(2)]
         )
@@ -421,6 +421,7 @@ class ConvDetectionDecoder(nn.Module):
 
 
 class ConvDetector(DensityMap):
+
     def __init__(
         self,
         shot_features,
@@ -430,10 +431,11 @@ class ConvDetector(DensityMap):
         test_features,
         test_coordinates,
         test_names,
-        patch_size: int,
+        patch_sizes: list[int],
     ):
-        assert patch_size == 224
-        heatmap_size = 32
+        heatmap_size = 16 if len(patch_sizes) <= 2 else patch_sizes[2]
+        assert patch_sizes[0] == patch_sizes[1], f"{patch_sizes[:2]=} must be square."
+        assert patch_sizes[0] % heatmap_size == 0, f"{patch_sizes=} should be divisable by {heatmap_size=}"
         num_epochs = 200
         learning_rate = 0.00001
         super().__init__(
@@ -444,7 +446,7 @@ class ConvDetector(DensityMap):
             test_features,
             test_coordinates,
             test_names,
-            patch_size,
+            patch_sizes[0],
             heatmap_size,
             num_epochs,
             learning_rate,
