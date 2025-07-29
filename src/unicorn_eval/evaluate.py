@@ -189,8 +189,7 @@ def process(job):
 
     mapping_path = GROUNDTRUTH_DIRECTORY / "mapping.csv"
     try:
-        mapping = pd.read_csv(mapping_path)
-        mapping.case_id = mapping.case_id.astype("str")
+        mapping = pd.read_csv(mapping_path, dtype={"case_id": str})  # ensure case_id is string to enable leading zeros
     except FileNotFoundError:
         # if the mapping file is not found, we assume that the evaluation is for a language task
         # and we do not need the mapping
@@ -601,8 +600,7 @@ def group_predictions_by_task(predictions):
     # we need to look at the mapping.csv to determine which task each prediction belongs to
     mapping_path = GROUNDTRUTH_DIRECTORY / "mapping.csv"
     try:
-        mapping = pd.read_csv(mapping_path)
-        mapping.case_id = mapping.case_id.astype("str")
+        mapping = pd.read_csv(mapping_path, dtype={"case_id": str})  # ensure case_id is string to enable leading zeros
     except FileNotFoundError:
         # if the mapping file is not found, we assume that the evaluation is for a language task
         print(f"{mapping_path} not found, cannot group by task.")
