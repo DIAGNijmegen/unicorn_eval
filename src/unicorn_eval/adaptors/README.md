@@ -27,6 +27,7 @@ Below are the approved adaptors for each task type.
 ### 🧩 Adaptor Pathology Detection
 
 - `density-map`
+- `conv-detector` contributed by [MEVIS-M3](https://unicorn.grand-challenge.org/teams/4756/)
 
 ---
 
