@@ -398,6 +398,7 @@ class ConvDetectionDecoder(nn.Module):
         super().__init__()
         self.heatmap_size = heatmap_size
         output_size = heatmap_size * heatmap_size
+        assert input_dim_flat % (heatmap_size**2) == 0, f"{input_dim_flat=} needs to be divisable by {heatmap_size**2=}"
         self.spatial_dim = input_dim_flat // (heatmap_size**2)
         print(f"{self.spatial_dim=}, {output_size=}, {heatmap_size=}")
         self.convs = nn.ModuleList(
