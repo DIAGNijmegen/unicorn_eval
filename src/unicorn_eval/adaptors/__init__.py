@@ -26,7 +26,7 @@ from unicorn_eval.adaptors.regression import (
     MultiLayerPerceptronRegressor,
 )
 
-from unicorn_eval.adaptors.detection import DensityMap, PatchNoduleRegressor
+from unicorn_eval.adaptors.detection import DensityMap, ConvDetector, PatchNoduleRegressor
 from unicorn_eval.adaptors.segmentation import (
     SegmentationUpsampling,
     SegmentationUpsampling3D,
@@ -43,6 +43,7 @@ __all__ = [
     "LinearProbingRegressor",
     "MultiLayerPerceptronRegressor",
     "DensityMap",
+    "ConvDetector",
     "PatchNoduleRegressor",
     "SegmentationUpsampling",
     "SegmentationUpsampling3D",
