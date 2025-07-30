@@ -86,7 +86,7 @@ case_id,task_name,task_type,domain,modality,split
 * [`tests/task-1/ground-truth/Task01_classifying_he_prostate_biopsies_into_isup_scores/0403dcc49b1420545299f692f7d8e270/isup-grade.json`](task-1/ground-truth/Task01_classifying_he_prostate_biopsies_into_isup_scores/0403dcc49b1420545299f692f7d8e270/isup-grade.json)
 
 
-## 3. Running the Evaluation Locally
+## 4. Running the Evaluation Locally
 - Obtain the neural representation `JSON` files by either:
   - Using the [task 1 examples from this repo](task-1/input)  **or**
   - Downloading them from Grand Challenge when navigating to `Submit` -> `Submissions` -> your algorithm run -> `Result` or navigate to your algorithm page -> `Results` after running your algorithm on the leaderboard, **or**
