@@ -25,7 +25,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from monai.data import DataLoader as dataloader_monai
 from monai.data import Dataset as dataset_monai
-from monai.losses import DiceLoss
+from monai.losses.dice import DiceLoss, DiceFocalLoss, one_hot
 from monai.networks.blocks.upsample import UpSample
 from monai.networks.layers.factories import Act, Conv, Norm, split_args
 from monai.networks.layers.utils import get_act_layer, get_norm_layer
@@ -427,9 +427,11 @@ class Decoder3D(nn.Module):
         return self.decoder(x)
 
 
-def train_decoder3d(decoder, data_loader, device, num_epochs = 3):
-    loss_fn = DiceLoss(sigmoid=True)
-    optimizer = optim.Adam(decoder.parameters(), lr=1e-3)
+def train_decoder3d(decoder, data_loader, device, num_epochs=3, loss_fn=None, optimizer=None, label_mapper=None):
+    if loss_fn is None:
+        loss_fn = DiceLoss(sigmoid=True)
+    if optimizer is None:
+        optimizer = optim.Adam(decoder.parameters(), lr=1e-3)
     # Train decoder
     for epoch in range(num_epochs):
         decoder.train()
@@ -440,7 +442,10 @@ def train_decoder3d(decoder, data_loader, device, num_epochs = 3):
             iteration_count += 1
 
             patch_emb = batch["patch"].to(device)
-            patch_label = batch["patch_label"].to(device)
+            patch_label = batch["patch_label"]
+            if label_mapper is not None:
+                patch_label = label_mapper(patch_label)
+            patch_label = patch_label.to(device)
 
             optimizer.zero_grad()
             de_output = decoder(patch_emb)
@@ -453,8 +458,8 @@ def train_decoder3d(decoder, data_loader, device, num_epochs = 3):
 
         print(f"Avg total epoch loss = {epoch_loss / iteration_count:.4f}")
 
-
     return decoder
+
 
 def world_to_voxel(coord, origin, spacing, inv_direction):
     relative = np.array(coord) - origin
@@ -515,7 +520,18 @@ def create_grid(decoded_patches):
     return grids
 
 
-def inference3d(decoder, data_loader, device, return_binary,  test_cases, test_label_sizes, test_label_spacing, test_label_origins, test_label_directions):
+def inference3d(
+    decoder,
+    data_loader,
+    device,
+    return_binary,
+    test_cases,
+    test_label_sizes,
+    test_label_spacing,
+    test_label_origins,
+    test_label_directions,
+    inference_postprocessor=None,
+):
     decoder.eval()
     with torch.no_grad():
         grouped_predictions = defaultdict(lambda: defaultdict(list))
@@ -526,11 +542,14 @@ def inference3d(decoder, data_loader, device, return_binary,  test_cases, test_l
             image_idxs = batch["case_number"]
 
             outputs = decoder(inputs)  # shape: [B, ...]
-            probs = torch.sigmoid(outputs)
-            if return_binary:
-                pred_mask = (probs > 0.5).float()
+            if inference_postprocessor is not None:
+                pred_mask = inference_postprocessor(outputs)
             else:
-                pred_mask = probs
+                probs = torch.sigmoid(outputs)
+                if return_binary:
+                    pred_mask = (probs > 0.5).float()
+                else:
+                    pred_mask = probs
 
             batch["image_origin"] = batch["image_origin"][0]
             batch["image_spacing"] = batch["image_spacing"][0]
@@ -1083,3 +1102,142 @@ class VectorToTensor(nn.Module):
         x = self.fc(x)
         x = x.view(x.size(0), *self.target_shape)
         return x
+
+
+class ConvDecoder3D(nn.Module):
+    def __init__(
+        self,
+        patch_size: tuple[int, int, int],
+        target_shape: tuple[int, int, int, int],
+        num_classes: int,
+    ):
+        super().__init__()
+        self.patch_size = patch_size
+        self.num_classes, self.num_channels, self.spatials = num_classes, target_shape[0], target_shape[1:]
+        print(f"SimpleDecoder: {self.num_classes=}, {self.num_channels=}, {self.spatials=}")
+        self.emb_norm = nn.GroupNorm(1, self.num_channels)
+        self.emb_activation = nn.GELU()
+        self.ctx_stacks = nn.ModuleList(
+            [
+                nn.Sequential(
+                    nn.Conv3d(
+                        in_channels=self.num_channels,
+                        out_channels=self.num_channels,
+                        kernel_size=3,
+                        padding=1,
+                        padding_mode="replicate",
+                    ),
+                    nn.GroupNorm(1, self.num_channels),
+                    nn.GELU(),
+                )
+                for _ in range(2)
+            ]
+        )
+        self.clf_conv = nn.Conv3d(self.num_channels, self.num_classes, kernel_size=1)
+
+    def forward(self, x):
+        x = x.view(batchsize := x.shape[0], self.num_channels, *self.spatials)
+        x = self.emb_norm(x)
+        x = self.emb_activation(x)
+        # Do all processing in low resolution
+        for stack in self.ctx_stacks:
+            x = stack(x)
+        x = self.clf_conv(x)
+        # After processing, convert the patch into full resolution
+        x = F.interpolate(x, size=self.patch_size[::-1], mode="nearest-exact")
+        return x
+
+
+class ConvSegmentation3D(SegmentationUpsampling3D):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # First three components are the original patchsize, next three are the resolution within the patch
+        # If no pack size is given, use (1, 1, 1) to be compatible with sparse models
+        self.pack_size = self.patch_size[3:] if len(self.patch_size) > 3 else (1, 1, 1)
+        self.patch_size = self.patch_size[:3]
+
+    def gt_to_multiclass(self, gt: torch.Tensor) -> torch.Tensor:
+        if self.is_task11:  # Fix Task11 instance segmentation masks using the logic from spider.py
+            res = torch.zeros_like(gt)
+            res[(gt > 0) & (gt < 100)] = 1
+            res[gt == 100] = 2
+            res[gt > 200] = 3
+            return res[:, None, ...]
+        else:
+            return gt[:, None, ...] > 0.5
+
+    def inference_postprocessor(self, model_outputs):
+        if not self.return_binary:  # return raw scores
+            assert self.num_classes == 2, f"Scores only implemented for binary segmentation"
+            return model_outputs.softmax(dim=1)[:, 1, ...].unsqueeze(1)  # return the positive class scores
+        else:  # return the predicted classes
+            return torch.argmax(model_outputs, dim=1).unsqueeze(1)  # later code will squeeze second dim
+
+    def fit(self):
+        # build training data and loader
+        train_data = construct_data_with_labels(
+            coordinates=self.shot_coordinates,
+            embeddings=self.shot_features,
+            cases=self.shot_names,
+            patch_size=self.patch_size,
+            labels=self.shot_labels,
+        )
+        train_loader = load_patch_data(train_data, batch_size=32)
+        # Channels are the remaining dimension before the spatial dimensions
+        z_dim, num_spatials = len(self.shot_features[0][0]), self.pack_size[0] * self.pack_size[1] * self.pack_size[2]
+        assert z_dim % num_spatials == 0, "Latent dimension must be divisible by spatials!"
+        # Task11 GT is encoded with instances in 3 classes. This adaptor can only predict the classes, not instances:
+        maxlabel = int(max([np.max(patch["features"]) for label in self.shot_labels for patch in label["patches"]]))
+        self.is_task11 = maxlabel >= 100
+        num_channels, self.num_classes = z_dim // num_spatials, 4 if self.is_task11 else 2
+        if self.num_classes != maxlabel + 1:
+            print(f"Warning: {self.num_classes=} != {maxlabel + 1=}, will use {self.num_classes} classes for training")
+        target_shape = (num_channels, *self.pack_size[::-1])
+
+        # set up device and model
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        decoder = ConvDecoder3D(
+            num_classes=self.num_classes,
+            patch_size=self.patch_size,
+            target_shape=target_shape,
+        )
+
+        loss = DiceFocalLoss(to_onehot_y=True, softmax=True)
+        optimizer = optim.AdamW(decoder.parameters(), lr=5e-4)
+        decoder.to(self.device)
+        self.decoder = train_decoder3d(
+            decoder,
+            train_loader,
+            self.device,
+            num_epochs=15,
+            loss_fn=loss,
+            optimizer=optimizer,
+            label_mapper=self.gt_to_multiclass,
+        )
+
+    def predict(self):  # Copied from SegmentationUpsampling3D to change activation
+        test_data = construct_data_with_labels(
+            coordinates=self.test_coordinates,
+            embeddings=self.test_features,
+            cases=self.test_cases,
+            patch_size=self.patch_size,
+            image_sizes=self.test_image_sizes,
+            image_origins=self.test_image_origins,
+            image_spacings=self.test_image_spacings,
+            image_directions=self.test_image_directions,
+        )
+
+        test_loader = load_patch_data(test_data, batch_size=10)
+        return inference3d(
+            self.decoder,
+            test_loader,
+            self.device,
+            self.return_binary,
+            self.test_cases,
+            self.test_label_sizes,
+            self.test_label_spacing,
+            self.test_label_origins,
+            self.test_label_directions,
+            inference_postprocessor=self.inference_postprocessor,  # overwrite original behaviour of applying sigmoid
+        )
