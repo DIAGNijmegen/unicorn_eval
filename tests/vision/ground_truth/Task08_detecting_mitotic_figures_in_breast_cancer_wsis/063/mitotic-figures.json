@@ -1,0 +1,42 @@
+{
+  "name": "Points of interest",
+  "type": "Multiple points",
+  "points": [
+    {
+      "name": "Point 1",
+      "point": [
+        2064.0,
+        1236.0,
+        0.5
+      ]
+    },
+    {
+      "name": "Point 2",
+      "point": [
+        958.0,
+        2344.0,
+        0.5
+      ]
+    },
+    {
+      "name": "Point 3",
+      "point": [
+        1772.0,
+        2778.0,
+        0.5
+      ]
+    },
+    {
+      "name": "Point 4",
+      "point": [
+        4660.0,
+        4190.0,
+        0.5
+      ]
+    }
+  ],
+  "version": {
+    "major": 1,
+    "minor": 0
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "Points of interest",
+  "type": "Multiple points",
+  "points": [],
+  "version": {
+    "major": 1,
+    "minor": 0
+  }
+}
