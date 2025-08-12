@@ -1006,5 +1006,131 @@
         }
       }
     ]
+  },
+  {
+    "pk": "case_radboud_0041",
+    "inputs": [
+      {
+        "image": {
+          "name": "case_radboud_0041.tif"
+        },
+        "interface": {
+          "slug": "prostatectomy-tissue-whole-slide-image"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "image-neural-representation",
+          "relative_path": "image-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "case_radboud_0055",
+    "inputs": [
+      {
+        "image": {
+          "name": "case_radboud_0055.tif"
+        },
+        "interface": {
+          "slug": "prostatectomy-tissue-whole-slide-image"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "image-neural-representation",
+          "relative_path": "image-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "case_radboud_0247",
+    "inputs": [
+      {
+        "image": {
+          "name": "case_radboud_0247.tif"
+        },
+        "interface": {
+          "slug": "prostatectomy-tissue-whole-slide-image"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "image-neural-representation",
+          "relative_path": "image-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "case_radboud_0492",
+    "inputs": [
+      {
+        "image": {
+          "name": "case_radboud_0492.tif"
+        },
+        "interface": {
+          "slug": "prostatectomy-tissue-whole-slide-image"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "image-neural-representation",
+          "relative_path": "image-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "case_radboud_0543",
+    "inputs": [
+      {
+        "image": {
+          "name": "case_radboud_0543.tif"
+        },
+        "interface": {
+          "slug": "prostatectomy-tissue-whole-slide-image"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "image-neural-representation",
+          "relative_path": "image-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "case_radboud_0594",
+    "inputs": [
+      {
+        "image": {
+          "name": "case_radboud_0594.tif"
+        },
+        "interface": {
+          "slug": "prostatectomy-tissue-whole-slide-image"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "image-neural-representation",
+          "relative_path": "image-neural-representation.json"
+        }
+      }
+    ]
   }
 ]
