@@ -19,8 +19,8 @@ jobs:
       - name: Verify required folders exist
         run: |
           set -euo pipefail
-          test -d tests/adaptors/image-level/input
-          test -d tests/adaptors/image-level/ground_truth
+          test -d tests/adaptors/input
+          test -d tests/adaptors/ground_truth
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
