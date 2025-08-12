@@ -45,6 +45,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
+          file: Dockerfile.lightweight
           push: false
           load: true
           tags: unicorn-eval:${{ github.sha }}
