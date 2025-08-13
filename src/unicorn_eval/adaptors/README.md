@@ -61,6 +61,7 @@ Below are the approved adaptors for each task type.
 
 - `segmentation-upsampling-3d`
 - `linear-upsample-conv3d` contributed by [AIMHI](https://unicorn.grand-challenge.org/teams/4707/)
+- `conv-segmentation-3d` contributed by [MEVIS-M3](https://unicorn.grand-challenge.org/teams/4756/)
 
 ---
 
@@ -73,3 +74,4 @@ Below are the approved adaptors for each task type.
 ### 🧩 Adaptor Radiology Detection Segmentation
 
 - `detection-by-segmentation-upsampling-3d`
+- `conv-detection-segmentation-3d` contributed by [MEVIS-M3](https://unicorn.grand-challenge.org/teams/4756/)
