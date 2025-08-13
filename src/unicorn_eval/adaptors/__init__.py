@@ -30,6 +30,7 @@ from unicorn_eval.adaptors.detection import DensityMap, ConvDetector, PatchNodul
 from unicorn_eval.adaptors.segmentation import (
     SegmentationUpsampling,
     SegmentationUpsampling3D,
+    LinearUpsampleConv3D
 )
 
 __all__ = [
@@ -47,4 +48,5 @@ __all__ = [
     "PatchNoduleRegressor",
     "SegmentationUpsampling",
     "SegmentationUpsampling3D",
+    "LinearUpsampleConv3D"
 ]

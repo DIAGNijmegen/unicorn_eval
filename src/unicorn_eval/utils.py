@@ -32,6 +32,7 @@ from unicorn_eval.adaptors import (
     PatchNoduleRegressor,
     SegmentationUpsampling,
     SegmentationUpsampling3D,
+    LinearUpsampleConv3D,
     WeightedKNN,
     WeightedKNNRegressor,
 )
@@ -341,6 +342,33 @@ def adapt_features(
             patch_size=patch_size[0],
         )
 
+    elif adaptor_name == "linear-upsample-conv3d":
+        adaptor = LinearUpsampleConv3D(
+            shot_features=shot_features,
+            shot_coordinates=shot_coordinates,
+            shot_names=shot_names,
+            shot_labels=shot_labels,
+            shot_label_spacing=shot_label_spacing,
+            shot_label_origins=shot_label_origins,
+            shot_label_directions=shot_label_directions,
+            test_features=test_features,
+            test_coordinates=test_coordinates,
+            test_names=test_names,  # try to remove this input
+            test_image_sizes=test_image_sizes,
+            test_image_origins=test_image_origins,
+            test_image_spacings=test_image_spacing,
+            test_image_directions=test_image_directions,
+            test_label_sizes=test_label_sizes,
+            test_label_spacing=test_label_spacing,
+            test_label_origins=test_label_origins,
+            test_label_directions=test_label_directions,
+            patch_size=patch_size,
+            shot_image_sizes=shot_image_sizes,
+            shot_image_spacing=shot_image_spacing,
+            shot_image_origins=shot_image_origins,
+            shot_image_directions=shot_image_directions,
+        )
+        
     elif adaptor_name == "segmentation-upsampling-3d":
         adaptor = SegmentationUpsampling3D(
             shot_features=shot_features,
