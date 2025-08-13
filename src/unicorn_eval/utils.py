@@ -64,7 +64,7 @@ METRIC_DICT = {
     "Task04_predicting_slide_level_tumor_proportion_score_in_ihc_stained_wsi": {
         "name": "cohen-kappa-quadratic",
         "fn": partial(cohen_kappa_score, weights="quadratic"),
-        "range": (-1, 1),
+        "range": (0, 1),
     },
     "Task05_detecting_signet_ring_cells_in_he_stained_wsi_of_gastric_cancer": {
         "name": "f1",
@@ -369,7 +369,7 @@ def adapt_features(
             shot_image_origins=shot_image_origins,
             shot_image_directions=shot_image_directions,
         )
-        
+
     elif adaptor_name == "segmentation-upsampling-3d":
         adaptor = SegmentationUpsampling3D(
             shot_features=shot_features,
