@@ -54,12 +54,12 @@ METRIC_DICT = {
     "Task02_classifying_lung_nodule_malignancy_in_ct": {
         "name": "auc",
         "fn": roc_auc_score,
-        "range": (0, 1),
+        "range": (0.5, 1),
     },
     "Task03_predicting_the_time_to_biochemical_recurrence_in_he_prostatectomies": {
         "name": "c-index",
         "fn": concordance_index_censored,
-        "range": (0, 1),
+        "range": (0.5, 1),
     },
     "Task04_predicting_slide_level_tumor_proportion_score_in_ihc_stained_wsi": {
         "name": "cohen-kappa-quadratic",
@@ -107,11 +107,11 @@ METRIC_DICT = {
     },
     "Task13_classifying_pulmonary_nodule_presence": {
         "name": "auc",
-        "range": (0, 1),
+        "range": (0.5, 1),
     },
     "Task14_classifying_kidney_abnormality": {
         "name": "auc",
-        "range": (0, 1),
+        "range": (0.5, 1),
     },
     "Task15_hip_kellgren_lawrence_score": {
         "name": "unweighted-kappa",
@@ -119,7 +119,7 @@ METRIC_DICT = {
     },
     "Task16_classifying_colon_histopathology_diagnosis": {
         "name": "macro-auc",
-        "range": (0, 1),
+        "range": (0.5, 1),
     },
     "Task17_predicting_lesion_size_measurements": {
         "name": "rsmape",
