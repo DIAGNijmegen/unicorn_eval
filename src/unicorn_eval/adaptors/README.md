@@ -60,6 +60,7 @@ Below are the approved adaptors for each task type.
 ### 🧩 Adaptor Radiology Segmentation
 
 - `segmentation-upsampling-3d`
+- `linear-upsample-conv3d` contributed by [AIMHI](https://unicorn.grand-challenge.org/teams/4707/)
 
 ---
 
