@@ -1132,5 +1132,2021 @@
         }
       }
     ]
+  },
+  {
+    "pk": "11882-64596-2042-2032",
+    "inputs": [
+      {
+        "image": {
+          "name": "11882-64596-2042-2032.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "12112-37198-2058-2042",
+    "inputs": [
+      {
+        "image": {
+          "name": "12112-37198-2058-2042.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "16770-59565-2026-2068",
+    "inputs": [
+      {
+        "image": {
+          "name": "16770-59565-2026-2068.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "19194-32684-2057-2018",
+    "inputs": [
+      {
+        "image": {
+          "name": "19194-32684-2057-2018.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "21164-5136-2060-2007",
+    "inputs": [
+      {
+        "image": {
+          "name": "21164-5136-2060-2007.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "22553-3054-2057-2045",
+    "inputs": [
+      {
+        "image": {
+          "name": "22553-3054-2057-2045.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "24557-17188-2000-2104",
+    "inputs": [
+      {
+        "image": {
+          "name": "24557-17188-2000-2104.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "24675-3006-2082-2057",
+    "inputs": [
+      {
+        "image": {
+          "name": "24675-3006-2082-2057.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "2603-48562-2024-2004",
+    "inputs": [
+      {
+        "image": {
+          "name": "2603-48562-2024-2004.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "27132-20588-2050-2029",
+    "inputs": [
+      {
+        "image": {
+          "name": "27132-20588-2050-2029.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "2784-50608-2024-2032",
+    "inputs": [
+      {
+        "image": {
+          "name": "2784-50608-2024-2032.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "28848-17956-2016-2016",
+    "inputs": [
+      {
+        "image": {
+          "name": "28848-17956-2016-2016.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "29412-29229-2017-2017",
+    "inputs": [
+      {
+        "image": {
+          "name": "29412-29229-2017-2017.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "29705-20186-2024-2049",
+    "inputs": [
+      {
+        "image": {
+          "name": "29705-20186-2024-2049.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "30701-42947-2018-2044",
+    "inputs": [
+      {
+        "image": {
+          "name": "30701-42947-2018-2044.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "31516-25647-2025-2012",
+    "inputs": [
+      {
+        "image": {
+          "name": "31516-25647-2025-2012.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "33309-36600-2018-2023",
+    "inputs": [
+      {
+        "image": {
+          "name": "33309-36600-2018-2023.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "33830-25116-2045-2026",
+    "inputs": [
+      {
+        "image": {
+          "name": "33830-25116-2045-2026.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "34251-31146-2019-2075",
+    "inputs": [
+      {
+        "image": {
+          "name": "34251-31146-2019-2075.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "36192-21210-2012-2053",
+    "inputs": [
+      {
+        "image": {
+          "name": "36192-21210-2012-2053.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "37057-24798-2012-2072",
+    "inputs": [
+      {
+        "image": {
+          "name": "37057-24798-2012-2072.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "38368-62991-2040-2016",
+    "inputs": [
+      {
+        "image": {
+          "name": "38368-62991-2040-2016.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "39466-31353-2074-2047",
+    "inputs": [
+      {
+        "image": {
+          "name": "39466-31353-2074-2047.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "42909-22296-2027-2043",
+    "inputs": [
+      {
+        "image": {
+          "name": "42909-22296-2027-2043.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "44476-50787-2017-2045",
+    "inputs": [
+      {
+        "image": {
+          "name": "44476-50787-2017-2045.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "45391-48686-2017-2063",
+    "inputs": [
+      {
+        "image": {
+          "name": "45391-48686-2017-2063.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "46550-17615-2038-2055",
+    "inputs": [
+      {
+        "image": {
+          "name": "46550-17615-2038-2055.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "47611-63515-2072-2046",
+    "inputs": [
+      {
+        "image": {
+          "name": "47611-63515-2072-2046.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "47662-55703-2020-2046",
+    "inputs": [
+      {
+        "image": {
+          "name": "47662-55703-2020-2046.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "4908-49211-2073-2105",
+    "inputs": [
+      {
+        "image": {
+          "name": "4908-49211-2073-2105.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "49394-18682-2060-2021",
+    "inputs": [
+      {
+        "image": {
+          "name": "49394-18682-2060-2021.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "5132-31444-2032-2043",
+    "inputs": [
+      {
+        "image": {
+          "name": "5132-31444-2032-2043.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "54215-56419-2068-2043",
+    "inputs": [
+      {
+        "image": {
+          "name": "54215-56419-2068-2043.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "56452-38197-2017-2032",
+    "inputs": [
+      {
+        "image": {
+          "name": "56452-38197-2017-2032.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "63809-55942-2041-2070",
+    "inputs": [
+      {
+        "image": {
+          "name": "63809-55942-2041-2070.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "64005-53913-2001-2023",
+    "inputs": [
+      {
+        "image": {
+          "name": "64005-53913-2001-2023.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "6630-14336-2073-2073",
+    "inputs": [
+      {
+        "image": {
+          "name": "6630-14336-2073-2073.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "67097-37769-2048-2033",
+    "inputs": [
+      {
+        "image": {
+          "name": "67097-37769-2048-2033.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "67149-42248-2021-2027",
+    "inputs": [
+      {
+        "image": {
+          "name": "67149-42248-2021-2027.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "67535-40153-2017-2009",
+    "inputs": [
+      {
+        "image": {
+          "name": "67535-40153-2017-2009.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "688-50611-2041-2033",
+    "inputs": [
+      {
+        "image": {
+          "name": "688-50611-2041-2033.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "79391-6912-2072-2044",
+    "inputs": [
+      {
+        "image": {
+          "name": "79391-6912-2072-2044.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "81171-9039-2016-2027",
+    "inputs": [
+      {
+        "image": {
+          "name": "81171-9039-2016-2027.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "81540-6990-2055-2005",
+    "inputs": [
+      {
+        "image": {
+          "name": "81540-6990-2055-2005.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "83128-38504-2005-2016",
+    "inputs": [
+      {
+        "image": {
+          "name": "83128-38504-2005-2016.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "86017-42508-2011-2039",
+    "inputs": [
+      {
+        "image": {
+          "name": "86017-42508-2011-2039.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "88083-42481-2049-2082",
+    "inputs": [
+      {
+        "image": {
+          "name": "88083-42481-2049-2082.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "9472-50739-2080-2046",
+    "inputs": [
+      {
+        "image": {
+          "name": "9472-50739-2080-2046.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "114S_roi_2",
+    "inputs": [
+      {
+        "image": {
+          "name": "114S_roi_2.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "122S_roi_1",
+    "inputs": [
+      {
+        "image": {
+          "name": "122S_roi_1.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "133S_roi_1",
+    "inputs": [
+      {
+        "image": {
+          "name": "133S_roi_1.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "133S_roi_2",
+    "inputs": [
+      {
+        "image": {
+          "name": "133S_roi_2.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "134B_roi_1",
+    "inputs": [
+      {
+        "image": {
+          "name": "134B_roi_1.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "181S_roi_3",
+    "inputs": [
+      {
+        "image": {
+          "name": "181S_roi_3.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "196S_roi_3",
+    "inputs": [
+      {
+        "image": {
+          "name": "196S_roi_3.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "198B_roi_3",
+    "inputs": [
+      {
+        "image": {
+          "name": "198B_roi_3.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "201B_roi_1",
+    "inputs": [
+      {
+        "image": {
+          "name": "201B_roi_1.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "201B_roi_3",
+    "inputs": [
+      {
+        "image": {
+          "name": "201B_roi_3.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "231S_roi_3",
+    "inputs": [
+      {
+        "image": {
+          "name": "231S_roi_3.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "234B_roi_3",
+    "inputs": [
+      {
+        "image": {
+          "name": "234B_roi_3.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "240S_roi_2",
+    "inputs": [
+      {
+        "image": {
+          "name": "240S_roi_2.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "242B_roi_3",
+    "inputs": [
+      {
+        "image": {
+          "name": "242B_roi_3.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "250B_roi_2",
+    "inputs": [
+      {
+        "image": {
+          "name": "250B_roi_2.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "TC_S01_P000003_C0001_B104_roi_1",
+    "inputs": [
+      {
+        "image": {
+          "name": "TC_S01_P000003_C0001_B104_roi_1.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "TC_S01_P000003_C0001_B104_roi_2",
+    "inputs": [
+      {
+        "image": {
+          "name": "TC_S01_P000003_C0001_B104_roi_2.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "TC_S01_P000005_C0001_B204_roi_3",
+    "inputs": [
+      {
+        "image": {
+          "name": "TC_S01_P000005_C0001_B204_roi_3.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "TC_S01_P000010_C0001_B204_roi_1",
+    "inputs": [
+      {
+        "image": {
+          "name": "TC_S01_P000010_C0001_B204_roi_1.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "TC_S01_P000013_C0001_B204_roi_1",
+    "inputs": [
+      {
+        "image": {
+          "name": "TC_S01_P000013_C0001_B204_roi_1.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "TC_S01_P000015_C0001_B104_roi_1",
+    "inputs": [
+      {
+        "image": {
+          "name": "TC_S01_P000015_C0001_B104_roi_1.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "TC_S01_P000015_C0001_B104_roi_2",
+    "inputs": [
+      {
+        "image": {
+          "name": "TC_S01_P000015_C0001_B104_roi_2.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "TC_S01_P000015_C0001_B104_roi_3",
+    "inputs": [
+      {
+        "image": {
+          "name": "TC_S01_P000015_C0001_B104_roi_3.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "TC_S01_P000016_C0001_B205_roi_3",
+    "inputs": [
+      {
+        "image": {
+          "name": "TC_S01_P000016_C0001_B205_roi_3.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "TC_S01_P000024_C0001_B102_roi_1",
+    "inputs": [
+      {
+        "image": {
+          "name": "TC_S01_P000024_C0001_B102_roi_1.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "TC_S01_P000024_C0001_B102_roi_3",
+    "inputs": [
+      {
+        "image": {
+          "name": "TC_S01_P000024_C0001_B102_roi_3.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "TC_S01_P000030_C0001_B208_roi_2",
+    "inputs": [
+      {
+        "image": {
+          "name": "TC_S01_P000030_C0001_B208_roi_2.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "TC_S01_P000030_C0001_B208_roi_3",
+    "inputs": [
+      {
+        "image": {
+          "name": "TC_S01_P000030_C0001_B208_roi_3.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "TC_S01_P000039_C0001_B101_roi_1",
+    "inputs": [
+      {
+        "image": {
+          "name": "TC_S01_P000039_C0001_B101_roi_1.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "TC_S01_P000039_C0001_B101_roi_2",
+    "inputs": [
+      {
+        "image": {
+          "name": "TC_S01_P000039_C0001_B101_roi_2.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "TC_S01_P000046_C0001_B101_roi_2",
+    "inputs": [
+      {
+        "image": {
+          "name": "TC_S01_P000046_C0001_B101_roi_2.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "TC_S01_P000046_C0001_B101_roi_3",
+    "inputs": [
+      {
+        "image": {
+          "name": "TC_S01_P000046_C0001_B101_roi_3.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "TC_S01_P000054_C0001_B101_roi_1",
+    "inputs": [
+      {
+        "image": {
+          "name": "TC_S01_P000054_C0001_B101_roi_1.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "TC_S01_P000057_C0001_B105_roi_1",
+    "inputs": [
+      {
+        "image": {
+          "name": "TC_S01_P000057_C0001_B105_roi_1.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "TC_S01_P000057_C0001_B105_roi_2",
+    "inputs": [
+      {
+        "image": {
+          "name": "TC_S01_P000057_C0001_B105_roi_2.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "TC_S01_P000060_C0001_B101_roi_3",
+    "inputs": [
+      {
+        "image": {
+          "name": "TC_S01_P000060_C0001_B101_roi_3.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "TC_S01_P000071_C0001_B101_roi_2",
+    "inputs": [
+      {
+        "image": {
+          "name": "TC_S01_P000071_C0001_B101_roi_2.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "TC_S01_P000078_C0001_B101_roi_1",
+    "inputs": [
+      {
+        "image": {
+          "name": "TC_S01_P000078_C0001_B101_roi_1.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "TC_S01_P000078_C0001_B101_roi_2",
+    "inputs": [
+      {
+        "image": {
+          "name": "TC_S01_P000078_C0001_B101_roi_2.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "TC_S01_P000115_C0001_B105_roi_2",
+    "inputs": [
+      {
+        "image": {
+          "name": "TC_S01_P000115_C0001_B105_roi_2.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "TC_S01_P000115_C0001_B105_roi_3",
+    "inputs": [
+      {
+        "image": {
+          "name": "TC_S01_P000115_C0001_B105_roi_3.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "TC_S01_P000145_C0001_B102_roi_3",
+    "inputs": [
+      {
+        "image": {
+          "name": "TC_S01_P000145_C0001_B102_roi_3.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "TC_S01_P000147_C0001_B104_roi_1",
+    "inputs": [
+      {
+        "image": {
+          "name": "TC_S01_P000147_C0001_B104_roi_1.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "TC_S01_P000147_C0001_B104_roi_2",
+    "inputs": [
+      {
+        "image": {
+          "name": "TC_S01_P000147_C0001_B104_roi_2.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "TC_S01_P000147_C0001_B104_roi_3",
+    "inputs": [
+      {
+        "image": {
+          "name": "TC_S01_P000147_C0001_B104_roi_3.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "TC_S01_P000159_C0001_B108_roi_1",
+    "inputs": [
+      {
+        "image": {
+          "name": "TC_S01_P000159_C0001_B108_roi_1.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "TC_S01_P000159_C0001_B108_roi_2",
+    "inputs": [
+      {
+        "image": {
+          "name": "TC_S01_P000159_C0001_B108_roi_2.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "TC_S01_P000183_C0001_B101_roi_3",
+    "inputs": [
+      {
+        "image": {
+          "name": "TC_S01_P000183_C0001_B101_roi_3.tif"
+        },
+        "interface": {
+          "slug": "histopathology-region-of-interest-cropout"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
   }
 ]
