@@ -983,7 +983,10 @@ def seg_inference3d(decoder, data_loader, device, return_binary,  test_cases, te
             if return_binary:
                 pred_mask = torch.argmax(probs, dim=1).float()
             else:
-                pred_mask = probs[:, :1:2]
+                # pred_mask = probs[:,1:2]
+                raise NotImplementedError(
+                    "seg_inference3d currently supports only return_binary=True. "
+                )
 
             batch["image_origin"] = batch["image_origin"][0]
             batch["image_spacing"] = batch["image_spacing"][0]
