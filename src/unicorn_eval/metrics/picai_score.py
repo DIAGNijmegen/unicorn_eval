@@ -8,4 +8,4 @@ def compute_picai_score(gts, preds):
         y_true=gts,
         y_det_postprocess_func=lambda pred: extract_lesion_candidates(pred)[0],
     )
-    return metrics.auroc
+    return metrics.score
