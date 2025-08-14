@@ -87,3 +87,62 @@ def extract_patches(
         coordinates.append(world_coordinates)
 
     return patches, coordinates
+
+
+def extract_overlapping_patches(
+    image: sitk.Image,
+    patch_size: Iterable[int],
+    overlap_fraction: Iterable[float],
+    spacing: Iterable[float] | None = None,
+) -> tuple[list[sitk.Image], list[tuple]]:
+    """
+    Similar to extract_patches, but allows for overlapping patches based on specified overlap fractions.
+    """
+
+    if any(not (0 <= f < 1) for f in overlap_fraction):
+        raise ValueError("overlap_fraction values must be between 0 (inclusive) and 1 (exclusive).")
+
+    if spacing is not None:
+        # resample image to specified spacing
+        image = resample_img(
+            image=image,
+            out_spacing=spacing[::-1],
+            interpolation=sitk.sitkLinear,
+        )
+        print(f"Resampled image to spacing: {spacing}. Image size: {image.GetSize()}")
+
+    # pad image to fit patch size
+    image = pad_image(
+        image=image,
+        patch_size=patch_size,
+    )
+
+    image_size = image.GetSize()
+
+    # Compute step size for each dimension based on overlap fraction
+    step_sizes = [
+        max(1, round(patch_size[d] * (1 - overlap_fraction[d])))
+        for d in range(3)
+    ]
+
+    steps = [
+        range(0, max(image_size[dim] - patch_size[dim] + 1, 1), step_sizes[dim])
+        for dim in range(3)
+    ]
+
+    patches = []
+    coordinates = []
+    for x, y, z in itertools.product(*steps):
+        start_coords = (x, y, z)
+        patch = sitk.RegionOfInterest(image, patch_size, start_coords)
+        patches.append(patch)
+        matrix_coordinates = (
+            (x, y, z),
+            (x + patch_size[0], y + patch_size[1], z + patch_size[2]),
+        )
+        world_coordinates = tuple(
+            image.TransformIndexToPhysicalPoint(coord) for coord in matrix_coordinates
+        )
+        coordinates.append(world_coordinates)
+
+    return patches, coordinates

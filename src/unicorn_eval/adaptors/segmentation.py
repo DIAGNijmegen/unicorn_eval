@@ -36,7 +36,7 @@ from torch.utils.data._utils.collate import default_collate
 from tqdm import tqdm
 
 from unicorn_eval.adaptors.base import PatchLevelTaskAdaptor
-from unicorn_eval.adaptors.patch_extraction import extract_patches
+from unicorn_eval.adaptors.patch_extraction import extract_patches, extract_overlapping_patches
 
 
 def compute_num_upsample_layers(initial_size, target_size):
@@ -771,6 +771,72 @@ def extract_patch_labels(
 
     return patch_labels
 
+def extract_overlapping_patch_labels(
+    label,
+    label_spacing,
+    label_origin,
+    label_direction,
+    image_size,
+    image_spacing,
+    image_origin,
+    image_direction,
+    overlap_fraction: Iterable[float],
+    patch_size: list[int] = [16, 256, 256],
+    patch_spacing: list[float] | None = None,
+) -> list[dict]:
+    """
+    Like `extract_patch_labels`, but extracts overlapping patches from the label image.
+    """
+
+    label = sitk.GetImageFromArray(label)
+    label.SetOrigin(label_origin)
+    label.SetSpacing(label_spacing)
+    label.SetDirection(label_direction)
+
+    label = sitk.Resample(label,
+                          image_size,
+                          sitk.Transform(),
+                          sitk.sitkNearestNeighbor,
+                          image_origin,
+                          image_spacing,
+                          image_direction)
+
+    patch_features = []
+
+    # this line is different from `extract_patch_labels`
+    patches, coordinates = extract_overlapping_patches(
+        image=label,
+        patch_size=patch_size,
+        overlap_fraction=overlap_fraction,
+        spacing=patch_spacing,
+    )
+    if patch_spacing is None:
+        patch_spacing = label.GetSpacing()
+
+    for patch, coordinates in tqdm(
+        zip(patches, coordinates), total=len(patches), desc="Extracting features"
+    ):
+        patch_array = sitk.GetArrayFromImage(patch)
+        patch_features.append(
+            {
+                "coordinates": list(coordinates[0]),  # save the start coordinates
+                "features": patch_array,
+            }
+        )
+
+    patch_labels = make_patch_level_neural_representation(
+        patch_features=patch_features,
+        patch_size=patch_size,
+        patch_spacing=patch_spacing,
+        image_size=label.GetSize(),
+        image_origin=label.GetOrigin(),
+        image_spacing=label.GetSpacing(),
+        image_direction=label.GetDirection(),
+        title="patch_labels",
+    )
+
+    return patch_labels
+
 
 def load_patch_data(data_array: np.ndarray, batch_size: int = 80) -> DataLoader:
     train_ds = dataset_monai(data=data_array)
@@ -1181,8 +1247,6 @@ def train_seg_adaptor3d(decoder, data_loader, device, num_epochs = 3):
         print(f"Epoch {epoch+1}: Avg total loss = {epoch_loss / iteration_count:.4f}")                               
     return decoder
 
-
-
 class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
     """
     Patch-level adaptor that trains a 3D upsampling decoder for segmentation.
@@ -1336,6 +1400,83 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
         test_loader = load_patch_data(test_data, batch_size=10)
         # run inference using the trained decoder
         return inference3d(self.decoder, test_loader, self.device, self.return_binary, self.test_cases, self.test_label_sizes, self.test_label_spacing, self.test_label_origins, self.test_label_directions)
+
+class OverlappingSegmentationUpsampling3D(SegmentationUpsampling3D):
+    """
+    Patch-level adaptor that trains a 3D upsampling decoder for segmentation.
+    This adaptor is similar to SegmentationUpsampling3D but allows for overlapping patches.
+    """
+    
+    def __init__(
+        self,
+        shot_features,
+        shot_coordinates,
+        shot_names,
+        shot_labels,
+        shot_image_spacing,
+        shot_image_origins,
+        shot_image_directions,
+        shot_image_sizes,
+        shot_label_spacing,
+        shot_label_origins,
+        shot_label_directions,
+        test_features,
+        test_coordinates,
+        test_names,
+        test_image_sizes,
+        test_image_origins,
+        test_image_spacings,
+        test_image_directions,
+        test_label_sizes,
+        test_label_spacing,
+        test_label_origins,
+        test_label_directions,
+        patch_size,
+        overlap_fraction,
+        return_binary=True,
+    ):   
+        label_patch_features = []
+        for idx, label in enumerate(shot_labels):
+            label_feats = extract_overlapping_patch_labels(
+                label=label,
+                label_spacing=shot_label_spacing[shot_names[idx]],
+                label_origin=shot_label_origins[shot_names[idx]],
+                label_direction=shot_label_directions[shot_names[idx]],
+                image_size=shot_image_sizes[shot_names[idx]],
+                image_origin=shot_image_origins[shot_names[idx]],
+                image_spacing=shot_image_spacing[shot_names[idx]],
+                image_direction=shot_image_directions[shot_names[idx]],
+                patch_size=patch_size,
+                overlap_fraction=overlap_fraction,
+            )
+            label_patch_features.append(label_feats)
+        label_patch_features = np.array(label_patch_features, dtype=object)
+
+        super().__init__(
+            shot_features=shot_features,
+            shot_labels=label_patch_features,
+            shot_coordinates=shot_coordinates,
+            test_features=test_features,
+            test_coordinates=test_coordinates,
+            shot_extra_labels=None,  # not used here
+        )
+
+        self.shot_names = shot_names
+        self.test_cases = test_names
+        self.test_image_sizes = test_image_sizes
+        self.test_image_origins = test_image_origins
+        self.test_image_spacings = test_image_spacings
+        self.test_image_directions = test_image_directions
+        self.shot_image_spacing = shot_image_spacing
+        self.shot_image_origins = shot_image_origins
+        self.shot_image_directions = shot_image_directions
+        self.test_label_sizes = test_label_sizes
+        self.test_label_spacing = test_label_spacing
+        self.test_label_origins = test_label_origins
+        self.test_label_directions = test_label_directions
+        self.patch_size = patch_size
+        self.decoder = None
+        self.return_binary = return_binary
 
 
 class SegResNetDecoderOnly(nn.Module):

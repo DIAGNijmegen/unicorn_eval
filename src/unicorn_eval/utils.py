@@ -32,6 +32,7 @@ from unicorn_eval.adaptors import (
     PatchNoduleRegressor,
     SegmentationUpsampling,
     SegmentationUpsampling3D,
+    OverlappingSegmentationUpsampling3D,
     ConvSegmentation3D,
     LinearUpsampleConv3D,
     WeightedKNN,
@@ -170,6 +171,7 @@ def adapt_features(
     shot_label_directions=None,
     shot_extra_labels=None,
     return_probabilities=False,
+    overlap_fraction=None, # added for overlapping segmentation adaptors
 ):
     num_shots = len(shot_features)
 
@@ -396,6 +398,34 @@ def adapt_features(
             shot_image_origins=shot_image_origins,
             shot_image_directions=shot_image_directions,
         )
+    
+    elif adaptor_name == "overlapping-segmentation-upsampling-3d":
+        adaptor = OverlappingSegmentationUpsampling3D( # All args copied from segmentation-upsampling-3d but added overlap_fraction
+            shot_features=shot_features,
+            shot_coordinates=shot_coordinates,
+            shot_names=shot_names,
+            shot_labels=shot_labels,
+            shot_label_spacing=shot_label_spacing,
+            shot_label_origins=shot_label_origins,
+            shot_label_directions=shot_label_directions,
+            test_features=test_features,
+            test_coordinates=test_coordinates,
+            test_names=test_names,  # try to remove this input
+            test_image_sizes=test_image_sizes,
+            test_image_origins=test_image_origins,
+            test_image_spacings=test_image_spacing,
+            test_image_directions=test_image_directions,
+            test_label_sizes=test_label_sizes,
+            test_label_spacing=test_label_spacing,
+            test_label_origins=test_label_origins,
+            test_label_directions=test_label_directions,
+            patch_size=patch_size,
+            shot_image_sizes=shot_image_sizes,
+            shot_image_spacing=shot_image_spacing,
+            shot_image_origins=shot_image_origins,
+            shot_image_directions=shot_image_directions,
+            overlap_fraction=overlap_fraction,  # addition
+        )
 
     elif adaptor_name == "conv-segmentation-3d":
         adaptor = ConvSegmentation3D(  # All args copied from segmentation-upsampling-3d
@@ -449,6 +479,35 @@ def adapt_features(
             test_label_origins=test_label_origins,
             test_label_directions=test_label_directions,
             patch_size=patch_size,
+            return_binary=False,
+        )
+    
+    elif adaptor_name == "detection-by-overlapping-segmentation-upsampling-3d":
+        adaptor = OverlappingSegmentationUpsampling3D( # All args copied from detection-by-segmentation-upsampling-3d but added overlap_fraction
+            shot_features=shot_features,
+            shot_coordinates=shot_coordinates,
+            shot_names=shot_names,
+            shot_image_sizes=shot_image_sizes,
+            shot_image_spacing=shot_image_spacing,
+            shot_image_origins=shot_image_origins,
+            shot_image_directions=shot_image_directions,
+            shot_labels=shot_labels,
+            shot_label_spacing=shot_label_spacing,
+            shot_label_origins=shot_label_origins,
+            shot_label_directions=shot_label_directions,
+            test_features=test_features,
+            test_coordinates=test_coordinates,
+            test_names=test_names,
+            test_image_sizes=test_image_sizes,
+            test_image_origins=test_image_origins,
+            test_image_spacings=test_image_spacing,
+            test_image_directions=test_image_directions,
+            test_label_sizes=test_label_sizes,
+            test_label_spacing=test_label_spacing,
+            test_label_origins=test_label_origins,
+            test_label_directions=test_label_directions,
+            patch_size=patch_size,
+            overlap_fraction = overlap_fraction, # addition
             return_binary=False,
         )
 
@@ -777,6 +836,7 @@ def extract_embeddings_and_labels(processed_results, task_name):
         "cases_label_spacings": {},
         "cases_label_origins": {},
         "cases_label_directions": {},
+        "overlap_fraction": None,  # added for overlapping segmentation adaptors
     }
 
     valid_results_found = False
@@ -799,6 +859,7 @@ def extract_embeddings_and_labels(processed_results, task_name):
             task_data["domain"] = result["domain"]
             task_data["spacing"] = result["spacing"]
             task_data["patch_size"] = result["patch_size"]
+            task_data["overlap_fraction"] = result.get("overlap_fraction", None) # added for overlapping segmentation adaptors, default None
 
         if result["split"] == "shot":
             task_data["shot_embeddings"].append(result["embeddings"])

@@ -713,6 +713,7 @@ def main():
             case_label_spacings = task_results["cases_label_spacings"]
             case_label_origins = task_results["cases_label_origins"]
             case_label_directions = task_results["cases_label_directions"]
+            overlap_fraction = task_results["overlap_fraction"]
 
             if task_type in ["classification", "regression"]:
                 save_predictions = True
@@ -749,6 +750,7 @@ def main():
                 shot_label_origins=shot_label_origins,
                 shot_label_directions=shot_label_directions,
                 return_probabilities=return_probabilities,
+                overlap_fraction=overlap_fraction,
             )
 
             # delete arrays and run garbage collection
