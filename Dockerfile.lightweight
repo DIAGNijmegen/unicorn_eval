@@ -1,0 +1,7 @@
+FROM waticlems/unicorn_eval:latest
+
+# re-install unicorn_eval
+COPY --chown=user:user . /opt/app/unicorn_eval
+RUN python -m pip install /opt/app/unicorn_eval
+
+ENTRYPOINT ["unicorn_eval"]

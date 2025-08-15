@@ -24,9 +24,9 @@ input/
 **Reference example files**
 
 You can find working examples of these files in the `tests` folder of this repository:
-* [`tests/task-1/input/predictions.json`](task-1/input/predictions.json)
-* [`tests/task-1/input/adaptor-pathology-classification.json`](task-1/input/adaptor-pathology-classification.json)
-* [`tests/task-1/input/0403dcc49b1420545299f692f7d8e270/output/image-neural-representation.json`](task-1/input/0403dcc49b1420545299f692f7d8e270/output/image-neural-representation.json)
+* [`tests/vision/input/predictions.json`](vision/input/predictions.json)
+* [`tests/vision/input/adaptor-pathology-classification.json`](vision/input/adaptor-pathology-classification.json)
+* [`tests/vision/input/0403dcc49b1420545299f692f7d8e270/output/image-neural-representation.json`](vision/input/0403dcc49b1420545299f692f7d8e270/output/image-neural-representation.json)
 
 You can also download `patch-neural-representation.json` or `image-neural-representation.json` from Grand Challenge after executing your algorithm on a leaderboard. Downloading these files will help you understand its structure. Or, alternative, create them yourself by running your algorithm locally.
 
@@ -82,13 +82,13 @@ case_id,task_name,task_type,domain,modality,split
 ```
 
 **Reference example files**
-* [`tests/task-1/ground-truth/mapping.csv`](task-1/ground-truth/mapping.csv)
-* [`tests/task-1/ground-truth/Task01_classifying_he_prostate_biopsies_into_isup_scores/0403dcc49b1420545299f692f7d8e270/isup-grade.json`](task-1/ground-truth/Task01_classifying_he_prostate_biopsies_into_isup_scores/0403dcc49b1420545299f692f7d8e270/isup-grade.json)
+* [`tests/vision/ground_truth/mapping.csv`](vision/ground_truth/mapping.csv)
+* [`tests/vision/ground_truth/Task01_classifying_he_prostate_biopsies_into_isup_scores/0403dcc49b1420545299f692f7d8e270/isup-grade.json`](vision/ground_truth/Task01_classifying_he_prostate_biopsies_into_isup_scores/0403dcc49b1420545299f692f7d8e270/isup-grade.json)
 
 
 ## 3. Running the Evaluation Locally
 - Obtain the neural representation `JSON` files by either:
-  - Using the [task 1 examples from this repo](task-1/input)  **or**
+  - Using the [task 1 examples from this repo](vision/input)  **or**
   - Downloading them from Grand Challenge when navigating to `Submit` -> `Submissions` -> your algorithm run -> `Result` or navigate to your algorithm page -> `Results` after running your algorithm on the leaderboard, **or**
   - Running your algorithm locally on public data from Zenodo ([baseline setup example](https://github.com/DIAGNijmegen/unicorn_baseline/blob/main/setup-docker.md)).
 - Ensure that:
