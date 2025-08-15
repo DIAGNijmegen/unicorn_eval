@@ -707,6 +707,7 @@ def extract_patch_labels(
     image_spacing,
     image_origin,
     image_direction,
+    start_coordinates,
     patch_size: list[int] = [16, 256, 256],
     patch_spacing: list[float] | None = None,
 ) -> list[dict]:
@@ -739,8 +740,9 @@ def extract_patch_labels(
 
     patch_features = []
 
-    patches, coordinates = extract_patches(
+    patches = extract_patches(
         image=label,
+        coordinates=start_coordinates,
         patch_size=patch_size,
         spacing=patch_spacing,
     )
@@ -748,12 +750,12 @@ def extract_patch_labels(
         patch_spacing = label.GetSpacing()
 
     for patch, coordinates in tqdm(
-        zip(patches, coordinates), total=len(patches), desc="Extracting features"
+        zip(patches, start_coordinates), total=len(patches), desc="Extracting features"
     ):
         patch_array = sitk.GetArrayFromImage(patch)
         patch_features.append(
             {
-                "coordinates": list(coordinates[0]),  # save the start coordinates
+                "coordinates": list(coordinates),  # save the start coordinates
                 "features": patch_array,
             }
         )
@@ -1251,6 +1253,7 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
                 image_origin=shot_image_origins[shot_names[idx]],
                 image_spacing=shot_image_spacing[shot_names[idx]],
                 image_direction=shot_image_directions[shot_names[idx]],
+                start_coordinates=shot_coordinates[idx],
                 patch_size=patch_size,
             )
             label_patch_features.append(label_feats)
