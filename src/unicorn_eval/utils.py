@@ -74,7 +74,7 @@ METRIC_DICT = {
     "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams": {
         "name": "picai",
         "fn": compute_picai_score,
-        "range": (0, 1),
+        "range": (0.25, 1),
     },
     "Task07_detecting_lung_nodules_in_thoracic_ct": {
         "name": "sensitivity",
@@ -89,7 +89,7 @@ METRIC_DICT = {
     "Task09_segmenting_rois_in_breast_cancer_wsis": {
         "name": "dice",
         "fn": compute_dice_score,
-        "range": (0, 1),
+        "range": (0.25, 1),
     },
     "Task10_segmenting_lesions_within_vois_in_ct": {
         "name": "uls_score",
