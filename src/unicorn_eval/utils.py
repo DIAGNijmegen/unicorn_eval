@@ -49,7 +49,7 @@ METRIC_DICT = {
     "Task01_classifying_he_prostate_biopsies_into_isup_scores": {
         "name": "cohen-kappa-quadratic",
         "fn": partial(cohen_kappa_score, weights="quadratic"),
-        "range": (-1, 1),
+        "range": (0, 1),
     },
     "Task02_classifying_lung_nodule_malignancy_in_ct": {
         "name": "auc",
@@ -103,7 +103,7 @@ METRIC_DICT = {
     },
     "Task12_predicting_histopathology_sample_origin": {
         "name": "unweighted-kappa",
-        "range": (-1, 1),
+        "range": (0, 1),
     },
     "Task13_classifying_pulmonary_nodule_presence": {
         "name": "auc",
@@ -115,7 +115,7 @@ METRIC_DICT = {
     },
     "Task15_hip_kellgren_lawrence_score": {
         "name": "unweighted-kappa",
-        "range": (-1, 1),
+        "range": (0, 1),
     },
     "Task16_classifying_colon_histopathology_diagnosis": {
         "name": "macro-auc",
