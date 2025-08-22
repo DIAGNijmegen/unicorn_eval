@@ -32,7 +32,6 @@ from unicorn_eval.adaptors.segmentation import (
     SegmentationUpsampling3D,
     ConvSegmentation3D,
     LinearUpsampleConv3D,
-    Conv3DLineaerUpsample
 )
 
 __all__ = [
@@ -52,5 +51,4 @@ __all__ = [
     "SegmentationUpsampling3D",
     "ConvSegmentation3D",
     "LinearUpsampleConv3D",
-    "Conv3DLineaerUpsample"
 ]

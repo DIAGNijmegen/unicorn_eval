@@ -1337,11 +1337,12 @@ class LinearUpsampleConv3D(SegmentationUpsampling3D):
         patch_size : Size of each 3D patch.
         return_binary : Whether to threshold predictions into binary segmentation masks.
     """
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, conv_then_upsample: bool = False, **kwargs):
         super().__init__(*args, **kwargs)
         self.is_task11 = False
         self.is_task06 = False
-
+        self.conv_then_upsample = conv_then_upsample
+        
     def fit(self):
         # build training data and loader
         train_data = construct_data_with_labels(
@@ -1365,10 +1366,17 @@ class LinearUpsampleConv3D(SegmentationUpsampling3D):
 
         # set up device and model
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        decoder = UpsampleConvSegAdaptor(
-            target_shape=self.patch_size[::-1],  # Convert to (D, H, W) order
-            num_classes=num_classes,
-        )
+        if self.conv_then_upsample:   # True → Conv→Upsample
+            decoder = ConvUpsampleSegAdaptor(
+                target_shape=self.patch_size[::-1],  # (D, H, W)
+                num_classes=num_classes,
+            )
+        else:                         # False → Upsample→Conv
+            decoder = UpsampleConvSegAdaptor(
+                target_shape=self.patch_size[::-1],
+                num_classes=num_classes,
+            )
+
         print(f"Training decoder with {num_classes} classes")
         print(decoder)
         decoder.to(self.device)
@@ -1391,94 +1399,6 @@ class LinearUpsampleConv3D(SegmentationUpsampling3D):
         # run inference using the trained decoder
 
         return inference3d_softmax(self.decoder, test_loader, self.device, self.return_binary, self.test_cases, self.test_label_sizes, self.test_label_spacing, self.test_label_origins, self.test_label_directions, is_task11=self.is_task11)
-
-
-class Conv3DLineaerUpsample(SegmentationUpsampling3D):
-    """
-    Patch-level adaptor that performs segmentation by linearly upsampling 
-    3D patch-level features followed by convolutional refinement.
-
-    This adaptor takes precomputed patch-level features from 3D medical images
-    and predicts voxel-wise segmentation by applying a simple decoder that:
-    1) linearly upsamples the patch embeddings to the original resolution, and
-    2) passes them through 3D convolution layers for spatial refinement.
-
-    Steps:
-    1. Extract patch-level segmentation labels using spatial metadata.
-    2. Construct training data from patch features and coordinates.
-    3. Train a lightweight 3D decoder that linearly upsamples features and refines them with convolution layers.
-    4. At inference, apply the decoder to test patch features and reconstruct full-size segmentation predictions.
-
-    Args:
-        shot_features : Patch-level feature embeddings of few-shot labeled volumes.
-        shot_labels : Full-resolution segmentation labels (used to supervise the decoder).
-        shot_coordinates : Patch coordinates corresponding to shot_features.
-        shot_names : Case identifiers for few-shot examples.
-        test_features : Patch-level feature embeddings for testing.
-        test_coordinates : Patch coordinates corresponding to test_features.
-        test_names : Case identifiers for testing examples.
-        test_image_sizes, test_image_origins, test_image_spacings, test_image_directions:
-            Metadata for reconstructing the spatial layout of test predictions.
-        shot_image_spacing, shot_image_origins, shot_image_directions:
-            Metadata used to align segmentation labels with patch features during training.
-        patch_size : Size of each 3D patch.
-        return_binary : Whether to threshold predictions into binary segmentation masks.
-    """
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.is_task11 = False
-        self.is_task06 = False
-
-    def fit(self):
-        # build training data and loader
-        train_data = construct_data_with_labels(
-            coordinates=self.shot_coordinates,
-            embeddings=self.shot_features,
-            cases=self.shot_names,
-            patch_size=self.patch_size,
-            labels=self.shot_labels,
-        )
-        train_loader = load_patch_data(train_data, batch_size=1)
-
-        max_class = max_class_label_from_labels(self.shot_labels)
-        if max_class >= 100:
-            self.is_task11 = True
-            num_classes = 4
-        elif max_class > 1:
-            self.is_task06 = True
-            num_classes = 2
-        else:
-            num_classes = max_class + 1
-
-        # set up device and model
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        decoder = ConvUpsampleSegAdaptor(
-            target_shape=self.patch_size[::-1],  # Convert to (D, H, W) order
-            num_classes=num_classes,
-        )
-        print(f"Training decoder with {num_classes} classes")
-        print(decoder)
-        decoder.to(self.device)
-        self.decoder = train_seg_adaptor3d(decoder, train_loader, self.device, is_task11=self.is_task11, is_task06=self.is_task06)
-
-    def predict(self) -> np.ndarray:
-        # build test data and loader
-        test_data = construct_data_with_labels(
-            coordinates=self.test_coordinates,
-            embeddings=self.test_features,
-            cases=self.test_cases,
-            patch_size=self.patch_size,
-            image_sizes=self.test_image_sizes,
-            image_origins=self.test_image_origins,
-            image_spacings=self.test_image_spacings,
-            image_directions=self.test_image_directions,
-        )
-
-        test_loader = load_patch_data(test_data, batch_size=1)
-        # run inference using the trained decoder
-
-        return inference3d_softmax(self.decoder, test_loader, self.device, self.return_binary, self.test_cases, self.test_label_sizes, self.test_label_spacing, self.test_label_origins, self.test_label_directions, is_task11=self.is_task11)
-
 
 def expand_instance_labels(y: np.ndarray) -> np.ndarray:
     """
@@ -1791,6 +1711,46 @@ def train_seg_adaptor3d(decoder, data_loader, device, num_epochs = 3, is_task11=
     return decoder
 
 
+def exact_triplet_from_ref(self, flat: int, ref: tuple[int, int, int]) -> tuple[int, int, int]:
+    """
+    Find integers (D,H,W) with D*H*W == flat, close to the heuristic proportions
+    implied by 'ref' (D_ref,H_ref,W_ref).
+    """
+
+    D_ref, H_ref, W_ref = ref
+    ref_ratio = max(1, D_ref * H_ref * W_ref)
+    k = (flat / ref_ratio) ** (1.0 / 3.0)
+
+    # helper: all divisors of n
+    def divisors(n: int):
+        ds = []
+        r = int(math.isqrt(n))
+        for d in range(1, r + 1):
+            if n % d == 0:
+                ds.append(d)
+                q = n // d
+                if q != d:
+                    ds.append(q)
+        return sorted(ds)
+
+    # pick W as a divisor of 'flat' closest to W_ref*k
+    w_heur = max(1, int(round(W_ref * k)))
+    w_candidates = divisors(flat)
+    W = min(w_candidates, key=lambda w: abs(w - w_heur))
+
+    base = flat // W  # now need D*H = base
+
+    # pick D as a divisor of 'base' closest to D_ref*k; H follows
+    d_heur = max(1, int(round(D_ref * k)))
+    d_candidates = divisors(base)
+    D = min(d_candidates, key=lambda d: abs(d - d_heur))
+    H = base // D
+
+    # ensure non-zero
+    D = max(1, D); H = max(1, H); W = max(1, W)
+    assert D * H * W == flat, f"factorization failed: {D}*{H}*{W} != {flat}"
+    return D, H, W
+
 
 class UpsampleConvSegAdaptor(nn.Module):
     def __init__(self, target_shape=None, in_channels=32, num_classes=2):
@@ -1808,24 +1768,30 @@ class UpsampleConvSegAdaptor(nn.Module):
 
     def forward(self, x):
         C = self.in_channels
-        B = x.shape[0]
-        flat_voxel_count = x.shape[1] // C
+        B, feat_len = x.shape
+        if feat_len % C != 0:
+            raise ValueError(
+            f"[Adaptor] Embedding length {feat_len} must be divisible by in_channels={C}."
+        )
+
+        flat = feat_len // C
 
         D_ref, H_ref, W_ref = self.target_shape
         ref_ratio = D_ref * H_ref * W_ref
 
-        k = (flat_voxel_count / ref_ratio) ** (1 / 3)
-
+        k = (flat / ref_ratio) ** (1 / 3)
         D = round(D_ref * k)
         H = round(H_ref * k)
         W = round(W_ref * k)
-
+        
+        if D * H * W != flat:
+            D, H, W = exact_triplet_from_ref(flat, (D_ref, H_ref, W_ref))
+        
         x = x.view(B, C, D, H, W)
         x = F.interpolate(x, size=self.target_shape, mode="trilinear", align_corners=False)
         x = self.conv_blocks(x)
         return x
-
-
+    
 class ConvUpsampleSegAdaptor(nn.Module):
     def __init__(self, target_shape=None, in_channels=32, num_classes=2):
         super().__init__()
@@ -1837,23 +1803,31 @@ class ConvUpsampleSegAdaptor(nn.Module):
 
     def forward(self, x):
         C = self.in_channels
-        B = x.shape[0]
-        flat_voxel_count = x.shape[1] // C
+        B, feat_len = x.shape
+        if feat_len % C != 0:
+            raise ValueError(
+            f"[Adaptor] Embedding length {feat_len} must be divisible by in_channels={C}."
+        )
+
+        flat = x.shape[1] // C
 
         D_ref, H_ref, W_ref = self.target_shape
         ref_ratio = D_ref * H_ref * W_ref
 
-        k = (flat_voxel_count / ref_ratio) ** (1 / 3)
+        k = (flat / ref_ratio) ** (1 / 3)
 
         D = round(D_ref * k)
         H = round(H_ref * k)
         W = round(W_ref * k)
 
+        if D * H * W != flat:
+            D, H, W = exact_triplet_from_ref(flat, (D_ref, H_ref, W_ref))
+
         x = x.view(B, C, D, H, W)
         x = self.conv_blocks(x)
         x = F.interpolate(x, size=self.target_shape, mode="trilinear", align_corners=False)
         return x
-
+    
 def dice_loss(pred, target, smooth=1e-5):
     num_classes = pred.shape[1]
     pred = F.softmax(pred, dim=1)

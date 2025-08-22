@@ -34,7 +34,6 @@ from unicorn_eval.adaptors import (
     SegmentationUpsampling3D,
     ConvSegmentation3D,
     LinearUpsampleConv3D,
-    Conv3DLineaerUpsample,
     WeightedKNN,
     WeightedKNNRegressor,
 )
@@ -370,7 +369,7 @@ def adapt_features(
             shot_image_directions=shot_image_directions,
         )
     elif adaptor_name == "conv3d-linear-upsample":
-        adaptor = Conv3DLineaerUpsample(
+        adaptor = LinearUpsampleConv3D(
             shot_features=shot_features,
             shot_coordinates=shot_coordinates,
             shot_names=shot_names,
@@ -394,6 +393,7 @@ def adapt_features(
             shot_image_spacing=shot_image_spacing,
             shot_image_origins=shot_image_origins,
             shot_image_directions=shot_image_directions,
+            conv_then_upsample=True
         )
 
     elif adaptor_name == "segmentation-upsampling-3d":
@@ -479,7 +479,7 @@ def adapt_features(
         )
 
     elif adaptor_name == "detection-by-conv3d-linear-upsample":
-        adaptor = Conv3DLineaerUpsample(
+        adaptor = LinearUpsampleConv3D(
             shot_features=shot_features,
             shot_coordinates=shot_coordinates,
             shot_names=shot_names,
@@ -504,6 +504,7 @@ def adapt_features(
             test_label_directions=test_label_directions,
             patch_size=patch_size,
             return_binary=False,
+            conv_then_upsample=True,
         )
 
     elif adaptor_name == "detection-by-segmentation-upsampling-3d":
