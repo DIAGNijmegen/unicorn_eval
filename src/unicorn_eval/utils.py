@@ -342,7 +342,6 @@ def adapt_features(
             test_image_sizes=test_image_sizes,
             patch_size=patch_size[0],
         )
-
     elif adaptor_name == "linear-upsample-conv3d":
         adaptor = LinearUpsampleConv3D(
             shot_features=shot_features,
@@ -368,6 +367,33 @@ def adapt_features(
             shot_image_spacing=shot_image_spacing,
             shot_image_origins=shot_image_origins,
             shot_image_directions=shot_image_directions,
+        )
+    elif adaptor_name == "conv3d-linear-upsample":
+        adaptor = LinearUpsampleConv3D(
+            shot_features=shot_features,
+            shot_coordinates=shot_coordinates,
+            shot_names=shot_names,
+            shot_labels=shot_labels,
+            shot_label_spacing=shot_label_spacing,
+            shot_label_origins=shot_label_origins,
+            shot_label_directions=shot_label_directions,
+            test_features=test_features,
+            test_coordinates=test_coordinates,
+            test_names=test_names,  # try to remove this input
+            test_image_sizes=test_image_sizes,
+            test_image_origins=test_image_origins,
+            test_image_spacings=test_image_spacing,
+            test_image_directions=test_image_directions,
+            test_label_sizes=test_label_sizes,
+            test_label_spacing=test_label_spacing,
+            test_label_origins=test_label_origins,
+            test_label_directions=test_label_directions,
+            patch_size=patch_size,
+            shot_image_sizes=shot_image_sizes,
+            shot_image_spacing=shot_image_spacing,
+            shot_image_origins=shot_image_origins,
+            shot_image_directions=shot_image_directions,
+            conv_then_upsample=True
         )
 
     elif adaptor_name == "segmentation-upsampling-3d":
@@ -422,6 +448,63 @@ def adapt_features(
             shot_image_spacing=shot_image_spacing,
             shot_image_origins=shot_image_origins,
             shot_image_directions=shot_image_directions,
+        )
+
+    elif adaptor_name == "detection-by-linear-upsample-conv3d":
+        adaptor = LinearUpsampleConv3D(
+            shot_features=shot_features,
+            shot_coordinates=shot_coordinates,
+            shot_names=shot_names,
+            shot_image_sizes=shot_image_sizes,
+            shot_image_spacing=shot_image_spacing,
+            shot_image_origins=shot_image_origins,
+            shot_image_directions=shot_image_directions,
+            shot_labels=shot_labels,
+            shot_label_spacing=shot_label_spacing,
+            shot_label_origins=shot_label_origins,
+            shot_label_directions=shot_label_directions,
+            test_features=test_features,
+            test_coordinates=test_coordinates,
+            test_names=test_names,
+            test_image_sizes=test_image_sizes,
+            test_image_origins=test_image_origins,
+            test_image_spacings=test_image_spacing,
+            test_image_directions=test_image_directions,
+            test_label_sizes=test_label_sizes,
+            test_label_spacing=test_label_spacing,
+            test_label_origins=test_label_origins,
+            test_label_directions=test_label_directions,
+            patch_size=patch_size,
+            return_binary=False,
+        )
+
+    elif adaptor_name == "detection-by-conv3d-linear-upsample":
+        adaptor = LinearUpsampleConv3D(
+            shot_features=shot_features,
+            shot_coordinates=shot_coordinates,
+            shot_names=shot_names,
+            shot_image_sizes=shot_image_sizes,
+            shot_image_spacing=shot_image_spacing,
+            shot_image_origins=shot_image_origins,
+            shot_image_directions=shot_image_directions,
+            shot_labels=shot_labels,
+            shot_label_spacing=shot_label_spacing,
+            shot_label_origins=shot_label_origins,
+            shot_label_directions=shot_label_directions,
+            test_features=test_features,
+            test_coordinates=test_coordinates,
+            test_names=test_names,
+            test_image_sizes=test_image_sizes,
+            test_image_origins=test_image_origins,
+            test_image_spacings=test_image_spacing,
+            test_image_directions=test_image_directions,
+            test_label_sizes=test_label_sizes,
+            test_label_spacing=test_label_spacing,
+            test_label_origins=test_label_origins,
+            test_label_directions=test_label_directions,
+            patch_size=patch_size,
+            return_binary=False,
+            conv_then_upsample=True,
         )
 
     elif adaptor_name == "detection-by-segmentation-upsampling-3d":
