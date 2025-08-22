@@ -14,10 +14,10 @@
 
 import gc
 import json
+from collections import defaultdict
 from multiprocessing import Pool
 from pathlib import Path
 from pprint import pformat
-from collections import defaultdict
 
 import numpy as np
 import openslide
@@ -28,14 +28,9 @@ from dragon_eval.evaluation import REGRESSION_EPSILON, TASK_TYPE, EvalType
 from picai_prep.preprocessing import PreprocessingSettings, Sample
 
 from unicorn_eval.helpers import get_max_workers
-from unicorn_eval.utils import (
-    adapt_features,
-    evaluate_predictions,
-    extract_data,
-    extract_embeddings_and_labels,
-    normalize_metric,
-    write_json_file,
-)
+from unicorn_eval.utils import (adapt_features, evaluate_predictions,
+                                extract_data, extract_embeddings_and_labels,
+                                normalize_metric, write_json_file)
 
 INPUT_DIRECTORY = Path("/input")
 OUTPUT_DIRECTORY = Path("/output")
@@ -179,9 +174,17 @@ REGRESSION_EPSILON.update(
 def process(job):
     """Processes a single algorithm job, looking at the outputs"""
 
-    embeddings = coordinates = spacing = patch_size = None
-    image_size = image_spacing = prediction = None
-    image_origin = image_direction = None
+    (
+        embeddings,
+        prediction,
+        coordinates,
+        spacing,
+        patch_size,
+        image_size,
+        image_spacing,
+        image_origin,
+        image_direction,
+    ) = (None, None, None, None, None, None, None, None, None)
 
     report = "Processing:\n"
     report += pformat(job)
@@ -247,15 +250,6 @@ def process(job):
                 feature = np.array(feature).astype(np.float32)
                 features.append(feature)
             embeddings = np.concatenate(features)
-            (
-                coordinates,
-                spacing,
-                patch_size,
-                image_size,
-                image_spacing,
-                image_origin,
-                image_direction,
-            ) = (None, None, None, None, None, None, None)
 
         elif slug_embedding == "patch-neural-representation":
             # TODO: better handle the case when there are multiple encoded inputs for a case
@@ -455,7 +449,7 @@ def write_metrics(*, metrics):
 
 
 def write_combined_metrics(
-    *, metric_dict: dict[dict], save_predictions: bool = True
+    *, metric_dict: dict[str, dict], save_predictions: bool = True
 ) -> None:
     metrics = {"metrics": {}, "normalized_metrics": {}}
     predictions = {"predictions": []}
