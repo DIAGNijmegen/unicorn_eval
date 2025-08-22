@@ -319,7 +319,7 @@ def process(job):
     elif label_path.suffix == ".mha":
         label_path = Path(str(label_path).replace("{case_id}", case_name))
         label, label_size, label_origin, label_spacing, label_direction = load_mha_file(
-            location=label_path
+            path=label_path, spacing=image_spacing, matrix_size=image_size
         )
     else:
         raise ValueError(f"Unsupported file format: {label_path.suffix}")
@@ -429,18 +429,22 @@ def load_tif_file(*, location):
     return class_labels
 
 
-def load_mha_file(*, location):
-    class_labels = sitk.ReadImage(location)
-    if "transverse-cspca-label" in str(location):
+def load_mha_file(*, path: Path | str, spacing: list[float] | None = None, matrix_size: list[int] | None = None):
+    class_labels = sitk.ReadImage(str(path))
+    if "transverse-cspca-label" in str(path):
         pat_case = Sample(
             scans=[class_labels],
-            lbl=class_labels,
             settings=PreprocessingSettings(
-                spacing=[3, 1.5, 1.5], matrix_size=[16, 256, 256]
+                spacing=spacing, matrix_size=matrix_size
+                # spacing=[3, 1.5, 1.5], matrix_size=[16, 256, 256]
             ),
         )
         pat_case.preprocess()
-        class_labels = pat_case.lbl
+        class_labels = pat_case.scans[0]
+
+    if class_labels is None:
+        raise ValueError("Failed to load class labels from MHA file.")
+
     return (
         sitk.GetArrayFromImage(class_labels),
         list(class_labels.GetSize()),
