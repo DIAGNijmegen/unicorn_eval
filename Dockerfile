@@ -53,7 +53,7 @@ tokenizer.save_pretrained('/opt/app/unicorn_eval/models/dragon-bert-base-mixed-d
 
 # install unicorn_eval
 COPY --chown=user:user . /opt/app/unicorn_eval
-RUN python -m pip install /opt/app/unicorn_eval
+RUN python -m pip install -e /opt/app/unicorn_eval
 
 
 ENTRYPOINT ["unicorn_eval"]
