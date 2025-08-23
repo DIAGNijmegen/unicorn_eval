@@ -25,7 +25,6 @@ import pandas as pd
 import SimpleITK as sitk
 from dragon_eval import DragonEval
 from dragon_eval.evaluation import REGRESSION_EPSILON, TASK_TYPE, EvalType
-from picai_prep.preprocessing import PreprocessingSettings, Sample
 
 from unicorn_eval.helpers import get_max_workers
 from unicorn_eval.utils import (adapt_features, evaluate_predictions,
