@@ -353,6 +353,7 @@ def process(job):
     case_info_dict["image_origin"] = image_origin
     case_info_dict["image_direction"] = image_direction
     case_info_dict["patch_size"] = patch_size
+    case_info_dict["patch_spacing"] = patch_spacing
     case_info_dict["feature_grid_resolution"] = feature_grid_resolution
     case_info_dict["prediction"] = prediction
     case_info_dict["label"] = label
