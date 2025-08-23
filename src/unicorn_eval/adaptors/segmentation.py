@@ -1168,7 +1168,7 @@ class ConvSegmentation3D(SegmentationUpsampling3D):
         super().__init__(*args, **kwargs)
         # First three components are the original patchsize, next three are the resolution within the patch
         # If no pack size is given, use (1, 1, 1) to be compatible with sparse models
-        self.pack_size = self.patch_size[3:] if len(self.patch_size) > 3 else (1, 1, 1)
+        self.pack_size = self.feature_grid_resolution if self.feature_grid_resolution is not None else (1, 1, 1)
         self.patch_size = self.patch_size[:3]
 
     @staticmethod

@@ -268,6 +268,7 @@ def process(job):
                     curr_coordinates,
                     curr_spacing,
                     curr_patch_size,
+                    curr_feature_grid_resolution,
                     curr_image_size,
                     curr_image_spacing,
                     curr_image_origin,
@@ -278,6 +279,7 @@ def process(job):
                     coordinates = curr_coordinates
                     spacing = curr_spacing
                     patch_size = curr_patch_size
+                    feature_grid_resolution = curr_feature_grid_resolution
                     image_size = curr_image_size
                     image_spacing = curr_image_spacing
                     image_origin = curr_image_origin
@@ -347,6 +349,7 @@ def process(job):
     case_info_dict["image_origin"] = image_origin
     case_info_dict["image_direction"] = image_direction
     case_info_dict["patch_size"] = patch_size
+    case_info_dict["feature_grid_resolution"] = feature_grid_resolution
     case_info_dict["prediction"] = prediction
     case_info_dict["label"] = label
     case_info_dict["extra_labels"] = extra_labels
@@ -690,6 +693,7 @@ def main():
             return_probabilities = REQUIRES_PROBABILITIES_DICT[task_name]
 
             patch_size = task_results["patch_size"]
+            feature_grid_resolution = task_results["feature_grid_resolution"]
 
             shot_embeddings = task_results["shot_embeddings"]
             shot_labels = task_results["shot_labels"]
@@ -732,6 +736,7 @@ def main():
                 test_coordinates=task_results["cases_coordinates"],
                 test_names=case_ids,
                 patch_size=patch_size,
+                feature_grid_resolution=feature_grid_resolution,
                 test_image_sizes=case_image_sizes,
                 shot_extra_labels=shot_extra_labels,
                 test_image_spacing=case_image_spacings,
