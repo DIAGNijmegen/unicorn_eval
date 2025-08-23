@@ -1518,6 +1518,10 @@ def inference3d_softmax(decoder, data_loader, device, return_binary,  test_cases
                             int(batch["patch_size"][j][i])
                             for j in range(len(batch["patch_size"]))
                         ],
+                        "patch_spacing": [
+                            float(batch["patch_spacing"][j][i])
+                            for j in range(len(batch["patch_spacing"]))
+                        ],
                         "image_size": [
                             int(batch["image_size"][j][i])
                             for j in range(len(batch["image_size"]))
@@ -1550,6 +1554,7 @@ def inference3d_softmax(decoder, data_loader, device, return_binary,  test_cases
                         "coord": list(coord),
                         "features": avg_features,
                         "patch_size": patches[0]["patch_size"],
+                        "patch_spacing": patches[0]["patch_spacing"],
                         "image_size": patches[0]["image_size"],
                         "image_origin": patches[0]["image_origin"],
                         "image_spacing": patches[0]["image_spacing"],
