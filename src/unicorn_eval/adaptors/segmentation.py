@@ -568,6 +568,10 @@ def inference3d(
                             int(batch["patch_size"][j][i])
                             for j in range(len(batch["patch_size"]))
                         ],
+                        "patch_spacing": [
+                            float(batch["patch_spacing"][j][i])
+                            for j in range(len(batch["patch_spacing"]))
+                        ],
                         "image_size": [
                             int(batch["image_size"][j][i])
                             for j in range(len(batch["image_size"]))
@@ -600,6 +604,7 @@ def inference3d(
                         "coord": list(coord),
                         "features": avg_features,
                         "patch_size": patches[0]["patch_size"],
+                        "patch_spacing": patches[0]["patch_spacing"],
                         "image_size": patches[0]["image_size"],
                         "image_origin": patches[0]["image_origin"],
                         "image_spacing": patches[0]["image_spacing"],
@@ -642,6 +647,7 @@ def construct_data_with_labels(
     embeddings,
     cases,
     patch_size,
+    patch_spacing,
     labels=None,
     image_sizes=None,
     image_origins=None,
@@ -675,6 +681,7 @@ def construct_data_with_labels(
                 "patch": np.array(patch_img, dtype=np.float32),
                 "coordinates": patch_coordinates[i],
                 "patch_size": patch_size,
+                "patch_spacing": patch_spacing,
                 "case_number": case_idx,
             }
             if lbl_feat is not None:
@@ -846,6 +853,7 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
         test_label_origins,
         test_label_directions,
         patch_size,
+        patch_spacing,
         return_binary=True,
     ):   
         label_patch_features = []
@@ -861,6 +869,7 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
                 image_direction=shot_image_directions[shot_names[idx]],
                 start_coordinates=shot_coordinates[idx],
                 patch_size=patch_size,
+                patch_spacing=patch_spacing,
             )
             label_patch_features.append(label_feats)
         label_patch_features = np.array(label_patch_features, dtype=object)
@@ -888,6 +897,7 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
         self.test_label_origins = test_label_origins
         self.test_label_directions = test_label_directions
         self.patch_size = patch_size
+        self.patch_spacing = patch_spacing
         self.decoder = None
         self.return_binary = return_binary
 
@@ -898,6 +908,7 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
             embeddings=self.shot_features,
             cases=self.shot_names,
             patch_size=self.patch_size,
+            patch_spacing=self.patch_spacing,
             labels=self.shot_labels,
         )
 
@@ -937,6 +948,7 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
             embeddings=self.test_features,
             cases=self.test_cases,
             patch_size=self.patch_size,
+            patch_spacing=self.patch_spacing,
             image_sizes=self.test_image_sizes,
             image_origins=self.test_image_origins,
             image_spacings=self.test_image_spacings,
@@ -1238,6 +1250,7 @@ class ConvSegmentation3D(SegmentationUpsampling3D):
             embeddings=self.shot_features,
             cases=self.shot_names,
             patch_size=self.patch_size,
+            patch_spacing=self.patch_spacing,
             labels=self.shot_labels,
         )
         train_loader = load_patch_data(train_data, batch_size=32)
@@ -1285,6 +1298,7 @@ class ConvSegmentation3D(SegmentationUpsampling3D):
             embeddings=self.test_features,
             cases=self.test_cases,
             patch_size=self.patch_size,
+            patch_spacing=self.patch_spacing,
             image_sizes=self.test_image_sizes,
             image_origins=self.test_image_origins,
             image_spacings=self.test_image_spacings,
@@ -1352,6 +1366,7 @@ class LinearUpsampleConv3D(SegmentationUpsampling3D):
             embeddings=self.shot_features,
             cases=self.shot_names,
             patch_size=self.patch_size,
+            patch_spacing=self.patch_spacing,
             labels=self.shot_labels,
         )
         train_loader = load_patch_data(train_data, batch_size=1)
@@ -1390,6 +1405,7 @@ class LinearUpsampleConv3D(SegmentationUpsampling3D):
             embeddings=self.test_features,
             cases=self.test_cases,
             patch_size=self.patch_size,
+            patch_spacing=self.patch_spacing,
             image_sizes=self.test_image_sizes,
             image_origins=self.test_image_origins,
             image_spacings=self.test_image_spacings,

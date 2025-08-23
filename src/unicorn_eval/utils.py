@@ -147,6 +147,7 @@ def adapt_features(
     shot_names=None,
     test_names=None,
     patch_size=224,
+    patch_spacing=None,
     feature_grid_resolution=None,
     test_image_sizes=None,
     test_image_spacing=None,
@@ -336,6 +337,7 @@ def adapt_features(
             test_names=test_names,
             test_image_sizes=test_image_sizes,
             patch_size=patch_size[0],
+            patch_spacing=patch_spacing[0],  # TODO: check if this makes sense
         )
     elif adaptor_name == "linear-upsample-conv3d":
         adaptor = LinearUpsampleConv3D(
@@ -358,6 +360,7 @@ def adapt_features(
             test_label_origins=test_label_origins,
             test_label_directions=test_label_directions,
             patch_size=patch_size,
+            patch_spacing=patch_spacing,
             shot_image_sizes=shot_image_sizes,
             shot_image_spacing=shot_image_spacing,
             shot_image_origins=shot_image_origins,
@@ -384,6 +387,7 @@ def adapt_features(
             test_label_origins=test_label_origins,
             test_label_directions=test_label_directions,
             patch_size=patch_size,
+            patch_spacing=patch_spacing,
             shot_image_sizes=shot_image_sizes,
             shot_image_spacing=shot_image_spacing,
             shot_image_origins=shot_image_origins,
@@ -412,6 +416,7 @@ def adapt_features(
             test_label_origins=test_label_origins,
             test_label_directions=test_label_directions,
             patch_size=patch_size,
+            patch_spacing=patch_spacing,
             shot_image_sizes=shot_image_sizes,
             shot_image_spacing=shot_image_spacing,
             shot_image_origins=shot_image_origins,
@@ -528,6 +533,7 @@ def adapt_features(
             test_label_origins=test_label_origins,
             test_label_directions=test_label_directions,
             patch_size=patch_size,
+            patch_spacing=patch_spacing,
             return_binary=False,
         )
 
@@ -556,7 +562,8 @@ def adapt_features(
             test_label_origins=test_label_origins,
             test_label_directions=test_label_directions,
             patch_size=patch_size,
-            feature_grid_resolution = feature_grid_resolution,
+            patch_spacing=patch_spacing,
+            feature_grid_resolution=feature_grid_resolution,
             return_binary=False,
         )
 
@@ -940,6 +947,7 @@ def extract_data(patch_neural_representation):
     metadata: dict[str, Any] = patch_neural_representation["meta"]
     spacing = metadata["patch-spacing"]
     patch_size = metadata["patch-size"]
+    patch_spacing = metadata["patch-spacing"]
     feature_grid_resolution = metadata.get("feature-grid-resolution", [1]*len(patch_size))
     image_size = metadata["image-size"]
     image_spacing = metadata["image-spacing"]
@@ -958,6 +966,7 @@ def extract_data(patch_neural_representation):
         coordinates,
         spacing,
         patch_size,
+        patch_spacing,
         feature_grid_resolution,
         image_size,
         image_spacing,

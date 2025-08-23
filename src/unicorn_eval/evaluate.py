@@ -178,6 +178,7 @@ def process(job):
     coordinates = None
     spacing = None
     patch_size = None
+    patch_spacing = None
     image_size = None
     image_spacing = None
     image_origin = None
@@ -260,6 +261,7 @@ def process(job):
                     curr_coordinates,
                     curr_spacing,
                     curr_patch_size,
+                    curr_patch_spacing,
                     curr_feature_grid_resolution,
                     curr_image_size,
                     curr_image_spacing,
@@ -271,6 +273,7 @@ def process(job):
                     coordinates = curr_coordinates
                     spacing = curr_spacing
                     patch_size = curr_patch_size
+                    patch_spacing = curr_patch_spacing
                     feature_grid_resolution = curr_feature_grid_resolution
                     image_size = curr_image_size
                     image_spacing = curr_image_spacing
@@ -281,6 +284,7 @@ def process(job):
                     assert np.all(coordinates == curr_coordinates), "Coordinates do not match between images"
                     assert np.all(spacing == curr_spacing), "Spacing does not match between images"
                     assert np.all(patch_size == curr_patch_size), "Patch size does not match between images"
+                    assert np.all(patch_spacing == curr_patch_spacing), "Patch spacing does not match between images"
                     assert np.all(image_size == curr_image_size), "Image size does not match between images"
                     assert np.all(image_spacing == curr_image_spacing), "Image spacing does not match between images"
                     assert np.all(image_origin == curr_image_origin), "Image origin does not match between images"
@@ -687,6 +691,7 @@ def main():
             return_probabilities = REQUIRES_PROBABILITIES_DICT[task_name]
 
             patch_size = task_results["patch_size"]
+            patch_spacing = task_results["patch_spacing"]
             feature_grid_resolution = task_results["feature_grid_resolution"]
 
             shot_embeddings = task_results["shot_embeddings"]
@@ -730,6 +735,7 @@ def main():
                 test_coordinates=task_results["cases_coordinates"],
                 test_names=case_ids,
                 patch_size=patch_size,
+                patch_spacing=patch_spacing,
                 feature_grid_resolution=feature_grid_resolution,
                 test_image_sizes=case_image_sizes,
                 shot_extra_labels=shot_extra_labels,
