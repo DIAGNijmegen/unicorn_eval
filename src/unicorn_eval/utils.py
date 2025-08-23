@@ -837,6 +837,7 @@ def extract_embeddings_and_labels(processed_results, task_name):
         "domain": None,
         "spacing": None,
         "patch_size": None,
+        "patch_spacing": None,
         "feature_grid_resolution": None,
         "prediction": [],
         "shot_embeddings": [],
@@ -886,6 +887,7 @@ def extract_embeddings_and_labels(processed_results, task_name):
             task_data["modality"] = result["modality"]
             task_data["domain"] = result["domain"]
             task_data["spacing"] = result["spacing"]
+            task_data["patch_size"] = result["patch_size"]
             task_data["patch_size"] = result["patch_size"]
             task_data["feature_grid_resolution"] = result["feature_grid_resolution"]
 
