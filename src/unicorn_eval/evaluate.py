@@ -687,7 +687,8 @@ def main():
         task_type = task_results["task_type"]
 
         if modality == "vision":
-
+            if task_name not in adaptors:
+                raise Exception(f"No adaptor found for task {task_name}")
             adaptor_name = adaptors[task_name]
             return_probabilities = REQUIRES_PROBABILITIES_DICT[task_name]
 
