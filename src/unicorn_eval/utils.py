@@ -153,6 +153,7 @@ def adapt_features(
     shot_names=None,
     test_names=None,
     patch_size=224,
+    feature_grid_resolution=None,
     test_image_sizes=None,
     test_image_spacing=None,
     test_image_origins=None,
@@ -444,6 +445,7 @@ def adapt_features(
             test_label_origins=test_label_origins,
             test_label_directions=test_label_directions,
             patch_size=patch_size,
+            feature_grid_resolution = feature_grid_resolution,
             shot_image_sizes=shot_image_sizes,
             shot_image_spacing=shot_image_spacing,
             shot_image_origins=shot_image_origins,
@@ -560,6 +562,7 @@ def adapt_features(
             test_label_origins=test_label_origins,
             test_label_directions=test_label_directions,
             patch_size=patch_size,
+            feature_grid_resolution = feature_grid_resolution,
             return_binary=False,
         )
 
@@ -833,6 +836,7 @@ def extract_embeddings_and_labels(processed_results, task_name):
         "domain": None,
         "spacing": None,
         "patch_size": None,
+        "feature_grid_resolution": None,
         "prediction": [],
         "shot_embeddings": [],
         "shot_coordinates": [],
@@ -882,6 +886,7 @@ def extract_embeddings_and_labels(processed_results, task_name):
             task_data["domain"] = result["domain"]
             task_data["spacing"] = result["spacing"]
             task_data["patch_size"] = result["patch_size"]
+            task_data["feature_grid_resolution"] = result["feature_grid_resolution"]
 
         if result["split"] == "shot":
             task_data["shot_embeddings"].append(result["embeddings"])
@@ -938,6 +943,7 @@ def extract_data(patch_neural_representation):
     # Extract metadata
     spacing = patch_neural_representation["meta"]["patch-spacing"]
     patch_size = patch_neural_representation["meta"]["patch-size"]
+    feature_grid_resolution = patch_neural_representation["meta"]["feature-grid-resolution"]
     image_size = patch_neural_representation["meta"]["image-size"]
     image_spacing = patch_neural_representation["meta"]["image-spacing"]
     image_origin = patch_neural_representation["meta"]["image-origin"]
@@ -955,6 +961,7 @@ def extract_data(patch_neural_representation):
         coordinates,
         spacing,
         patch_size,
+        feature_grid_resolution,
         image_size,
         image_spacing,
         image_origin,
