@@ -926,9 +926,11 @@ def extract_embeddings_and_labels(processed_results, task_name):
     elif task_type == "detection":
         if task_domain == "pathology":
             task_data = process_detection_pathology(task_data)
-        elif (task_domain == "CT") | (task_domain == "MR"):
+        elif task_domain in ["CT", "MR"]:
             if task_name != "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams":
                 task_data = process_detection_radiology(task_data, task_name)
+        else:
+            raise ValueError(f"Unknown task domain: {task_domain}")
 
     return task_data
 
