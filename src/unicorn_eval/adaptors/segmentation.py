@@ -432,7 +432,7 @@ class Decoder3D(nn.Module):
         return self.decoder(x)
 
 
-def train_decoder3d(decoder, data_loader, device, num_epochs=3, loss_fn=None, optimizer=None, label_mapper=None):
+def train_decoder3d(decoder, data_loader, device, num_epochs: int = 3, iterations_per_epoch: int | None = None, loss_fn=None, optimizer=None, label_mapper=None):
     if loss_fn is None:
         loss_fn = DiceLoss(sigmoid=True)
     if optimizer is None:
@@ -443,7 +443,8 @@ def train_decoder3d(decoder, data_loader, device, num_epochs=3, loss_fn=None, op
         epoch_loss = 0
 
         iteration_count = 0
-        for batch in data_loader:
+        batch_iter = tqdm(data_loader, total=iterations_per_epoch, desc=f"Epoch {epoch+1}/{num_epochs}", leave=False)
+        for batch in batch_iter:
             iteration_count += 1
 
             patch_emb = batch["patch"].to(device)
@@ -461,7 +462,13 @@ def train_decoder3d(decoder, data_loader, device, num_epochs=3, loss_fn=None, op
 
             epoch_loss += loss.item()
 
-        print(f"Avg total epoch loss = {epoch_loss / iteration_count:.4f}")
+            # Update progress bar with current loss and running average
+            batch_iter.set_postfix(loss=f"{loss.item():.4f}", avg=f"{epoch_loss / iteration_count:.4f}")
+
+            if iterations_per_epoch is not None and iteration_count >= iterations_per_epoch:
+                break
+
+        print(f"Epoch {epoch+1}: Avg total loss = {epoch_loss / iteration_count:.4f}")
 
     return decoder
 
@@ -1484,7 +1491,7 @@ def inference3d_softmax(decoder, data_loader, device, return_binary,  test_cases
     with torch.no_grad():
         grouped_predictions = defaultdict(lambda: defaultdict(list))
 
-        for batch in data_loader:
+        for batch in tqdm(data_loader, desc="Inference"):
             inputs = batch["patch"].to(device)  # shape: [B, ...]
             coords = batch["coordinates"]  # list of 3 tensors
             image_idxs = batch["case_number"]
@@ -1691,7 +1698,7 @@ def map_labels(y: torch.Tensor) -> torch.Tensor:
     return y_new
 
 
-def train_seg_adaptor3d(decoder, data_loader, device, num_epochs = 3, is_task11=False, is_task06=False):
+def train_seg_adaptor3d(decoder, data_loader, device, num_epochs = 3, iterations_per_epoch: int | None = None, is_task11=False, is_task06=False):
     ce_loss = nn.CrossEntropyLoss()
     optimizer = optim.Adam(decoder.parameters(), lr=1e-3)
     # Train decoder
@@ -1700,7 +1707,7 @@ def train_seg_adaptor3d(decoder, data_loader, device, num_epochs = 3, is_task11=
         epoch_loss = 0.0
 
         # batch progress
-        batch_iter = tqdm(data_loader, desc=f"Epoch {epoch+1}/{num_epochs}", leave=False)
+        batch_iter = tqdm(data_loader, total=iterations_per_epoch, desc=f"Epoch {epoch+1}/{num_epochs}", leave=False)
         iteration_count = 0
     
         for batch in batch_iter:
@@ -1727,11 +1734,13 @@ def train_seg_adaptor3d(decoder, data_loader, device, num_epochs = 3, is_task11=
 
             epoch_loss += loss.item()
 
-            # tqdm description 
+            # Update progress bar with current loss and running average
             batch_iter.set_postfix(loss=f"{loss.item():.4f}", avg=f"{epoch_loss / iteration_count:.4f}")
 
-        print(f"Epoch {epoch+1}: Avg total loss = {epoch_loss / iteration_count:.4f}")                               
+            if iterations_per_epoch is not None and iteration_count >= iterations_per_epoch:
+                break
 
+        print(f"Epoch {epoch+1}: Avg total loss = {epoch_loss / iteration_count:.4f}")
 
     return decoder
 
