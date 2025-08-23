@@ -3148,5 +3148,1781 @@
         }
       }
     ]
+  },
+  {
+    "pk": "10025_1000025",
+    "inputs": [
+      {
+        "image": {
+          "name": "10025_1000025_t2w.mha"
+        },
+        "interface": {
+          "slug": "transverse-t2-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10025_1000025_adc.mha"
+        },
+        "interface": {
+          "slug": "transverse-adc-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10025_1000025_hbv.mha"
+        },
+        "interface": {
+          "slug": "transverse-hbv-prostate-mri"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "10035_1000035",
+    "inputs": [
+      {
+        "image": {
+          "name": "10035_1000035_t2w.mha"
+        },
+        "interface": {
+          "slug": "transverse-t2-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10035_1000035_adc.mha"
+        },
+        "interface": {
+          "slug": "transverse-adc-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10035_1000035_hbv.mha"
+        },
+        "interface": {
+          "slug": "transverse-hbv-prostate-mri"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "10015_1000015",
+    "inputs": [
+      {
+        "image": {
+          "name": "10015_1000015_t2w.mha"
+        },
+        "interface": {
+          "slug": "transverse-t2-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10015_1000015_adc.mha"
+        },
+        "interface": {
+          "slug": "transverse-adc-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10015_1000015_hbv.mha"
+        },
+        "interface": {
+          "slug": "transverse-hbv-prostate-mri"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "10097_1000097",
+    "inputs": [
+      {
+        "image": {
+          "name": "10097_1000097_t2w.mha"
+        },
+        "interface": {
+          "slug": "transverse-t2-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10097_1000097_adc.mha"
+        },
+        "interface": {
+          "slug": "transverse-adc-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10097_1000097_hbv.mha"
+        },
+        "interface": {
+          "slug": "transverse-hbv-prostate-mri"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "10005_1000005",
+    "inputs": [
+      {
+        "image": {
+          "name": "10005_1000005_t2w.mha"
+        },
+        "interface": {
+          "slug": "transverse-t2-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10005_1000005_adc.mha"
+        },
+        "interface": {
+          "slug": "transverse-adc-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10005_1000005_hbv.mha"
+        },
+        "interface": {
+          "slug": "transverse-hbv-prostate-mri"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "10045_1000045",
+    "inputs": [
+      {
+        "image": {
+          "name": "10045_1000045_t2w.mha"
+        },
+        "interface": {
+          "slug": "transverse-t2-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10045_1000045_adc.mha"
+        },
+        "interface": {
+          "slug": "transverse-adc-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10045_1000045_hbv.mha"
+        },
+        "interface": {
+          "slug": "transverse-hbv-prostate-mri"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "10007_1000007",
+    "inputs": [
+      {
+        "image": {
+          "name": "10007_1000007_t2w.mha"
+        },
+        "interface": {
+          "slug": "transverse-t2-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10007_1000007_adc.mha"
+        },
+        "interface": {
+          "slug": "transverse-adc-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10007_1000007_hbv.mha"
+        },
+        "interface": {
+          "slug": "transverse-hbv-prostate-mri"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "10017_1000017",
+    "inputs": [
+      {
+        "image": {
+          "name": "10017_1000017_t2w.mha"
+        },
+        "interface": {
+          "slug": "transverse-t2-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10017_1000017_adc.mha"
+        },
+        "interface": {
+          "slug": "transverse-adc-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10017_1000017_hbv.mha"
+        },
+        "interface": {
+          "slug": "transverse-hbv-prostate-mri"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "10085_1000085",
+    "inputs": [
+      {
+        "image": {
+          "name": "10085_1000085_t2w.mha"
+        },
+        "interface": {
+          "slug": "transverse-t2-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10085_1000085_adc.mha"
+        },
+        "interface": {
+          "slug": "transverse-adc-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10085_1000085_hbv.mha"
+        },
+        "interface": {
+          "slug": "transverse-hbv-prostate-mri"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "10037_1000037",
+    "inputs": [
+      {
+        "image": {
+          "name": "10037_1000037_t2w.mha"
+        },
+        "interface": {
+          "slug": "transverse-t2-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10037_1000037_adc.mha"
+        },
+        "interface": {
+          "slug": "transverse-adc-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10037_1000037_hbv.mha"
+        },
+        "interface": {
+          "slug": "transverse-hbv-prostate-mri"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "10027_1000027",
+    "inputs": [
+      {
+        "image": {
+          "name": "10027_1000027_t2w.mha"
+        },
+        "interface": {
+          "slug": "transverse-t2-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10027_1000027_adc.mha"
+        },
+        "interface": {
+          "slug": "transverse-adc-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10027_1000027_hbv.mha"
+        },
+        "interface": {
+          "slug": "transverse-hbv-prostate-mri"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "10033_1000033",
+    "inputs": [
+      {
+        "image": {
+          "name": "10033_1000033_t2w.mha"
+        },
+        "interface": {
+          "slug": "transverse-t2-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10033_1000033_adc.mha"
+        },
+        "interface": {
+          "slug": "transverse-adc-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10033_1000033_hbv.mha"
+        },
+        "interface": {
+          "slug": "transverse-hbv-prostate-mri"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "10023_1000023",
+    "inputs": [
+      {
+        "image": {
+          "name": "10023_1000023_t2w.mha"
+        },
+        "interface": {
+          "slug": "transverse-t2-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10023_1000023_adc.mha"
+        },
+        "interface": {
+          "slug": "transverse-adc-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10023_1000023_hbv.mha"
+        },
+        "interface": {
+          "slug": "transverse-hbv-prostate-mri"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "10078_1000078",
+    "inputs": [
+      {
+        "image": {
+          "name": "10078_1000078_t2w.mha"
+        },
+        "interface": {
+          "slug": "transverse-t2-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10078_1000078_adc.mha"
+        },
+        "interface": {
+          "slug": "transverse-adc-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10078_1000078_hbv.mha"
+        },
+        "interface": {
+          "slug": "transverse-hbv-prostate-mri"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "10003_1000003",
+    "inputs": [
+      {
+        "image": {
+          "name": "10003_1000003_t2w.mha"
+        },
+        "interface": {
+          "slug": "transverse-t2-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10003_1000003_adc.mha"
+        },
+        "interface": {
+          "slug": "transverse-adc-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10003_1000003_hbv.mha"
+        },
+        "interface": {
+          "slug": "transverse-hbv-prostate-mri"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "10048_1000048",
+    "inputs": [
+      {
+        "image": {
+          "name": "10048_1000048_t2w.mha"
+        },
+        "interface": {
+          "slug": "transverse-t2-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10048_1000048_adc.mha"
+        },
+        "interface": {
+          "slug": "transverse-adc-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10048_1000048_hbv.mha"
+        },
+        "interface": {
+          "slug": "transverse-hbv-prostate-mri"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "10043_1000043",
+    "inputs": [
+      {
+        "image": {
+          "name": "10043_1000043_t2w.mha"
+        },
+        "interface": {
+          "slug": "transverse-t2-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10043_1000043_adc.mha"
+        },
+        "interface": {
+          "slug": "transverse-adc-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10043_1000043_hbv.mha"
+        },
+        "interface": {
+          "slug": "transverse-hbv-prostate-mri"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "10018_1000018",
+    "inputs": [
+      {
+        "image": {
+          "name": "10018_1000018_t2w.mha"
+        },
+        "interface": {
+          "slug": "transverse-t2-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10018_1000018_adc.mha"
+        },
+        "interface": {
+          "slug": "transverse-adc-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10018_1000018_hbv.mha"
+        },
+        "interface": {
+          "slug": "transverse-hbv-prostate-mri"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "10038_1000038",
+    "inputs": [
+      {
+        "image": {
+          "name": "10038_1000038_t2w.mha"
+        },
+        "interface": {
+          "slug": "transverse-t2-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10038_1000038_adc.mha"
+        },
+        "interface": {
+          "slug": "transverse-adc-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10038_1000038_hbv.mha"
+        },
+        "interface": {
+          "slug": "transverse-hbv-prostate-mri"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "10028_1000028",
+    "inputs": [
+      {
+        "image": {
+          "name": "10028_1000028_t2w.mha"
+        },
+        "interface": {
+          "slug": "transverse-t2-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10028_1000028_adc.mha"
+        },
+        "interface": {
+          "slug": "transverse-adc-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10028_1000028_hbv.mha"
+        },
+        "interface": {
+          "slug": "transverse-hbv-prostate-mri"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "10041_1000041",
+    "inputs": [
+      {
+        "image": {
+          "name": "10041_1000041_t2w.mha"
+        },
+        "interface": {
+          "slug": "transverse-t2-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10041_1000041_adc.mha"
+        },
+        "interface": {
+          "slug": "transverse-adc-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10041_1000041_hbv.mha"
+        },
+        "interface": {
+          "slug": "transverse-hbv-prostate-mri"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "10011_1000011",
+    "inputs": [
+      {
+        "image": {
+          "name": "10011_1000011_t2w.mha"
+        },
+        "interface": {
+          "slug": "transverse-t2-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10011_1000011_adc.mha"
+        },
+        "interface": {
+          "slug": "transverse-adc-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10011_1000011_hbv.mha"
+        },
+        "interface": {
+          "slug": "transverse-hbv-prostate-mri"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "10001_1000001",
+    "inputs": [
+      {
+        "image": {
+          "name": "10001_1000001_t2w.mha"
+        },
+        "interface": {
+          "slug": "transverse-t2-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10001_1000001_adc.mha"
+        },
+        "interface": {
+          "slug": "transverse-adc-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10001_1000001_hbv.mha"
+        },
+        "interface": {
+          "slug": "transverse-hbv-prostate-mri"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "10021_1000021",
+    "inputs": [
+      {
+        "image": {
+          "name": "10021_1000021_t2w.mha"
+        },
+        "interface": {
+          "slug": "transverse-t2-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10021_1000021_adc.mha"
+        },
+        "interface": {
+          "slug": "transverse-adc-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10021_1000021_hbv.mha"
+        },
+        "interface": {
+          "slug": "transverse-hbv-prostate-mri"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "10031_1000031",
+    "inputs": [
+      {
+        "image": {
+          "name": "10031_1000031_t2w.mha"
+        },
+        "interface": {
+          "slug": "transverse-t2-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10031_1000031_adc.mha"
+        },
+        "interface": {
+          "slug": "transverse-adc-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10031_1000031_hbv.mha"
+        },
+        "interface": {
+          "slug": "transverse-hbv-prostate-mri"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "10019_1000019",
+    "inputs": [
+      {
+        "image": {
+          "name": "10019_1000019_t2w.mha"
+        },
+        "interface": {
+          "slug": "transverse-t2-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10019_1000019_adc.mha"
+        },
+        "interface": {
+          "slug": "transverse-adc-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10019_1000019_hbv.mha"
+        },
+        "interface": {
+          "slug": "transverse-hbv-prostate-mri"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "10042_1000042",
+    "inputs": [
+      {
+        "image": {
+          "name": "10042_1000042_t2w.mha"
+        },
+        "interface": {
+          "slug": "transverse-t2-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10042_1000042_adc.mha"
+        },
+        "interface": {
+          "slug": "transverse-adc-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10042_1000042_hbv.mha"
+        },
+        "interface": {
+          "slug": "transverse-hbv-prostate-mri"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "10009_1000009",
+    "inputs": [
+      {
+        "image": {
+          "name": "10009_1000009_t2w.mha"
+        },
+        "interface": {
+          "slug": "transverse-t2-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10009_1000009_adc.mha"
+        },
+        "interface": {
+          "slug": "transverse-adc-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10009_1000009_hbv.mha"
+        },
+        "interface": {
+          "slug": "transverse-hbv-prostate-mri"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "10039_1000039",
+    "inputs": [
+      {
+        "image": {
+          "name": "10039_1000039_t2w.mha"
+        },
+        "interface": {
+          "slug": "transverse-t2-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10039_1000039_adc.mha"
+        },
+        "interface": {
+          "slug": "transverse-adc-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10039_1000039_hbv.mha"
+        },
+        "interface": {
+          "slug": "transverse-hbv-prostate-mri"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "10079_1000079",
+    "inputs": [
+      {
+        "image": {
+          "name": "10079_1000079_t2w.mha"
+        },
+        "interface": {
+          "slug": "transverse-t2-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10079_1000079_adc.mha"
+        },
+        "interface": {
+          "slug": "transverse-adc-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10079_1000079_hbv.mha"
+        },
+        "interface": {
+          "slug": "transverse-hbv-prostate-mri"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "10022_1000022",
+    "inputs": [
+      {
+        "image": {
+          "name": "10022_1000022_t2w.mha"
+        },
+        "interface": {
+          "slug": "transverse-t2-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10022_1000022_adc.mha"
+        },
+        "interface": {
+          "slug": "transverse-adc-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10022_1000022_hbv.mha"
+        },
+        "interface": {
+          "slug": "transverse-hbv-prostate-mri"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "10032_1000032",
+    "inputs": [
+      {
+        "image": {
+          "name": "10032_1000032_t2w.mha"
+        },
+        "interface": {
+          "slug": "transverse-t2-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10032_1000032_adc.mha"
+        },
+        "interface": {
+          "slug": "transverse-adc-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10032_1000032_hbv.mha"
+        },
+        "interface": {
+          "slug": "transverse-hbv-prostate-mri"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "10012_1000012",
+    "inputs": [
+      {
+        "image": {
+          "name": "10012_1000012_t2w.mha"
+        },
+        "interface": {
+          "slug": "transverse-t2-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10012_1000012_adc.mha"
+        },
+        "interface": {
+          "slug": "transverse-adc-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10012_1000012_hbv.mha"
+        },
+        "interface": {
+          "slug": "transverse-hbv-prostate-mri"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "10059_1000059",
+    "inputs": [
+      {
+        "image": {
+          "name": "10059_1000059_t2w.mha"
+        },
+        "interface": {
+          "slug": "transverse-t2-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10059_1000059_adc.mha"
+        },
+        "interface": {
+          "slug": "transverse-adc-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10059_1000059_hbv.mha"
+        },
+        "interface": {
+          "slug": "transverse-hbv-prostate-mri"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "10002_1000002",
+    "inputs": [
+      {
+        "image": {
+          "name": "10002_1000002_t2w.mha"
+        },
+        "interface": {
+          "slug": "transverse-t2-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10002_1000002_adc.mha"
+        },
+        "interface": {
+          "slug": "transverse-adc-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10002_1000002_hbv.mha"
+        },
+        "interface": {
+          "slug": "transverse-hbv-prostate-mri"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "10000_1000000",
+    "inputs": [
+      {
+        "image": {
+          "name": "10000_1000000_t2w.mha"
+        },
+        "interface": {
+          "slug": "transverse-t2-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10000_1000000_adc.mha"
+        },
+        "interface": {
+          "slug": "transverse-adc-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10000_1000000_hbv.mha"
+        },
+        "interface": {
+          "slug": "transverse-hbv-prostate-mri"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "10010_1000010",
+    "inputs": [
+      {
+        "image": {
+          "name": "10010_1000010_t2w.mha"
+        },
+        "interface": {
+          "slug": "transverse-t2-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10010_1000010_adc.mha"
+        },
+        "interface": {
+          "slug": "transverse-adc-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10010_1000010_hbv.mha"
+        },
+        "interface": {
+          "slug": "transverse-hbv-prostate-mri"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "10030_1000030",
+    "inputs": [
+      {
+        "image": {
+          "name": "10030_1000030_t2w.mha"
+        },
+        "interface": {
+          "slug": "transverse-t2-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10030_1000030_adc.mha"
+        },
+        "interface": {
+          "slug": "transverse-adc-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10030_1000030_hbv.mha"
+        },
+        "interface": {
+          "slug": "transverse-hbv-prostate-mri"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "10020_1000020",
+    "inputs": [
+      {
+        "image": {
+          "name": "10020_1000020_t2w.mha"
+        },
+        "interface": {
+          "slug": "transverse-t2-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10020_1000020_adc.mha"
+        },
+        "interface": {
+          "slug": "transverse-adc-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10020_1000020_hbv.mha"
+        },
+        "interface": {
+          "slug": "transverse-hbv-prostate-mri"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "10040_1000040",
+    "inputs": [
+      {
+        "image": {
+          "name": "10040_1000040_t2w.mha"
+        },
+        "interface": {
+          "slug": "transverse-t2-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10040_1000040_adc.mha"
+        },
+        "interface": {
+          "slug": "transverse-adc-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10040_1000040_hbv.mha"
+        },
+        "interface": {
+          "slug": "transverse-hbv-prostate-mri"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "10074_1000074",
+    "inputs": [
+      {
+        "image": {
+          "name": "10074_1000074_t2w.mha"
+        },
+        "interface": {
+          "slug": "transverse-t2-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10074_1000074_adc.mha"
+        },
+        "interface": {
+          "slug": "transverse-adc-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10074_1000074_hbv.mha"
+        },
+        "interface": {
+          "slug": "transverse-hbv-prostate-mri"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "10034_1000034",
+    "inputs": [
+      {
+        "image": {
+          "name": "10034_1000034_t2w.mha"
+        },
+        "interface": {
+          "slug": "transverse-t2-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10034_1000034_adc.mha"
+        },
+        "interface": {
+          "slug": "transverse-adc-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10034_1000034_hbv.mha"
+        },
+        "interface": {
+          "slug": "transverse-hbv-prostate-mri"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "10024_1000024",
+    "inputs": [
+      {
+        "image": {
+          "name": "10024_1000024_t2w.mha"
+        },
+        "interface": {
+          "slug": "transverse-t2-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10024_1000024_adc.mha"
+        },
+        "interface": {
+          "slug": "transverse-adc-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10024_1000024_hbv.mha"
+        },
+        "interface": {
+          "slug": "transverse-hbv-prostate-mri"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "10004_1000004",
+    "inputs": [
+      {
+        "image": {
+          "name": "10004_1000004_t2w.mha"
+        },
+        "interface": {
+          "slug": "transverse-t2-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10004_1000004_adc.mha"
+        },
+        "interface": {
+          "slug": "transverse-adc-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10004_1000004_hbv.mha"
+        },
+        "interface": {
+          "slug": "transverse-hbv-prostate-mri"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "10014_1000014",
+    "inputs": [
+      {
+        "image": {
+          "name": "10014_1000014_t2w.mha"
+        },
+        "interface": {
+          "slug": "transverse-t2-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10014_1000014_adc.mha"
+        },
+        "interface": {
+          "slug": "transverse-adc-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10014_1000014_hbv.mha"
+        },
+        "interface": {
+          "slug": "transverse-hbv-prostate-mri"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "10016_1000016",
+    "inputs": [
+      {
+        "image": {
+          "name": "10016_1000016_t2w.mha"
+        },
+        "interface": {
+          "slug": "transverse-t2-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10016_1000016_adc.mha"
+        },
+        "interface": {
+          "slug": "transverse-adc-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10016_1000016_hbv.mha"
+        },
+        "interface": {
+          "slug": "transverse-hbv-prostate-mri"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "10006_1000006",
+    "inputs": [
+      {
+        "image": {
+          "name": "10006_1000006_t2w.mha"
+        },
+        "interface": {
+          "slug": "transverse-t2-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10006_1000006_adc.mha"
+        },
+        "interface": {
+          "slug": "transverse-adc-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10006_1000006_hbv.mha"
+        },
+        "interface": {
+          "slug": "transverse-hbv-prostate-mri"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "10026_1000026",
+    "inputs": [
+      {
+        "image": {
+          "name": "10026_1000026_t2w.mha"
+        },
+        "interface": {
+          "slug": "transverse-t2-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10026_1000026_adc.mha"
+        },
+        "interface": {
+          "slug": "transverse-adc-prostate-mri"
+        }
+      },
+      {
+        "image": {
+          "name": "10026_1000026_hbv.mha"
+        },
+        "interface": {
+          "slug": "transverse-hbv-prostate-mri"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
   }
 ]
