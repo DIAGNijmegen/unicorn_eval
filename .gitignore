@@ -175,3 +175,4 @@ cython_debug/
 
 # models
 models/**/*.bin
+tests/task-6/.DS_Store
