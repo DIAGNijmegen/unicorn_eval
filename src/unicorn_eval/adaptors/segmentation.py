@@ -16,7 +16,6 @@ from __future__ import annotations
 import math
 from collections import defaultdict
 from typing import Iterable
-from scipy import ndimage as ndi
 
 import numpy as np
 import SimpleITK as sitk
@@ -26,12 +25,14 @@ import torch.nn.functional as F
 import torch.optim as optim
 from monai.data import DataLoader as dataloader_monai
 from monai.data import Dataset as dataset_monai
-from monai.losses.dice import DiceLoss, DiceFocalLoss
+from monai.losses.dice import DiceFocalLoss, DiceLoss
 from monai.networks.blocks.upsample import UpSample
 from monai.networks.layers.factories import Act, Conv, Norm, split_args
 from monai.networks.layers.utils import get_act_layer, get_norm_layer
-from monai.networks.nets.segresnet_ds import aniso_kernel, scales_for_resolution
+from monai.networks.nets.segresnet_ds import (aniso_kernel,
+                                              scales_for_resolution)
 from monai.utils import has_option
+from scipy import ndimage as ndi
 from torch.utils.data import DataLoader, Dataset
 from torch.utils.data._utils.collate import default_collate
 from tqdm import tqdm
@@ -718,7 +719,7 @@ def extract_patch_labels(
     start_coordinates,
     patch_size: list[int] = [16, 256, 256],
     patch_spacing: list[float] | None = None,
-) -> list[dict]:
+) -> dict:
     """
     Generate a list of patch features from a radiology image
 
@@ -768,7 +769,7 @@ def extract_patch_labels(
             }
         )
 
-    patch_labels = make_patch_level_neural_representation(
+    return make_patch_level_neural_representation(
         patch_features=patch_features,
         patch_size=patch_size,
         patch_spacing=patch_spacing,
@@ -778,8 +779,6 @@ def extract_patch_labels(
         image_direction=label.GetDirection(),
         title="patch_labels",
     )
-
-    return patch_labels
 
 
 def load_patch_data(data_array: np.ndarray, batch_size: int = 80) -> DataLoader:
@@ -1186,7 +1185,8 @@ class ConvSegmentation3D(SegmentationUpsampling3D):
             multiclass_mask.shape
         ), f"Metadata inconsistency, cannot process instances {sitk_mask.GetSize()=}"
 
-        from skimage.measure import label, regionprops  # import inline because it is not used for all tasks
+        from skimage.measure import (  # import inline because it is not used for all tasks
+            label, regionprops)
 
         assert multiclass_mask.ndim == 3, f"Expected 3D input, got {multiclass_mask.shape}"
         instance_regions, num_instances = label(multiclass_mask == divider_class, connectivity=1, return_num=True)
