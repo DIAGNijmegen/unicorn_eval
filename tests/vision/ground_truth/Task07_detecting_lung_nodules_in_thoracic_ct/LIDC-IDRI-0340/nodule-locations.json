@@ -1,0 +1,26 @@
+{
+  "name": "Points of interest",
+  "type": "Multiple points",
+  "points": [
+    {
+      "name": "LIDC-IDRI-0340_1",
+      "point": [
+        97.83677666,
+        55.50902909,
+        -280.9785357
+      ]
+    },
+    {
+      "name": "LIDC-IDRI-0340_2",
+      "point": [
+        88.68803313,
+        29.52753243,
+        -267.97218369999996
+      ]
+    }
+  ],
+  "version": {
+    "major": 1,
+    "minor": 0
+  }
+}

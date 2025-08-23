@@ -1,0 +1,98 @@
+{
+    "name": "Points of interest",
+    "type": "Multiple points",
+    "points": [
+        {
+            "name": "Point 1",
+            "point": [
+                264.0,
+                198.5,
+                0.5
+            ]
+        },
+        {
+            "name": "Point 2",
+            "point": [
+                534.0,
+                97.25,
+                0.5
+            ]
+        },
+        {
+            "name": "Point 3",
+            "point": [
+                528.75,
+                488.0,
+                0.5
+            ]
+        },
+        {
+            "name": "Point 4",
+            "point": [
+                705.0,
+                566.25,
+                0.5
+            ]
+        },
+        {
+            "name": "Point 5",
+            "point": [
+                673.25,
+                606.75,
+                0.5
+            ]
+        },
+        {
+            "name": "Point 6",
+            "point": [
+                413.0,
+                281.5,
+                0.5
+            ]
+        },
+        {
+            "name": "Point 7",
+            "point": [
+                374.5,
+                261.0,
+                0.5
+            ]
+        },
+        {
+            "name": "Point 8",
+            "point": [
+                390.5,
+                333.0,
+                0.5
+            ]
+        },
+        {
+            "name": "Point 9",
+            "point": [
+                477.75,
+                336.5,
+                0.5
+            ]
+        },
+        {
+            "name": "Point 10",
+            "point": [
+                202.0,
+                706.25,
+                0.5
+            ]
+        },
+        {
+            "name": "Point 11",
+            "point": [
+                199.0,
+                604.5,
+                0.5
+            ]
+        }
+    ],
+    "version": {
+        "major": 1,
+        "minor": 0
+    }
+}
