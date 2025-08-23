@@ -888,7 +888,7 @@ def extract_embeddings_and_labels(processed_results, task_name):
             task_data["domain"] = result["domain"]
             task_data["spacing"] = result["spacing"]
             task_data["patch_size"] = result["patch_size"]
-            task_data["patch_size"] = result["patch_size"]
+            task_data["patch_spacing"] = result["patch_spacing"]
             task_data["feature_grid_resolution"] = result["feature_grid_resolution"]
 
         if result["split"] == "shot":
