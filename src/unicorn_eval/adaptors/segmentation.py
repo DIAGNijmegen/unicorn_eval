@@ -657,14 +657,16 @@ def construct_data_with_labels(
         lbl_feat = labels[case_idx] if labels is not None else None
 
         if len(case_embeddings) != len(patch_coordinates):
+            K = len(case_embeddings) / len(patch_coordinates) 
             patch_coordinates = np.repeat(
-                patch_coordinates, repeats=len(case_embeddings), axis=0
+                patch_coordinates, repeats=K, axis=0
             )
 
         if lbl_feat is not None:
             if len(case_embeddings) != len(lbl_feat["patches"]):
+                K = len(case_embeddings) / len(lbl_feat["patches"]) 
                 lbl_feat["patches"] = np.repeat(
-                    lbl_feat["patches"], repeats=len(case_embeddings), axis=0
+                    lbl_feat["patches"], repeats=K, axis=0
                 )
 
         for i, patch_img in enumerate(case_embeddings):
@@ -674,7 +676,6 @@ def construct_data_with_labels(
                 "patch_size": patch_size,
                 "case_number": case_idx,
             }
-
             if lbl_feat is not None:
                 patch_lbl = lbl_feat["patches"][i]
                 assert np.allclose(
@@ -900,6 +901,7 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
             patch_size=self.patch_size,
             labels=self.shot_labels,
         )
+
         train_loader = load_patch_data(train_data, batch_size=10)
         latent_dim = len(self.shot_features[0][0])
         target_patch_size = tuple(int(j / 16) for j in self.patch_size)
@@ -1378,7 +1380,6 @@ class LinearUpsampleConv3D(SegmentationUpsampling3D):
             )
 
         print(f"Training decoder with {num_classes} classes")
-        print(decoder)
         decoder.to(self.device)
         self.decoder = train_seg_adaptor3d(decoder, train_loader, self.device, is_task11=self.is_task11, is_task06=self.is_task06)
 
@@ -1686,7 +1687,6 @@ def train_seg_adaptor3d(decoder, data_loader, device, num_epochs = 3, is_task11=
             if is_task11 or is_task06:
                 patch_label = map_labels(patch_label)
 
-
             optimizer.zero_grad()
             de_output = decoder(patch_emb) 
 
@@ -1711,7 +1711,7 @@ def train_seg_adaptor3d(decoder, data_loader, device, num_epochs = 3, is_task11=
     return decoder
 
 
-def exact_triplet_from_ref(self, flat: int, ref: tuple[int, int, int]) -> tuple[int, int, int]:
+def exact_triplet_from_ref(flat: int, ref: tuple[int, int, int]) -> tuple[int, int, int]:
     """
     Find integers (D,H,W) with D*H*W == flat, close to the heuristic proportions
     implied by 'ref' (D_ref,H_ref,W_ref).
