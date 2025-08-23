@@ -39,7 +39,7 @@ def _project_to_dir_coords(points_world, direction_flat):
 def stitch_patches(patches, pixel_id=sitk.sitkFloat32, average_overlaps=False):
     """
     patches: list of dicts, each with:
-      - 'values': numpy array shaped (z,y,x) for 3D or (y,x) for 2D (SimpleITK convention).
+      - 'features': numpy array shaped (z,y,x) for 3D or (y,x) for 2D (SimpleITK convention).
       - 'patch_size'     : (x,y[,z])         # size in index space for this patch
       - 'patch_spacing'  : (sx,sy[,sz])
       - 'image_direction': tuple/list length D*D
@@ -67,7 +67,7 @@ def stitch_patches(patches, pixel_id=sitk.sitkFloat32, average_overlaps=False):
     # 1) Compute global bounding box in the reference direction coordinates
     all_corners_world = []
     for p in patches:
-        size_xyz    = tuple(int(v) for v in p['patch_size'])
+        size_xyz = tuple(int(v) for v in p['patch_size'])
         start_world = tuple(float(v) for v in p['coord'])
         corners = _patch_corners_world(start_world, size_xyz, ref_spacing, ref_direction)
         all_corners_world.extend(corners)
@@ -82,7 +82,7 @@ def stitch_patches(patches, pixel_id=sitk.sitkFloat32, average_overlaps=False):
     # Choose u_origin = min_u rounded to the grid
     u_origin = min_u
     size_f = (max_u - u_origin) / np.array(ref_spacing, dtype=float)
-    out_size_xyz = tuple(int(np.ceil(size_f[i])) for i in range(D))
+    out_size_xyz = tuple(int(np.round(size_f[i])) for i in range(D))
 
     # Convert u_origin (dir-coords) back to world origin
     Dmat = _dir_flat_to_mat(ref_direction)
@@ -95,14 +95,17 @@ def stitch_patches(patches, pixel_id=sitk.sitkFloat32, average_overlaps=False):
     out_img.SetOrigin(out_origin_world)
 
     if average_overlaps:
-        sum_img   = sitk.Image(out_img)  # same geometry
+        sum_img = sitk.Image(out_img)  # same geometry
         count_img = sitk.Image(out_img)  # will hold counts (as float)
         sum_img = sitk.Cast(sum_img, sitk.sitkFloat64)
         count_img = sitk.Cast(count_img, sitk.sitkFloat64)
 
     # 3) Paste each patch
     for p in patches:
-        arr = p['values']
+        arr = p['features']
+        if arr.shape[0] == 1 and arr.ndim == 4:
+            arr = arr[0]
+
         # Make a SimpleITK image from the numpy array.
         # GetImageFromArray expects (z,y,x) for 3D / (y,x) for 2D which is what we assume here.
         src = sitk.GetImageFromArray(arr)
