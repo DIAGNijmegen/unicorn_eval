@@ -337,7 +337,7 @@ def adapt_features(
             test_names=test_names,
             test_image_sizes=test_image_sizes,
             patch_size=patch_size[0],
-            patch_spacing=patch_spacing[0],  # TODO: check if this makes sense
+            patch_spacing=patch_spacing[0],
         )
     elif adaptor_name == "linear-upsample-conv3d":
         adaptor = LinearUpsampleConv3D(
