@@ -14,36 +14,30 @@
 
 import json
 from functools import partial
+from typing import Any
 
 import numpy as np
 from sklearn.metrics import cohen_kappa_score, roc_auc_score
 from sksurv.metrics import concordance_index_censored
 
-from unicorn_eval.adaptors import (
-    KNN,
-    DensityMap,
-    ConvDetector,
-    KNNRegressor,
-    LinearProbing,
-    LinearProbingRegressor,
-    LogisticRegression,
-    MultiLayerPerceptron,
-    MultiLayerPerceptronRegressor,
-    PatchNoduleRegressor,
-    SegmentationUpsampling,
-    SegmentationUpsampling3D,
-    ConvSegmentation3D,
-    LinearUpsampleConv3D,
-    WeightedKNN,
-    WeightedKNNRegressor,
-)
+from unicorn_eval.adaptors import (KNN, ConvDetector, ConvSegmentation3D,
+                                   DensityMap, KNNRegressor, LinearProbing,
+                                   LinearProbingRegressor,
+                                   LinearUpsampleConv3D, LogisticRegression,
+                                   MultiLayerPerceptron,
+                                   MultiLayerPerceptronRegressor,
+                                   PatchNoduleRegressor,
+                                   SegmentationUpsampling,
+                                   SegmentationUpsampling3D, WeightedKNN,
+                                   WeightedKNNRegressor)
 from unicorn_eval.metrics.dice import compute_dice_score
 from unicorn_eval.metrics.f1_score import compute_f1
 from unicorn_eval.metrics.picai_score import compute_picai_score
 from unicorn_eval.metrics.sensitivity import compute_cpm
 from unicorn_eval.metrics.spider import compute_spider_score
 from unicorn_eval.metrics.uls import compute_uls_score
-from unicorn_eval.metrics.vision_language import compute_average_language_metric
+from unicorn_eval.metrics.vision_language import \
+    compute_average_language_metric
 
 METRIC_DICT = {
     "Task01_classifying_he_prostate_biopsies_into_isup_scores": {
@@ -941,13 +935,14 @@ def extract_embeddings_and_labels(processed_results, task_name):
 
 def extract_data(patch_neural_representation):
     # Extract metadata
-    spacing = patch_neural_representation["meta"]["patch-spacing"]
-    patch_size = patch_neural_representation["meta"]["patch-size"]
-    feature_grid_resolution = patch_neural_representation["meta"]["feature-grid-resolution"]
-    image_size = patch_neural_representation["meta"]["image-size"]
-    image_spacing = patch_neural_representation["meta"]["image-spacing"]
-    image_origin = patch_neural_representation["meta"]["image-origin"]
-    image_direction = patch_neural_representation["meta"]["image-direction"]
+    metadata: dict[str, Any] = patch_neural_representation["meta"]
+    spacing = metadata["patch-spacing"]
+    patch_size = metadata["patch-size"]
+    feature_grid_resolution = metadata.get("feature-grid-resolution", [1]*len(patch_size))
+    image_size = metadata["image-size"]
+    image_spacing = metadata["image-spacing"]
+    image_origin = metadata["image-origin"]
+    image_direction = metadata["image-direction"]
 
     # Extract patches
     patches = patch_neural_representation["patches"]

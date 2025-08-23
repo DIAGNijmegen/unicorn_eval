@@ -174,17 +174,16 @@ REGRESSION_EPSILON.update(
 def process(job):
     """Processes a single algorithm job, looking at the outputs"""
 
-    (
-        embeddings,
-        prediction,
-        coordinates,
-        spacing,
-        patch_size,
-        image_size,
-        image_spacing,
-        image_origin,
-        image_direction,
-    ) = (None, None, None, None, None, None, None, None, None)
+    embeddings = None
+    prediction = None
+    coordinates = None
+    spacing = None
+    patch_size = None
+    image_size = None
+    image_spacing = None
+    image_origin = None
+    image_direction = None
+    feature_grid_resolution = None
 
     report = "Processing:\n"
     report += pformat(job)
