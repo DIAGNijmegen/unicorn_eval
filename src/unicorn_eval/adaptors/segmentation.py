@@ -39,6 +39,7 @@ from tqdm import tqdm
 
 from unicorn_eval.adaptors.base import PatchLevelTaskAdaptor
 from unicorn_eval.adaptors.patch_extraction import extract_patches
+from unicorn_eval.adaptors.reconstruct_prediction import stitch_patches
 
 
 def compute_num_upsample_layers(initial_size, target_size):
@@ -325,6 +326,7 @@ class SegmentationUpsampling(PatchLevelTaskAdaptor):
         test_names,
         test_image_sizes,
         patch_size,
+        patch_spacing,
         num_epochs=20,
         learning_rate=1e-5,
     ):
@@ -339,6 +341,7 @@ class SegmentationUpsampling(PatchLevelTaskAdaptor):
         self.test_names = test_names
         self.test_image_sizes = test_image_sizes
         self.patch_size = patch_size
+        self.patch_spacing = patch_spacing
         self.num_epochs = num_epochs
         self.learning_rate = learning_rate
         self.decoder = None
@@ -473,6 +476,12 @@ def create_grid(decoded_patches):
     grids = {}
 
     for idx, patches in decoded_patches.items():
+        stitched = stitch_patches(patches)
+        grids[idx] = stitched
+
+    if False:
+        # deprecated
+
         # Pull meta from the first patch
         meta = patches[0]
         image_size = meta["image_size"]
