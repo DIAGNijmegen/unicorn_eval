@@ -6268,5 +6268,1013 @@
         }
       }
     ]
+  },
+    {
+    "pk": "LIDC-IDRI-0332",
+    "inputs": [
+      {
+        "image": {
+          "name": "LIDC-IDRI-0332.mha"
+        },
+        "interface": {
+          "slug": "chest-ct"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "LIDC-IDRI-0031",
+    "inputs": [
+      {
+        "image": {
+          "name": "LIDC-IDRI-0031.mha"
+        },
+        "interface": {
+          "slug": "chest-ct"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "LIDC-IDRI-0481",
+    "inputs": [
+      {
+        "image": {
+          "name": "LIDC-IDRI-0481.mha"
+        },
+        "interface": {
+          "slug": "chest-ct"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "LIDC-IDRI-0152",
+    "inputs": [
+      {
+        "image": {
+          "name": "LIDC-IDRI-0152.mha"
+        },
+        "interface": {
+          "slug": "chest-ct"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "LIDC-IDRI-0158",
+    "inputs": [
+      {
+        "image": {
+          "name": "LIDC-IDRI-0158.mha"
+        },
+        "interface": {
+          "slug": "chest-ct"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "LIDC-IDRI-0848",
+    "inputs": [
+      {
+        "image": {
+          "name": "LIDC-IDRI-0848.mha"
+        },
+        "interface": {
+          "slug": "chest-ct"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "LIDC-IDRI-0319",
+    "inputs": [
+      {
+        "image": {
+          "name": "LIDC-IDRI-0319.mha"
+        },
+        "interface": {
+          "slug": "chest-ct"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "LIDC-IDRI-0427",
+    "inputs": [
+      {
+        "image": {
+          "name": "LIDC-IDRI-0427.mha"
+        },
+        "interface": {
+          "slug": "chest-ct"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "LIDC-IDRI-0363",
+    "inputs": [
+      {
+        "image": {
+          "name": "LIDC-IDRI-0363.mha"
+        },
+        "interface": {
+          "slug": "chest-ct"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "LIDC-IDRI-0213",
+    "inputs": [
+      {
+        "image": {
+          "name": "LIDC-IDRI-0213.mha"
+        },
+        "interface": {
+          "slug": "chest-ct"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "LIDC-IDRI-0565",
+    "inputs": [
+      {
+        "image": {
+          "name": "LIDC-IDRI-0565.mha"
+        },
+        "interface": {
+          "slug": "chest-ct"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "LIDC-IDRI-0004",
+    "inputs": [
+      {
+        "image": {
+          "name": "LIDC-IDRI-0004.mha"
+        },
+        "interface": {
+          "slug": "chest-ct"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "LIDC-IDRI-0041",
+    "inputs": [
+      {
+        "image": {
+          "name": "LIDC-IDRI-0041.mha"
+        },
+        "interface": {
+          "slug": "chest-ct"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "LIDC-IDRI-0501",
+    "inputs": [
+      {
+        "image": {
+          "name": "LIDC-IDRI-0501.mha"
+        },
+        "interface": {
+          "slug": "chest-ct"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "LIDC-IDRI-0796",
+    "inputs": [
+      {
+        "image": {
+          "name": "LIDC-IDRI-0796.mha"
+        },
+        "interface": {
+          "slug": "chest-ct"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "LIDC-IDRI-0602",
+    "inputs": [
+      {
+        "image": {
+          "name": "LIDC-IDRI-0602.mha"
+        },
+        "interface": {
+          "slug": "chest-ct"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "LIDC-IDRI-0606",
+    "inputs": [
+      {
+        "image": {
+          "name": "LIDC-IDRI-0606.mha"
+        },
+        "interface": {
+          "slug": "chest-ct"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "LIDC-IDRI-0093",
+    "inputs": [
+      {
+        "image": {
+          "name": "LIDC-IDRI-0093.mha"
+        },
+        "interface": {
+          "slug": "chest-ct"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "LIDC-IDRI-0170",
+    "inputs": [
+      {
+        "image": {
+          "name": "LIDC-IDRI-0170.mha"
+        },
+        "interface": {
+          "slug": "chest-ct"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "LIDC-IDRI-0447",
+    "inputs": [
+      {
+        "image": {
+          "name": "LIDC-IDRI-0447.mha"
+        },
+        "interface": {
+          "slug": "chest-ct"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "LIDC-IDRI-0077",
+    "inputs": [
+      {
+        "image": {
+          "name": "LIDC-IDRI-0077.mha"
+        },
+        "interface": {
+          "slug": "chest-ct"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "LIDC-IDRI-0273",
+    "inputs": [
+      {
+        "image": {
+          "name": "LIDC-IDRI-0273.mha"
+        },
+        "interface": {
+          "slug": "chest-ct"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "LIDC-IDRI-0258",
+    "inputs": [
+      {
+        "image": {
+          "name": "LIDC-IDRI-0258.mha"
+        },
+        "interface": {
+          "slug": "chest-ct"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "LIDC-IDRI-0734",
+    "inputs": [
+      {
+        "image": {
+          "name": "LIDC-IDRI-0734.mha"
+        },
+        "interface": {
+          "slug": "chest-ct"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "LIDC-IDRI-0094",
+    "inputs": [
+      {
+        "image": {
+          "name": "LIDC-IDRI-0094.mha"
+        },
+        "interface": {
+          "slug": "chest-ct"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "LIDC-IDRI-0810",
+    "inputs": [
+      {
+        "image": {
+          "name": "LIDC-IDRI-0810.mha"
+        },
+        "interface": {
+          "slug": "chest-ct"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "LIDC-IDRI-0175",
+    "inputs": [
+      {
+        "image": {
+          "name": "LIDC-IDRI-0175.mha"
+        },
+        "interface": {
+          "slug": "chest-ct"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "LIDC-IDRI-0797",
+    "inputs": [
+      {
+        "image": {
+          "name": "LIDC-IDRI-0797.mha"
+        },
+        "interface": {
+          "slug": "chest-ct"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "LIDC-IDRI-0233",
+    "inputs": [
+      {
+        "image": {
+          "name": "LIDC-IDRI-0233.mha"
+        },
+        "interface": {
+          "slug": "chest-ct"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "LIDC-IDRI-0789",
+    "inputs": [
+      {
+        "image": {
+          "name": "LIDC-IDRI-0789.mha"
+        },
+        "interface": {
+          "slug": "chest-ct"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "LIDC-IDRI-0413",
+    "inputs": [
+      {
+        "image": {
+          "name": "LIDC-IDRI-0413.mha"
+        },
+        "interface": {
+          "slug": "chest-ct"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "LIDC-IDRI-0153",
+    "inputs": [
+      {
+        "image": {
+          "name": "LIDC-IDRI-0153.mha"
+        },
+        "interface": {
+          "slug": "chest-ct"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "LIDC-IDRI-0286",
+    "inputs": [
+      {
+        "image": {
+          "name": "LIDC-IDRI-0286.mha"
+        },
+        "interface": {
+          "slug": "chest-ct"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "LIDC-IDRI-0658",
+    "inputs": [
+      {
+        "image": {
+          "name": "LIDC-IDRI-0658.mha"
+        },
+        "interface": {
+          "slug": "chest-ct"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "LIDC-IDRI-0895",
+    "inputs": [
+      {
+        "image": {
+          "name": "LIDC-IDRI-0895.mha"
+        },
+        "interface": {
+          "slug": "chest-ct"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "LIDC-IDRI-0271",
+    "inputs": [
+      {
+        "image": {
+          "name": "LIDC-IDRI-0271.mha"
+        },
+        "interface": {
+          "slug": "chest-ct"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "LIDC-IDRI-0748",
+    "inputs": [
+      {
+        "image": {
+          "name": "LIDC-IDRI-0748.mha"
+        },
+        "interface": {
+          "slug": "chest-ct"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "LIDC-IDRI-0340",
+    "inputs": [
+      {
+        "image": {
+          "name": "LIDC-IDRI-0340.mha"
+        },
+        "interface": {
+          "slug": "chest-ct"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "LIDC-IDRI-0211",
+    "inputs": [
+      {
+        "image": {
+          "name": "LIDC-IDRI-0211.mha"
+        },
+        "interface": {
+          "slug": "chest-ct"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "LIDC-IDRI-0905",
+    "inputs": [
+      {
+        "image": {
+          "name": "LIDC-IDRI-0905.mha"
+        },
+        "interface": {
+          "slug": "chest-ct"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "LIDC-IDRI-0353",
+    "inputs": [
+      {
+        "image": {
+          "name": "LIDC-IDRI-0353.mha"
+        },
+        "interface": {
+          "slug": "chest-ct"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "LIDC-IDRI-0619",
+    "inputs": [
+      {
+        "image": {
+          "name": "LIDC-IDRI-0619.mha"
+        },
+        "interface": {
+          "slug": "chest-ct"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "LIDC-IDRI-0510",
+    "inputs": [
+      {
+        "image": {
+          "name": "LIDC-IDRI-0510.mha"
+        },
+        "interface": {
+          "slug": "chest-ct"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "LIDC-IDRI-0583",
+    "inputs": [
+      {
+        "image": {
+          "name": "LIDC-IDRI-0583.mha"
+        },
+        "interface": {
+          "slug": "chest-ct"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "LIDC-IDRI-0837",
+    "inputs": [
+      {
+        "image": {
+          "name": "LIDC-IDRI-0837.mha"
+        },
+        "interface": {
+          "slug": "chest-ct"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "LIDC-IDRI-1001",
+    "inputs": [
+      {
+        "image": {
+          "name": "LIDC-IDRI-1001.mha"
+        },
+        "interface": {
+          "slug": "chest-ct"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "LIDC-IDRI-0777",
+    "inputs": [
+      {
+        "image": {
+          "name": "LIDC-IDRI-0777.mha"
+        },
+        "interface": {
+          "slug": "chest-ct"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
+  },
+  {
+    "pk": "LIDC-IDRI-0272",
+    "inputs": [
+      {
+        "image": {
+          "name": "LIDC-IDRI-0272.mha"
+        },
+        "interface": {
+          "slug": "chest-ct"
+        }
+      }
+    ],
+    "outputs": [
+      {
+        "interface": {
+          "slug": "patch-neural-representation",
+          "relative_path": "patch-neural-representation.json"
+        }
+      }
+    ]
   }
 ]
