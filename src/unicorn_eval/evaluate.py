@@ -690,6 +690,7 @@ def main():
             if task_name not in adaptors:
                 raise Exception(f"No adaptor found for task {task_name}")
             adaptor_name = adaptors[task_name]
+            print(f"Using adaptor: {adaptor_name}")
             return_probabilities = REQUIRES_PROBABILITIES_DICT[task_name]
 
             patch_size = task_results["patch_size"]
