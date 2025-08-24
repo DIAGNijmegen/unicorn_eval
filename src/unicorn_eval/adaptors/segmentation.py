@@ -1615,6 +1615,54 @@ class LinearUpsampleConv3D(SegmentationUpsampling3D):
             is_task11=self.is_task11
         )
 
+
+class LinearUpsampleConv3D_V2(LinearUpsampleConv3D):
+    """
+    Adapts LinearUpsampleConv3D:
+    - Enable balanced background sampling by default
+    - Use a different training strategy
+    - Set batch size to 8
+    """
+    def __init__(self, *args, balanced_bg: bool = True, **kwargs):
+        super().__init__(*args, balanced_bg=balanced_bg, **kwargs)
+
+    def fit(self):
+        # build training data and loader
+        train_data = construct_data_with_labels(
+            coordinates=self.shot_coordinates,
+            embeddings=self.shot_features,
+            cases=self.shot_names,
+            patch_size=self.patch_size,
+            patch_spacing=self.patch_spacing,
+            labels=self.shot_labels,
+        )
+
+        train_loader = load_patch_data(train_data, batch_size=8, balance_bg=self.balance_bg)
+
+        max_class = max_class_label_from_labels(self.shot_labels)
+        if max_class >= 100:
+            self.is_task11 = True
+            num_classes = 4
+        elif max_class > 1:
+            self.is_task06 = True
+            num_classes = 2
+            self.return_binary = False  # Do not threshold predictions for task 06
+            # TODO: implement this choice more elegantly
+        else:
+            num_classes = max_class + 1
+
+        # set up device and model
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        decoder = self.decoder_cls(
+            target_shape=self.patch_size[::-1],  # (D, H, W)
+            num_classes=num_classes,
+        )
+
+        print(f"Training decoder with {num_classes} classes")
+        decoder.to(self.device)
+        self.decoder = train_seg_adaptor3d_v2(decoder, train_loader, self.device, is_task11=self.is_task11, is_task06=self.is_task06)
+
+
 def expand_instance_labels(y: np.ndarray) -> np.ndarray:
     """
     Reverse-expand class labels to instance labels.
