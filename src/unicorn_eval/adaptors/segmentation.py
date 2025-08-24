@@ -1928,7 +1928,20 @@ class UpsampleConvSegAdaptor(nn.Module):
         x = F.interpolate(x, size=self.target_shape, mode="trilinear", align_corners=False)
         x = self.conv_blocks(x)
         return x
-    
+
+
+class UpsampleConvSegAdaptorLeakyReLU(UpsampleConvSegAdaptor):
+    def __init__(self, target_shape=None, in_channels=32, num_classes=2):
+        super().__init__(target_shape=target_shape, in_channels=in_channels, num_classes=num_classes)
+        self.conv_blocks = nn.Sequential(
+            nn.Conv3d(in_channels, in_channels, kernel_size=3, padding=1),
+            nn.LeakyReLU(negative_slope=0.1, inplace=True),
+            nn.Conv3d(in_channels, in_channels, kernel_size=3, padding=1),
+            nn.LeakyReLU(negative_slope=0.1, inplace=True),
+            nn.Conv3d(in_channels, num_classes, kernel_size=1)
+        )
+
+
 class ConvUpsampleSegAdaptor(nn.Module):
     def __init__(self, target_shape=None, in_channels=32, num_classes=2):
         super().__init__()
@@ -1964,7 +1977,8 @@ class ConvUpsampleSegAdaptor(nn.Module):
         x = self.conv_blocks(x)
         x = F.interpolate(x, size=self.target_shape, mode="trilinear", align_corners=False)
         return x
-    
+
+
 def dice_loss(pred, target, smooth=1e-5):
     num_classes = pred.shape[1]
     pred = F.softmax(pred, dim=1)
