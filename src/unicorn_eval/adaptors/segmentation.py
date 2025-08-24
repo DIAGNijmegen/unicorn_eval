@@ -558,7 +558,7 @@ def inference3d(
     with torch.no_grad():
         grouped_predictions = defaultdict(lambda: defaultdict(list))
 
-        for batch in data_loader:
+        for batch in tqdm(data_loader, desc="Inference"):
             inputs = batch["patch"].to(device)  # shape: [B, ...]
             coords = batch["coordinates"]  # list of 3 tensors
             image_idxs = batch["case_number"]
@@ -941,7 +941,7 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
         patch_spacing,
         return_binary=True,
         balance_bg=False,
-    ):   
+    ):
         label_patch_features = []
         for idx, label in tqdm(enumerate(shot_labels), desc="Extracting patch labels"):
             label_feats = extract_patch_labels(
