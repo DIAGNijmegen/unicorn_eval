@@ -1029,7 +1029,7 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
         decoder.to(self.device)
         self.decoder = train_decoder3d(decoder, train_loader, self.device)
 
-    def predict(self) -> np.ndarray:
+    def predict(self) -> list:
         # build test data and loader
         test_data = construct_data_with_labels(
             coordinates=self.test_coordinates,
@@ -1499,7 +1499,7 @@ class LinearUpsampleConv3D(SegmentationUpsampling3D):
         decoder.to(self.device)
         self.decoder = train_seg_adaptor3d(decoder, train_loader, self.device, is_task11=self.is_task11, is_task06=self.is_task06)
 
-    def predict(self) -> np.ndarray:
+    def predict(self) -> list:
         # build test data and loader
         test_data = construct_data_with_labels(
             coordinates=self.test_coordinates,
@@ -1514,7 +1514,6 @@ class LinearUpsampleConv3D(SegmentationUpsampling3D):
         )
 
         test_loader = load_patch_data(test_data, batch_size=1)
-        # run inference using the trained decoder
 
         # run inference using the trained decoder
         return inference3d_softmax(
