@@ -434,7 +434,7 @@ class Decoder3D(nn.Module):
         return self.decoder(x)
 
 
-def train_decoder3d(decoder, data_loader, device, num_epochs: int = 3, iterations_per_epoch: int | None = None, loss_fn=None, optimizer=None, label_mapper=None):
+def train_decoder3d(decoder, data_loader, device, num_epochs: int = 3, iterations_per_epoch: int | None = None, loss_fn=None, optimizer=None, label_mapper=None, verbose: bool = True):
     if loss_fn is None:
         loss_fn = DiceLoss(sigmoid=True)
     if optimizer is None:
@@ -445,7 +445,7 @@ def train_decoder3d(decoder, data_loader, device, num_epochs: int = 3, iteration
         epoch_loss = 0
 
         iteration_count = 0
-        batch_iter = tqdm(data_loader, total=iterations_per_epoch, desc=f"Epoch {epoch+1}/{num_epochs}", leave=False)
+        batch_iter = tqdm(data_loader, total=iterations_per_epoch, desc=f"Epoch {epoch+1}/{num_epochs}", leave=False, disable=not verbose)
         for batch in batch_iter:
             iteration_count += 1
 
@@ -484,7 +484,7 @@ def world_to_voxel(coord, origin, spacing, inv_direction):
 def create_grid(decoded_patches):
     grids = {}
 
-    for idx, patches in decoded_patches.items():
+    for idx, patches in tqdm(decoded_patches.items(), desc="Creating grids"):
         stitched = stitch_patches(patches)
         grids[idx] = stitched
 
@@ -784,9 +784,7 @@ def extract_patch_labels(
     if patch_spacing is None:
         patch_spacing = label.GetSpacing()
 
-    for patch, coordinates in tqdm(
-        zip(patches, start_coordinates), total=len(patches), desc="Extracting features"
-    ):
+    for patch, coordinates in zip(patches, start_coordinates):
         patch_array = sitk.GetArrayFromImage(patch)
         patch_features.append(
             {
@@ -945,7 +943,7 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
         balance_bg=False,
     ):   
         label_patch_features = []
-        for idx, label in enumerate(shot_labels):
+        for idx, label in tqdm(enumerate(shot_labels), desc="Extracting patch labels"):
             label_feats = extract_patch_labels(
                 label=label,
                 label_spacing=shot_label_spacing[shot_names[idx]],
@@ -1933,7 +1931,7 @@ def map_labels(y: torch.Tensor) -> torch.Tensor:
     return y_new
 
 
-def train_seg_adaptor3d(decoder, data_loader, device, num_epochs = 3, iterations_per_epoch: int | None = None, is_task11=False, is_task06=False):
+def train_seg_adaptor3d(decoder, data_loader, device, num_epochs = 3, iterations_per_epoch: int | None = None, is_task11=False, is_task06=False, verbose: bool = True):
     ce_loss = nn.CrossEntropyLoss()
     optimizer = optim.Adam(decoder.parameters(), lr=1e-3)
     # Train decoder
@@ -1942,7 +1940,7 @@ def train_seg_adaptor3d(decoder, data_loader, device, num_epochs = 3, iterations
         epoch_loss = 0.0
 
         # batch progress
-        batch_iter = tqdm(data_loader, total=iterations_per_epoch, desc=f"Epoch {epoch+1}/{num_epochs}", leave=False)
+        batch_iter = tqdm(data_loader, total=iterations_per_epoch, desc=f"Epoch {epoch+1}/{num_epochs}", leave=False, disable=not verbose)
         iteration_count = 0
     
         for batch in batch_iter:
