@@ -56,7 +56,7 @@ def stitch_patches(patches, pixel_id=sitk.sitkFloat32, average_overlaps=False):
         raise ValueError("No patches provided.")
 
     # Use the first patch as the reference geometry
-    ref_spacing   = tuple(map(float, patches[0]['patch_spacing']))
+    ref_spacing = tuple(map(float, patches[0]['patch_spacing']))
     ref_direction = tuple(map(float, patches[0]['image_direction']))
     D = len(ref_spacing)
 

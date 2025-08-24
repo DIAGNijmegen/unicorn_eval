@@ -32,7 +32,7 @@ def extract_patches(
     coordinates: Iterable[tuple[float, float, float]],
     patch_size: Iterable[int],
     spacing: Iterable[float] | None = None,
-) -> tuple[list[sitk.Image], list[tuple]]:
+) -> list[sitk.Image]:
     """
     Extracts uniformly sized patches from a 3D SimpleITK image, optionally resampling it to a specified voxel spacing before extraction.
     
@@ -47,7 +47,7 @@ def extract_patches(
     Returns:
         - patches (list[sitk.Image]): List of extracted image patches.
      """
-    if spacing is not None:
+    if spacing is not None and tuple(spacing) != image.GetSpacing():
         # resample image to specified spacing
         image = resample_img(
             image=image,
