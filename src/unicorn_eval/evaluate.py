@@ -769,13 +769,14 @@ def main():
                 case_label_spacings, case_label_origins, case_label_directions
             )
             gc.collect()
-
         elif modality == "vision-language":
             predictions = [pred["text"] for pred in task_results["prediction"]]
             case_labels = [
                 label["text"] for case in task_results["case_labels"] for label in case
             ]
             case_extra_labels = None
+        else:
+            raise ValueError(f"Unsupported modality: {modality}")
 
         metrics = evaluate_predictions(
             task_name=task_name,
