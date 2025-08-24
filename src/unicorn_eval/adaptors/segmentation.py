@@ -1421,6 +1421,95 @@ class ConvSegmentation3D(SegmentationUpsampling3D):
         )
 
 
+class UpsampleConvSegAdaptor(nn.Module):
+    def __init__(self, target_shape=None, in_channels=32, num_classes=2):
+        super().__init__()
+        self.target_shape = target_shape
+        self.in_channels = in_channels
+        # Two intermediate conv layers + final prediction layer
+        self.conv_blocks = nn.Sequential(
+            nn.Conv3d(in_channels, in_channels, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv3d(in_channels, in_channels, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv3d(in_channels, num_classes, kernel_size=1)
+        )
+
+    def forward(self, x):
+        C = self.in_channels
+        B, feat_len = x.shape
+        if feat_len % C != 0:
+            raise ValueError(
+            f"[Adaptor] Embedding length {feat_len} must be divisible by in_channels={C}."
+        )
+
+        flat = feat_len // C
+
+        D_ref, H_ref, W_ref = self.target_shape
+        ref_ratio = D_ref * H_ref * W_ref
+
+        k = (flat / ref_ratio) ** (1 / 3)
+        D = round(D_ref * k)
+        H = round(H_ref * k)
+        W = round(W_ref * k)
+        
+        if D * H * W != flat:
+            D, H, W = exact_triplet_from_ref(flat, (D_ref, H_ref, W_ref))
+        
+        x = x.view(B, C, D, H, W)
+        x = F.interpolate(x, size=self.target_shape, mode="trilinear", align_corners=False)
+        x = self.conv_blocks(x)
+        return x
+
+
+class UpsampleConvSegAdaptorLeakyReLU(UpsampleConvSegAdaptor):
+    def __init__(self, target_shape=None, in_channels=32, num_classes=2):
+        super().__init__(target_shape=target_shape, in_channels=in_channels, num_classes=num_classes)
+        self.conv_blocks = nn.Sequential(
+            nn.Conv3d(in_channels, in_channels, kernel_size=3, padding=1),
+            nn.LeakyReLU(negative_slope=0.1, inplace=True),
+            nn.Conv3d(in_channels, in_channels, kernel_size=3, padding=1),
+            nn.LeakyReLU(negative_slope=0.1, inplace=True),
+            nn.Conv3d(in_channels, num_classes, kernel_size=1)
+        )
+
+
+class ConvUpsampleSegAdaptor(nn.Module):
+    def __init__(self, target_shape=None, in_channels=32, num_classes=2):
+        super().__init__()
+        self.target_shape = target_shape
+        self.in_channels = in_channels
+        self.conv_blocks = nn.Sequential(
+            nn.Conv3d(in_channels, num_classes, kernel_size=3, padding=1) 
+        )
+
+    def forward(self, x):
+        C = self.in_channels
+        B, feat_len = x.shape
+        if feat_len % C != 0:
+            raise ValueError(
+            f"[Adaptor] Embedding length {feat_len} must be divisible by in_channels={C}."
+        )
+
+        flat = x.shape[1] // C
+
+        D_ref, H_ref, W_ref = self.target_shape
+        ref_ratio = D_ref * H_ref * W_ref
+
+        k = (flat / ref_ratio) ** (1 / 3)
+
+        D = round(D_ref * k)
+        H = round(H_ref * k)
+        W = round(W_ref * k)
+
+        if D * H * W != flat:
+            D, H, W = exact_triplet_from_ref(flat, (D_ref, H_ref, W_ref))
+
+        x = x.view(B, C, D, H, W)
+        x = self.conv_blocks(x)
+        x = F.interpolate(x, size=self.target_shape, mode="trilinear", align_corners=False)
+        return x
+
 
 class LinearUpsampleConv3D(SegmentationUpsampling3D):
     """
@@ -1887,96 +1976,6 @@ def exact_triplet_from_ref(flat: int, ref: tuple[int, int, int]) -> tuple[int, i
     D = max(1, D); H = max(1, H); W = max(1, W)
     assert D * H * W == flat, f"factorization failed: {D}*{H}*{W} != {flat}"
     return D, H, W
-
-
-class UpsampleConvSegAdaptor(nn.Module):
-    def __init__(self, target_shape=None, in_channels=32, num_classes=2):
-        super().__init__()
-        self.target_shape = target_shape
-        self.in_channels = in_channels
-        # Two intermediate conv layers + final prediction layer
-        self.conv_blocks = nn.Sequential(
-            nn.Conv3d(in_channels, in_channels, kernel_size=3, padding=1),
-            nn.ReLU(inplace=True),
-            nn.Conv3d(in_channels, in_channels, kernel_size=3, padding=1),
-            nn.ReLU(inplace=True),
-            nn.Conv3d(in_channels, num_classes, kernel_size=1)
-        )
-
-    def forward(self, x):
-        C = self.in_channels
-        B, feat_len = x.shape
-        if feat_len % C != 0:
-            raise ValueError(
-            f"[Adaptor] Embedding length {feat_len} must be divisible by in_channels={C}."
-        )
-
-        flat = feat_len // C
-
-        D_ref, H_ref, W_ref = self.target_shape
-        ref_ratio = D_ref * H_ref * W_ref
-
-        k = (flat / ref_ratio) ** (1 / 3)
-        D = round(D_ref * k)
-        H = round(H_ref * k)
-        W = round(W_ref * k)
-        
-        if D * H * W != flat:
-            D, H, W = exact_triplet_from_ref(flat, (D_ref, H_ref, W_ref))
-        
-        x = x.view(B, C, D, H, W)
-        x = F.interpolate(x, size=self.target_shape, mode="trilinear", align_corners=False)
-        x = self.conv_blocks(x)
-        return x
-
-
-class UpsampleConvSegAdaptorLeakyReLU(UpsampleConvSegAdaptor):
-    def __init__(self, target_shape=None, in_channels=32, num_classes=2):
-        super().__init__(target_shape=target_shape, in_channels=in_channels, num_classes=num_classes)
-        self.conv_blocks = nn.Sequential(
-            nn.Conv3d(in_channels, in_channels, kernel_size=3, padding=1),
-            nn.LeakyReLU(negative_slope=0.1, inplace=True),
-            nn.Conv3d(in_channels, in_channels, kernel_size=3, padding=1),
-            nn.LeakyReLU(negative_slope=0.1, inplace=True),
-            nn.Conv3d(in_channels, num_classes, kernel_size=1)
-        )
-
-
-class ConvUpsampleSegAdaptor(nn.Module):
-    def __init__(self, target_shape=None, in_channels=32, num_classes=2):
-        super().__init__()
-        self.target_shape = target_shape
-        self.in_channels = in_channels
-        self.conv_blocks = nn.Sequential(
-            nn.Conv3d(in_channels, num_classes, kernel_size=3, padding=1) 
-        )
-
-    def forward(self, x):
-        C = self.in_channels
-        B, feat_len = x.shape
-        if feat_len % C != 0:
-            raise ValueError(
-            f"[Adaptor] Embedding length {feat_len} must be divisible by in_channels={C}."
-        )
-
-        flat = x.shape[1] // C
-
-        D_ref, H_ref, W_ref = self.target_shape
-        ref_ratio = D_ref * H_ref * W_ref
-
-        k = (flat / ref_ratio) ** (1 / 3)
-
-        D = round(D_ref * k)
-        H = round(H_ref * k)
-        W = round(W_ref * k)
-
-        if D * H * W != flat:
-            D, H, W = exact_triplet_from_ref(flat, (D_ref, H_ref, W_ref))
-
-        x = x.view(B, C, D, H, W)
-        x = self.conv_blocks(x)
-        x = F.interpolate(x, size=self.target_shape, mode="trilinear", align_corners=False)
-        return x
 
 
 def dice_loss(pred, target, smooth=1e-5):
