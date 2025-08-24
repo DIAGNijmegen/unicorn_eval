@@ -30,6 +30,7 @@ from unicorn_eval.adaptors import (KNN, ConvDetector, ConvSegmentation3D,
                                    SegmentationUpsampling,
                                    SegmentationUpsampling3D, WeightedKNN,
                                    WeightedKNNRegressor)
+from unicorn_eval.adaptors.segmentation import ConvUpsampleSegAdaptor
 from unicorn_eval.metrics.dice import compute_dice_score
 from unicorn_eval.metrics.f1_score import compute_f1
 from unicorn_eval.metrics.picai_score import compute_picai_score
@@ -392,7 +393,7 @@ def adapt_features(
             shot_image_spacing=shot_image_spacing,
             shot_image_origins=shot_image_origins,
             shot_image_directions=shot_image_directions,
-            conv_then_upsample=True
+            decoder=ConvUpsampleSegAdaptor,
         )
 
     elif adaptor_name == "segmentation-upsampling-3d":
@@ -505,7 +506,7 @@ def adapt_features(
             test_label_directions=test_label_directions,
             patch_size=patch_size,
             return_binary=False,
-            conv_then_upsample=True,
+            decoder=ConvUpsampleSegAdaptor,
         )
 
     elif adaptor_name == "detection-by-segmentation-upsampling-3d":

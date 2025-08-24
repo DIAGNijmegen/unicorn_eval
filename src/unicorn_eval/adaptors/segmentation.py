@@ -16,7 +16,7 @@ from __future__ import annotations
 import math
 import random
 from collections import defaultdict
-from typing import Iterable
+from typing import Iterable, Type
 
 import numpy as np
 import SimpleITK as sitk
@@ -1542,11 +1542,11 @@ class LinearUpsampleConv3D(SegmentationUpsampling3D):
         patch_size : Size of each 3D patch.
         return_binary : Whether to threshold predictions into binary segmentation masks.
     """
-    def __init__(self, *args, conv_then_upsample: bool = False, **kwargs):
+    def __init__(self, *args, decoder_cls: Type[nn.Module] = UpsampleConvSegAdaptor, **kwargs):
         super().__init__(*args, **kwargs)
         self.is_task11 = False
         self.is_task06 = False
-        self.conv_then_upsample = conv_then_upsample
+        self.decoder_cls = decoder_cls
 
     def fit(self):
         # build training data and loader
@@ -1575,16 +1575,10 @@ class LinearUpsampleConv3D(SegmentationUpsampling3D):
 
         # set up device and model
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        if self.conv_then_upsample:   # True → Conv→Upsample
-            decoder = ConvUpsampleSegAdaptor(
-                target_shape=self.patch_size[::-1],  # (D, H, W)
-                num_classes=num_classes,
-            )
-        else:                         # False → Upsample→Conv
-            decoder = UpsampleConvSegAdaptor(
-                target_shape=self.patch_size[::-1],
-                num_classes=num_classes,
-            )
+        decoder = self.decoder_cls(
+            target_shape=self.patch_size[::-1],  # (D, H, W)
+            num_classes=num_classes,
+        )
 
         print(f"Training decoder with {num_classes} classes")
         decoder.to(self.device)
