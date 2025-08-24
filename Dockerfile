@@ -42,10 +42,6 @@ RUN python -m pip install --upgrade pip setuptools pip-tools
 COPY --chown=user:user requirements.in .
 RUN python -m pip install --no-cache-dir -r requirements.in
 
-# install unicorn_eval
-COPY --chown=user:user . /opt/app/unicorn_eval
-RUN python -m pip install /opt/app/unicorn_eval
-
 # download Bert model weights
 RUN mkdir -p /opt/app/unicorn_eval/models/dragon-bert-base-mixed-domain && \
     python -c "\
@@ -54,6 +50,10 @@ model = AutoModel.from_pretrained('joeranbosma/dragon-bert-base-mixed-domain'); 
 tokenizer = AutoTokenizer.from_pretrained('joeranbosma/dragon-bert-base-mixed-domain'); \
 model.save_pretrained('/opt/app/unicorn_eval/models/dragon-bert-base-mixed-domain'); \
 tokenizer.save_pretrained('/opt/app/unicorn_eval/models/dragon-bert-base-mixed-domain')"
+
+# install unicorn_eval
+COPY --chown=user:user . /opt/app/unicorn_eval
+RUN python -m pip install -e /opt/app/unicorn_eval
 
 
 ENTRYPOINT ["unicorn_eval"]

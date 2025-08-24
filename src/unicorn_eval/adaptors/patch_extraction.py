@@ -1,33 +1,30 @@
 from typing import Iterable
+
 import SimpleITK as sitk
-from picai_prep.preprocessing import resample_img, crop_or_pad
+from picai_prep.preprocessing import resample_img
 
 
-def pad_image(image: sitk.Image, patch_size: Iterable[int]) -> sitk.Image:
-    """
-    Pads the input image symmetrically so its dimensions become divisible by the specified patch size.
-
-    Padding is performed using the minimum intensity value found in the original image, ensuring padded regions blend naturally with background values.
-
-    Args:
-        image (sitk.Image): Input 3D image to be padded.
-        patch_size (list[int]): Desired patch size as [x, y, z]. After padding, each dimension of the image will be divisible by the corresponding element in this list.
-
-    Returns:
-        sitk.Image: Padded SimpleITK image with dimensions divisible by `patch_size`.
-    """
-    min_val = float(sitk.GetArrayFromImage(image).min())
+def safe_region_of_interest(image: sitk.Image, patch_size: Iterable[int], start_index: Iterable[int], pad_value: int = 0) -> sitk.Image:
     size = image.GetSize()
-    pad = [(p - s % p) % p for s, p in zip(size, patch_size)]
-    new_size = tuple(s + pad_dim for s, pad_dim in zip(size, pad))
 
-    image = crop_or_pad(
-        image=image,
-        size=new_size[::-1],
-        pad_only=True,
-    )
+    # Convert to mutable lists
+    patch_size = list(patch_size)
+    start_index = list(start_index)
 
-    return image
+    # Calculate how much padding is needed
+    lower_pad = [max(0, -s) for s in start_index]
+    upper_pad = [max(0, (s + p) - sz) for s, p, sz in zip(start_index, patch_size, size)]
+
+    # Apply padding if needed
+    if any(lower_pad) or any(upper_pad):
+        image = sitk.ConstantPad(image, lower_pad, upper_pad, pad_value)
+        size = image.GetSize()
+
+        # Shift start index into padded image coordinates
+        start_index = [s + lp for s, lp in zip(start_index, lower_pad)]
+
+    # Finally extract ROI
+    return sitk.RegionOfInterest(image, patch_size, start_index)
 
 
 def extract_patches(
@@ -35,7 +32,7 @@ def extract_patches(
     coordinates: Iterable[tuple[float, float, float]],
     patch_size: Iterable[int],
     spacing: Iterable[float] | None = None,
-) -> tuple[list[sitk.Image], list[tuple]]:
+) -> list[sitk.Image]:
     """
     Extracts uniformly sized patches from a 3D SimpleITK image, optionally resampling it to a specified voxel spacing before extraction.
     
@@ -50,7 +47,7 @@ def extract_patches(
     Returns:
         - patches (list[sitk.Image]): List of extracted image patches.
      """
-    if spacing is not None:
+    if spacing is not None and tuple(spacing) != image.GetSpacing():
         # resample image to specified spacing
         image = resample_img(
             image=image,
@@ -58,19 +55,13 @@ def extract_patches(
             interpolation=sitk.sitkLinear,
         )
 
-    # pad image to fit patch size
-    image = pad_image(
-        image=image,
-        patch_size=patch_size,
-    )
-
     patches = []
     for coord in coordinates:
         # Convert start coordinate from world space to index space
         start_index = image.TransformPhysicalPointToIndex(coord)
 
         # Extract ROI
-        patch = sitk.RegionOfInterest(image, patch_size, start_index)
+        patch = safe_region_of_interest(image, patch_size, start_index)
         patches.append(patch)
 
     return patches

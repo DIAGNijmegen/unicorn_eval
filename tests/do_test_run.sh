@@ -54,7 +54,6 @@ docker run --rm \
   --volume "$INPUT_DIR":/input:ro \
   --volume "$GROUND_TRUTH_DIR":/opt/ml/input/data/ground_truth:ro \
   --volume "$OUTPUT_DIR":/output \
-  "$DOCKER_IMAGE_TAG" \
-  python -m unicorn_eval
+  "$DOCKER_IMAGE_TAG"
 
 echo "=+= Wrote results to ${OUTPUT_DIR}"
