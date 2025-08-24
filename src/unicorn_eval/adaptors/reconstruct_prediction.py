@@ -10,6 +10,7 @@ def _dir_flat_to_mat(direction_flat):
     M = np.asarray(direction_flat, dtype=float).reshape(D, D)
     return M
 
+
 def _patch_corners_world(start_phys, size_xyz, spacing_xyz, direction_flat):
     """
     Return all physical-space corner points of a patch whose index (0,0,0) is at start_phys.
@@ -28,6 +29,7 @@ def _patch_corners_world(start_phys, size_xyz, spacing_xyz, direction_flat):
         corners.append(p)
     return corners
 
+
 def _project_to_dir_coords(points_world, direction_flat):
     """Project world points into the coordinate system defined by 'direction' columns."""
     Dmat = _dir_flat_to_mat(direction_flat)
@@ -35,6 +37,7 @@ def _project_to_dir_coords(points_world, direction_flat):
     DT = Dmat.T
     points_world = np.asarray(points_world, dtype=float)
     return (DT @ points_world.T).T
+
 
 def stitch_patches(patches, pixel_id=sitk.sitkFloat32, average_overlaps=False):
     """
