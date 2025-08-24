@@ -1623,8 +1623,8 @@ class LinearUpsampleConv3D_V2(LinearUpsampleConv3D):
     - Use a different training strategy
     - Set batch size to 8
     """
-    def __init__(self, *args, balanced_bg: bool = True, **kwargs):
-        super().__init__(*args, balanced_bg=balanced_bg, **kwargs)
+    def __init__(self, *args, balance_bg: bool = True, **kwargs):
+        super().__init__(*args, balance_bg=balance_bg, **kwargs)
 
     def fit(self):
         # build training data and loader
