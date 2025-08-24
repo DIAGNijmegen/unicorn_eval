@@ -1560,7 +1560,7 @@ class LinearUpsampleConv3D(SegmentationUpsampling3D):
             labels=self.shot_labels,
         )
 
-        train_loader = load_patch_data(train_data, batch_size=16, balance_bg=self.balance_bg)
+        train_loader = load_patch_data(train_data, batch_size=1, balance_bg=self.balance_bg)
 
         max_class = max_class_label_from_labels(self.shot_labels)
         if max_class >= 100:
