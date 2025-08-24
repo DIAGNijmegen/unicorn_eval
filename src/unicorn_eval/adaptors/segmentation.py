@@ -539,6 +539,7 @@ def create_grid(decoded_patches):
 
 
 def inference3d(
+    *,
     decoder,
     data_loader,
     device,
@@ -973,7 +974,17 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
 
         test_loader = load_patch_data(test_data, batch_size=10)
         # run inference using the trained decoder
-        return inference3d(self.decoder, test_loader, self.device, self.return_binary, self.test_cases, self.test_label_sizes, self.test_label_spacing, self.test_label_origins, self.test_label_directions)
+        return inference3d(
+            decoder=self.decoder,
+            data_loader=test_loader,
+            device=self.device,
+            return_binary=self.return_binary,
+            test_cases=self.test_cases,
+            test_label_sizes=self.test_label_sizes,
+            test_label_spacing=self.test_label_spacing,
+            test_label_origins=self.test_label_origins,
+            test_label_directions=self.test_label_directions
+        )
 
 
 class SegResNetDecoderOnly(nn.Module):
@@ -1323,15 +1334,15 @@ class ConvSegmentation3D(SegmentationUpsampling3D):
 
         test_loader = load_patch_data(test_data, batch_size=10)
         return inference3d(
-            self.decoder,
-            test_loader,
-            self.device,
-            self.return_binary,
-            self.test_cases,
-            self.test_label_sizes,
-            self.test_label_spacing,
-            self.test_label_origins,
-            self.test_label_directions,
+            decoder=self.decoder,
+            data_loader=test_loader,
+            device=self.device,
+            return_binary=self.return_binary,
+            test_cases=self.test_cases,
+            test_label_sizes=self.test_label_sizes,
+            test_label_spacing=self.test_label_spacing,
+            test_label_origins=self.test_label_origins,
+            test_label_directions=self.test_label_directions,
             inference_postprocessor=self.inference_postprocessor,  # overwrite original behaviour of applying sigmoid
             mask_postprocessor=self.mask_processor,
         )
@@ -1431,7 +1442,19 @@ class LinearUpsampleConv3D(SegmentationUpsampling3D):
         test_loader = load_patch_data(test_data, batch_size=1)
         # run inference using the trained decoder
 
-        return inference3d_softmax(self.decoder, test_loader, self.device, self.return_binary, self.test_cases, self.test_label_sizes, self.test_label_spacing, self.test_label_origins, self.test_label_directions, is_task11=self.is_task11)
+        # run inference using the trained decoder
+        return inference3d_softmax(
+            decoder=self.decoder,
+            data_loader=test_loader,
+            device=self.device,
+            return_binary=self.return_binary,
+            test_cases=self.test_cases,
+            test_label_sizes=self.test_label_sizes,
+            test_label_spacing=self.test_label_spacing,
+            test_label_origins=self.test_label_origins,
+            test_label_directions=self.test_label_directions,
+            is_task11=self.is_task11
+        )
 
 def expand_instance_labels(y: np.ndarray) -> np.ndarray:
     """
@@ -1486,7 +1509,7 @@ def expand_instance_labels(y: np.ndarray) -> np.ndarray:
     return out
 
 
-def inference3d_softmax(decoder, data_loader, device, return_binary,  test_cases, test_label_sizes, test_label_spacing, test_label_origins, test_label_directions, is_task11=False):
+def inference3d_softmax(*, decoder, data_loader, device, return_binary, test_cases, test_label_sizes, test_label_spacing, test_label_origins, test_label_directions, is_task11=False):
     decoder.eval()
     with torch.no_grad():
         grouped_predictions = defaultdict(lambda: defaultdict(list))
