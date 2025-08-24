@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import math
+import random
 from collections import defaultdict
 from typing import Iterable
 
@@ -805,10 +806,77 @@ def extract_patch_labels(
     )
 
 
-def load_patch_data(data_array: np.ndarray, batch_size: int = 80) -> DataLoader:
-    train_ds = dataset_monai(data=data_array)
-    train_loader = dataloader_monai(train_ds, batch_size=batch_size, shuffle=False)
-    return train_loader
+class BalancedSegmentationDataset(Dataset):
+    """
+    Balanced dataset for segmentation that ensures equal probability of sampling
+    positive and negative patches using inverse probability weighting.
+    """
+
+    def __init__(self, data, transform=None, random_seed=42):
+        self.transform = transform
+        self.rng = random.Random(random_seed)
+    
+        # Separate positive and negative patches
+        self.positive_patches = []
+        self.negative_patches = []
+    
+        for data_dict in data:
+            patch_label = data_dict["patch_label"]
+            if np.any(patch_label != 0):
+                self.positive_patches.append(data_dict)
+            else:
+                self.negative_patches.append(data_dict)
+
+        self.num_positive = len(self.positive_patches)
+        self.num_negative = len(self.negative_patches)
+
+        # Total length is twice the minimum class size to ensure balance
+        self.total_length = 2 * min(self.num_positive, self.num_negative) if min(self.num_positive, self.num_negative) > 0 else max(self.num_positive, self.num_negative)
+
+        print(f"BalancedSegmentationDataset: {self.num_positive} positive, {self.num_negative} negative patches")
+        print(f"Total balanced dataset size: {self.total_length}")
+
+    def __len__(self):
+        return self.total_length
+
+    def __getitem__(self, idx):
+        # Use inverse probability weighting: sample positive and negative with equal probability
+        if self.num_positive > 0 and self.num_negative > 0:
+            # 50% chance of sampling positive or negative
+            if self.rng.random() < 0.5:
+                # Sample positive patch
+                patch_idx = self.rng.randint(0, self.num_positive - 1)
+                data_dict = self.positive_patches[patch_idx]
+            else:
+                # Sample negative patch
+                patch_idx = self.rng.randint(0, self.num_negative - 1)
+                data_dict = self.negative_patches[patch_idx]
+        elif self.num_positive > 0:
+            # Only positive patches available
+            patch_idx = self.rng.randint(0, self.num_positive - 1)
+            data_dict = self.positive_patches[patch_idx]
+        else:
+            # Only negative patches available
+            patch_idx = self.rng.randint(0, self.num_negative - 1)
+            data_dict = self.negative_patches[patch_idx]
+
+        # Apply transform if provided
+        if self.transform:
+            # Apply transform to patch data if needed
+            for key, value in data_dict.items():
+                if hasattr(value, 'shape'):  # Apply to array-like data
+                    data_dict[key] = self.transform(value)
+
+        return data_dict
+
+
+def load_patch_data(data_array: np.ndarray, batch_size: int = 80, balance_bg: bool = False) -> DataLoader:
+    if balance_bg:
+        train_ds = BalancedSegmentationDataset(data=data_array)
+    else:
+        train_ds = dataset_monai(data=data_array)
+
+    return dataloader_monai(train_ds, batch_size=batch_size, shuffle=False)
 
 
 
@@ -843,6 +911,7 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
             Metadata for extracting training labels at patch-level.
         patch_size : Size of each 3D patch.
         return_binary : Whether to threshold predictions to binary masks.
+        balance_bg : Whether to balance background and foreground patches using inverse probability weighting.
     """
 
     def __init__(
@@ -872,6 +941,7 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
         patch_size,
         patch_spacing,
         return_binary=True,
+        balance_bg=False,
     ):   
         label_patch_features = []
         for idx, label in enumerate(shot_labels):
@@ -917,6 +987,7 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
         self.patch_spacing = patch_spacing
         self.decoder = None
         self.return_binary = return_binary
+        self.balance_bg = balance_bg
 
     def fit(self):
         # build training data and loader
@@ -929,7 +1000,7 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
             labels=self.shot_labels,
         )
 
-        train_loader = load_patch_data(train_data, batch_size=10)
+        train_loader = load_patch_data(train_data, batch_size=10, balance_bg=self.balance_bg)
         latent_dim = len(self.shot_features[0][0])
         target_patch_size = tuple(int(j / 16) for j in self.patch_size)
         target_shape = (
@@ -973,6 +1044,7 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
         )
 
         test_loader = load_patch_data(test_data, batch_size=10)
+
         # run inference using the trained decoder
         return inference3d(
             decoder=self.decoder,
@@ -1280,7 +1352,8 @@ class ConvSegmentation3D(SegmentationUpsampling3D):
             patch_spacing=self.patch_spacing,
             labels=self.shot_labels,
         )
-        train_loader = load_patch_data(train_data, batch_size=32)
+        train_loader = load_patch_data(train_data, batch_size=32, balance_bg=self.balance_bg)
+
         # Channels are the remaining dimension before the spatial dimensions
         z_dim, num_spatials = len(self.shot_features[0][0]), self.pack_size[0] * self.pack_size[1] * self.pack_size[2]
         assert z_dim % num_spatials == 0, "Latent dimension must be divisible by spatials!"
@@ -1385,7 +1458,7 @@ class LinearUpsampleConv3D(SegmentationUpsampling3D):
         self.is_task11 = False
         self.is_task06 = False
         self.conv_then_upsample = conv_then_upsample
-        
+
     def fit(self):
         # build training data and loader
         train_data = construct_data_with_labels(
@@ -1396,7 +1469,8 @@ class LinearUpsampleConv3D(SegmentationUpsampling3D):
             patch_spacing=self.patch_spacing,
             labels=self.shot_labels,
         )
-        train_loader = load_patch_data(train_data, batch_size=1)
+
+        train_loader = load_patch_data(train_data, batch_size=16, balance_bg=self.balance_bg)
 
         max_class = max_class_label_from_labels(self.shot_labels)
         if max_class >= 100:
