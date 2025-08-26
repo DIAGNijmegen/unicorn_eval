@@ -41,8 +41,7 @@ from tqdm import tqdm
 
 from unicorn_eval.adaptors.base import PatchLevelTaskAdaptor
 from unicorn_eval.adaptors.patch_extraction import extract_patches
-from unicorn_eval.adaptors.reconstruct_prediction import (stitch_patches,
-                                                          stitch_patches_fast)
+from unicorn_eval.adaptors.reconstruct_prediction import stitch_patches_fast
 
 
 def compute_num_upsample_layers(initial_size, target_size):
@@ -486,15 +485,8 @@ def create_grid(decoded_patches):
     grids = {}
 
     for idx, patches in tqdm(decoded_patches.items(), desc="Creating grids"):
-        stitched1 = stitch_patches(patches)
-        stitched2 = stitch_patches_fast(patches)
-        import datetime
-        t0 = datetime.datetime.now()
-        stitch_patches_fast(patches)
-        t1 = datetime.datetime.now()
-        print(f"Time taken to stitch patches: {t1 - t0}")
-        assert (sitk.GetArrayFromImage(stitched1) == sitk.GetArrayFromImage(stitched2)).all(), "Stitching methods give different results!"
-        grids[idx] = stitched1
+        stitched = stitch_patches_fast(patches)
+        grids[idx] = stitched
 
     if False:
         # deprecated
