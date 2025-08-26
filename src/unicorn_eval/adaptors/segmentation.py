@@ -1275,11 +1275,11 @@ class ConvDecoder3D(nn.Module):
 
 class ConvSegmentation3D(SegmentationUpsampling3D):
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, feature_grid_resolution=None, **kwargs):
         super().__init__(*args, **kwargs)
         # First three components are the original patchsize, next three are the resolution within the patch
-        # If no pack size is given, use (1, 1, 1) to be compatible with sparse models
-        self.pack_size = self.feature_grid_resolution if self.feature_grid_resolution is not None else (1, 1, 1)
+        # If no feature grid resolution is given, use (1, 1, 1) to be compatible with sparse models
+        self.pack_size = feature_grid_resolution if feature_grid_resolution is not None else (1, 1, 1)
         self.patch_size = self.patch_size[:3]
 
     @staticmethod
