@@ -14,9 +14,9 @@
 from __future__ import annotations
 
 import math
+import random
 from collections import defaultdict
-from typing import Iterable
-from scipy import ndimage as ndi
+from typing import Iterable, Type
 
 import numpy as np
 import SimpleITK as sitk
@@ -26,18 +26,22 @@ import torch.nn.functional as F
 import torch.optim as optim
 from monai.data import DataLoader as dataloader_monai
 from monai.data import Dataset as dataset_monai
-from monai.losses.dice import DiceLoss, DiceFocalLoss
+from monai.losses.dice import DiceFocalLoss, DiceLoss
 from monai.networks.blocks.upsample import UpSample
 from monai.networks.layers.factories import Act, Conv, Norm, split_args
 from monai.networks.layers.utils import get_act_layer, get_norm_layer
-from monai.networks.nets.segresnet_ds import aniso_kernel, scales_for_resolution
+from monai.networks.nets.segresnet_ds import (aniso_kernel,
+                                              scales_for_resolution)
 from monai.utils import has_option
+from scipy import ndimage as ndi
+from torch.nn.utils.clip_grad import clip_grad_norm_
 from torch.utils.data import DataLoader, Dataset
 from torch.utils.data._utils.collate import default_collate
 from tqdm import tqdm
 
 from unicorn_eval.adaptors.base import PatchLevelTaskAdaptor
 from unicorn_eval.adaptors.patch_extraction import extract_patches
+from unicorn_eval.adaptors.reconstruct_prediction import stitch_patches
 
 
 def compute_num_upsample_layers(initial_size, target_size):
@@ -244,7 +248,7 @@ def train_decoder(decoder, dataloader, num_epochs=200, lr=0.001):
 
             total_loss += loss.item()
 
-        print(f"Epoch {epoch+1}, Loss: {total_loss / len(dataloader)}")
+        tqdm.write(f"Epoch {epoch+1}, Loss: {total_loss / len(dataloader)}")
 
     return decoder
 
@@ -324,6 +328,7 @@ class SegmentationUpsampling(PatchLevelTaskAdaptor):
         test_names,
         test_image_sizes,
         patch_size,
+        patch_spacing,
         num_epochs=20,
         learning_rate=1e-5,
     ):
@@ -338,6 +343,7 @@ class SegmentationUpsampling(PatchLevelTaskAdaptor):
         self.test_names = test_names
         self.test_image_sizes = test_image_sizes
         self.patch_size = patch_size
+        self.patch_spacing = patch_spacing
         self.num_epochs = num_epochs
         self.learning_rate = learning_rate
         self.decoder = None
@@ -428,7 +434,7 @@ class Decoder3D(nn.Module):
         return self.decoder(x)
 
 
-def train_decoder3d(decoder, data_loader, device, num_epochs=3, loss_fn=None, optimizer=None, label_mapper=None):
+def train_decoder3d(decoder, data_loader, device, num_epochs: int = 3, iterations_per_epoch: int | None = None, loss_fn=None, optimizer=None, label_mapper=None, verbose: bool = True):
     if loss_fn is None:
         loss_fn = DiceLoss(sigmoid=True)
     if optimizer is None:
@@ -439,7 +445,8 @@ def train_decoder3d(decoder, data_loader, device, num_epochs=3, loss_fn=None, op
         epoch_loss = 0
 
         iteration_count = 0
-        for batch in data_loader:
+        batch_iter = tqdm(data_loader, total=iterations_per_epoch, desc=f"Epoch {epoch+1}/{num_epochs}", leave=False, disable=not verbose)
+        for batch in batch_iter:
             iteration_count += 1
 
             patch_emb = batch["patch"].to(device)
@@ -457,7 +464,13 @@ def train_decoder3d(decoder, data_loader, device, num_epochs=3, loss_fn=None, op
 
             epoch_loss += loss.item()
 
-        print(f"Avg total epoch loss = {epoch_loss / iteration_count:.4f}")
+            # Update progress bar with current loss and running average
+            batch_iter.set_postfix(loss=f"{loss.item():.4f}", avg=f"{epoch_loss / iteration_count:.4f}")
+
+            if iterations_per_epoch is not None and iteration_count >= iterations_per_epoch:
+                break
+
+        tqdm.write(f"Epoch {epoch+1}: Avg total loss = {epoch_loss / iteration_count:.4f}")
 
     return decoder
 
@@ -471,7 +484,13 @@ def world_to_voxel(coord, origin, spacing, inv_direction):
 def create_grid(decoded_patches):
     grids = {}
 
-    for idx, patches in decoded_patches.items():
+    for idx, patches in tqdm(decoded_patches.items(), desc="Creating grids"):
+        stitched = stitch_patches(patches)
+        grids[idx] = stitched
+
+    if False:
+        # deprecated
+
         # Pull meta from the first patch
         meta = patches[0]
         image_size = meta["image_size"]
@@ -522,6 +541,7 @@ def create_grid(decoded_patches):
 
 
 def inference3d(
+    *,
     decoder,
     data_loader,
     device,
@@ -538,7 +558,7 @@ def inference3d(
     with torch.no_grad():
         grouped_predictions = defaultdict(lambda: defaultdict(list))
 
-        for batch in data_loader:
+        for batch in tqdm(data_loader, desc="Inference"):
             inputs = batch["patch"].to(device)  # shape: [B, ...]
             coords = batch["coordinates"]  # list of 3 tensors
             image_idxs = batch["case_number"]
@@ -566,6 +586,10 @@ def inference3d(
                         "patch_size": [
                             int(batch["patch_size"][j][i])
                             for j in range(len(batch["patch_size"]))
+                        ],
+                        "patch_spacing": [
+                            float(batch["patch_spacing"][j][i])
+                            for j in range(len(batch["patch_spacing"]))
                         ],
                         "image_size": [
                             int(batch["image_size"][j][i])
@@ -599,6 +623,7 @@ def inference3d(
                         "coord": list(coord),
                         "features": avg_features,
                         "patch_size": patches[0]["patch_size"],
+                        "patch_spacing": patches[0]["patch_spacing"],
                         "image_size": patches[0]["image_size"],
                         "image_origin": patches[0]["image_origin"],
                         "image_spacing": patches[0]["image_spacing"],
@@ -641,6 +666,7 @@ def construct_data_with_labels(
     embeddings,
     cases,
     patch_size,
+    patch_spacing,
     labels=None,
     image_sizes=None,
     image_origins=None,
@@ -674,6 +700,7 @@ def construct_data_with_labels(
                 "patch": np.array(patch_img, dtype=np.float32),
                 "coordinates": patch_coordinates[i],
                 "patch_size": patch_size,
+                "patch_spacing": patch_spacing,
                 "case_number": case_idx,
             }
             if lbl_feat is not None:
@@ -718,7 +745,7 @@ def extract_patch_labels(
     start_coordinates,
     patch_size: list[int] = [16, 256, 256],
     patch_spacing: list[float] | None = None,
-) -> list[dict]:
+) -> dict:
     """
     Generate a list of patch features from a radiology image
 
@@ -757,9 +784,7 @@ def extract_patch_labels(
     if patch_spacing is None:
         patch_spacing = label.GetSpacing()
 
-    for patch, coordinates in tqdm(
-        zip(patches, start_coordinates), total=len(patches), desc="Extracting features"
-    ):
+    for patch, coordinates in zip(patches, start_coordinates):
         patch_array = sitk.GetArrayFromImage(patch)
         patch_features.append(
             {
@@ -768,7 +793,7 @@ def extract_patch_labels(
             }
         )
 
-    patch_labels = make_patch_level_neural_representation(
+    return make_patch_level_neural_representation(
         patch_features=patch_features,
         patch_size=patch_size,
         patch_spacing=patch_spacing,
@@ -779,13 +804,78 @@ def extract_patch_labels(
         title="patch_labels",
     )
 
-    return patch_labels
+
+class BalancedSegmentationDataset(Dataset):
+    """
+    Balanced dataset for segmentation that ensures equal probability of sampling
+    positive and negative patches using inverse probability weighting.
+    """
+
+    def __init__(self, data, transform=None, random_seed=42):
+        self.transform = transform
+        self.rng = random.Random(random_seed)
+    
+        # Separate positive and negative patches
+        self.positive_patches = []
+        self.negative_patches = []
+    
+        for data_dict in data:
+            patch_label = data_dict["patch_label"]
+            if np.any(patch_label != 0):
+                self.positive_patches.append(data_dict)
+            else:
+                self.negative_patches.append(data_dict)
+
+        self.num_positive = len(self.positive_patches)
+        self.num_negative = len(self.negative_patches)
+
+        # Total length is twice the minimum class size to ensure balance
+        self.total_length = 2 * min(self.num_positive, self.num_negative) if min(self.num_positive, self.num_negative) > 0 else max(self.num_positive, self.num_negative)
+
+        print(f"BalancedSegmentationDataset: {self.num_positive} positive, {self.num_negative} negative patches")
+        print(f"Total balanced dataset size: {self.total_length}")
+
+    def __len__(self):
+        return self.total_length
+
+    def __getitem__(self, idx):
+        # Use inverse probability weighting: sample positive and negative with equal probability
+        if self.num_positive > 0 and self.num_negative > 0:
+            # 50% chance of sampling positive or negative
+            if self.rng.random() < 0.5:
+                # Sample positive patch
+                patch_idx = self.rng.randint(0, self.num_positive - 1)
+                data_dict = self.positive_patches[patch_idx]
+            else:
+                # Sample negative patch
+                patch_idx = self.rng.randint(0, self.num_negative - 1)
+                data_dict = self.negative_patches[patch_idx]
+        elif self.num_positive > 0:
+            # Only positive patches available
+            patch_idx = self.rng.randint(0, self.num_positive - 1)
+            data_dict = self.positive_patches[patch_idx]
+        else:
+            # Only negative patches available
+            patch_idx = self.rng.randint(0, self.num_negative - 1)
+            data_dict = self.negative_patches[patch_idx]
+
+        # Apply transform if provided
+        if self.transform:
+            # Apply transform to patch data if needed
+            for key, value in data_dict.items():
+                if hasattr(value, 'shape'):  # Apply to array-like data
+                    data_dict[key] = self.transform(value)
+
+        return data_dict
 
 
-def load_patch_data(data_array: np.ndarray, batch_size: int = 80) -> DataLoader:
-    train_ds = dataset_monai(data=data_array)
-    train_loader = dataloader_monai(train_ds, batch_size=batch_size, shuffle=False)
-    return train_loader
+def load_patch_data(data_array: np.ndarray, batch_size: int = 80, balance_bg: bool = False) -> DataLoader:
+    if balance_bg:
+        train_ds = BalancedSegmentationDataset(data=data_array)
+    else:
+        train_ds = dataset_monai(data=data_array)
+
+    return dataloader_monai(train_ds, batch_size=batch_size, shuffle=False)
 
 
 
@@ -820,6 +910,7 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
             Metadata for extracting training labels at patch-level.
         patch_size : Size of each 3D patch.
         return_binary : Whether to threshold predictions to binary masks.
+        balance_bg : Whether to balance background and foreground patches using inverse probability weighting.
     """
 
     def __init__(
@@ -847,10 +938,12 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
         test_label_origins,
         test_label_directions,
         patch_size,
+        patch_spacing,
         return_binary=True,
-    ):   
+        balance_bg=False,
+    ):
         label_patch_features = []
-        for idx, label in enumerate(shot_labels):
+        for idx, label in tqdm(enumerate(shot_labels), desc="Extracting patch labels"):
             label_feats = extract_patch_labels(
                 label=label,
                 label_spacing=shot_label_spacing[shot_names[idx]],
@@ -862,6 +955,7 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
                 image_direction=shot_image_directions[shot_names[idx]],
                 start_coordinates=shot_coordinates[idx],
                 patch_size=patch_size,
+                patch_spacing=patch_spacing,
             )
             label_patch_features.append(label_feats)
         label_patch_features = np.array(label_patch_features, dtype=object)
@@ -889,8 +983,10 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
         self.test_label_origins = test_label_origins
         self.test_label_directions = test_label_directions
         self.patch_size = patch_size
+        self.patch_spacing = patch_spacing
         self.decoder = None
         self.return_binary = return_binary
+        self.balance_bg = balance_bg
 
     def fit(self):
         # build training data and loader
@@ -899,10 +995,11 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
             embeddings=self.shot_features,
             cases=self.shot_names,
             patch_size=self.patch_size,
+            patch_spacing=self.patch_spacing,
             labels=self.shot_labels,
         )
 
-        train_loader = load_patch_data(train_data, batch_size=10)
+        train_loader = load_patch_data(train_data, batch_size=10, balance_bg=self.balance_bg)
         latent_dim = len(self.shot_features[0][0])
         target_patch_size = tuple(int(j / 16) for j in self.patch_size)
         target_shape = (
@@ -931,13 +1028,14 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
         decoder.to(self.device)
         self.decoder = train_decoder3d(decoder, train_loader, self.device)
 
-    def predict(self) -> np.ndarray:
+    def predict(self) -> list:
         # build test data and loader
         test_data = construct_data_with_labels(
             coordinates=self.test_coordinates,
             embeddings=self.test_features,
             cases=self.test_cases,
             patch_size=self.patch_size,
+            patch_spacing=self.patch_spacing,
             image_sizes=self.test_image_sizes,
             image_origins=self.test_image_origins,
             image_spacings=self.test_image_spacings,
@@ -945,8 +1043,19 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
         )
 
         test_loader = load_patch_data(test_data, batch_size=10)
+
         # run inference using the trained decoder
-        return inference3d(self.decoder, test_loader, self.device, self.return_binary, self.test_cases, self.test_label_sizes, self.test_label_spacing, self.test_label_origins, self.test_label_directions)
+        return inference3d(
+            decoder=self.decoder,
+            data_loader=test_loader,
+            device=self.device,
+            return_binary=self.return_binary,
+            test_cases=self.test_cases,
+            test_label_sizes=self.test_label_sizes,
+            test_label_spacing=self.test_label_spacing,
+            test_label_origins=self.test_label_origins,
+            test_label_directions=self.test_label_directions
+        )
 
 
 class SegResNetDecoderOnly(nn.Module):
@@ -1186,7 +1295,8 @@ class ConvSegmentation3D(SegmentationUpsampling3D):
             multiclass_mask.shape
         ), f"Metadata inconsistency, cannot process instances {sitk_mask.GetSize()=}"
 
-        from skimage.measure import label, regionprops  # import inline because it is not used for all tasks
+        from skimage.measure import (  # import inline because it is not used for all tasks
+            label, regionprops)
 
         assert multiclass_mask.ndim == 3, f"Expected 3D input, got {multiclass_mask.shape}"
         instance_regions, num_instances = label(multiclass_mask == divider_class, connectivity=1, return_num=True)
@@ -1238,9 +1348,11 @@ class ConvSegmentation3D(SegmentationUpsampling3D):
             embeddings=self.shot_features,
             cases=self.shot_names,
             patch_size=self.patch_size,
+            patch_spacing=self.patch_spacing,
             labels=self.shot_labels,
         )
-        train_loader = load_patch_data(train_data, batch_size=32)
+        train_loader = load_patch_data(train_data, batch_size=32, balance_bg=self.balance_bg)
+
         # Channels are the remaining dimension before the spatial dimensions
         z_dim, num_spatials = len(self.shot_features[0][0]), self.pack_size[0] * self.pack_size[1] * self.pack_size[2]
         assert z_dim % num_spatials == 0, "Latent dimension must be divisible by spatials!"
@@ -1285,6 +1397,7 @@ class ConvSegmentation3D(SegmentationUpsampling3D):
             embeddings=self.test_features,
             cases=self.test_cases,
             patch_size=self.patch_size,
+            patch_spacing=self.patch_spacing,
             image_sizes=self.test_image_sizes,
             image_origins=self.test_image_origins,
             image_spacings=self.test_image_spacings,
@@ -1293,19 +1406,108 @@ class ConvSegmentation3D(SegmentationUpsampling3D):
 
         test_loader = load_patch_data(test_data, batch_size=10)
         return inference3d(
-            self.decoder,
-            test_loader,
-            self.device,
-            self.return_binary,
-            self.test_cases,
-            self.test_label_sizes,
-            self.test_label_spacing,
-            self.test_label_origins,
-            self.test_label_directions,
+            decoder=self.decoder,
+            data_loader=test_loader,
+            device=self.device,
+            return_binary=self.return_binary,
+            test_cases=self.test_cases,
+            test_label_sizes=self.test_label_sizes,
+            test_label_spacing=self.test_label_spacing,
+            test_label_origins=self.test_label_origins,
+            test_label_directions=self.test_label_directions,
             inference_postprocessor=self.inference_postprocessor,  # overwrite original behaviour of applying sigmoid
             mask_postprocessor=self.mask_processor,
         )
 
+
+class UpsampleConvSegAdaptor(nn.Module):
+    def __init__(self, target_shape=None, in_channels=32, num_classes=2):
+        super().__init__()
+        self.target_shape = target_shape
+        self.in_channels = in_channels
+        # Two intermediate conv layers + final prediction layer
+        self.conv_blocks = nn.Sequential(
+            nn.Conv3d(in_channels, in_channels, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv3d(in_channels, in_channels, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.Conv3d(in_channels, num_classes, kernel_size=1)
+        )
+
+    def forward(self, x):
+        C = self.in_channels
+        B, feat_len = x.shape
+        if feat_len % C != 0:
+            raise ValueError(
+            f"[Adaptor] Embedding length {feat_len} must be divisible by in_channels={C}."
+        )
+
+        flat = feat_len // C
+
+        D_ref, H_ref, W_ref = self.target_shape
+        ref_ratio = D_ref * H_ref * W_ref
+
+        k = (flat / ref_ratio) ** (1 / 3)
+        D = round(D_ref * k)
+        H = round(H_ref * k)
+        W = round(W_ref * k)
+        
+        if D * H * W != flat:
+            D, H, W = exact_triplet_from_ref(flat, (D_ref, H_ref, W_ref))
+        
+        x = x.view(B, C, D, H, W)
+        x = F.interpolate(x, size=self.target_shape, mode="trilinear", align_corners=False)
+        x = self.conv_blocks(x)
+        return x
+
+
+class UpsampleConvSegAdaptorLeakyReLU(UpsampleConvSegAdaptor):
+    def __init__(self, target_shape=None, in_channels=32, num_classes=2):
+        super().__init__(target_shape=target_shape, in_channels=in_channels, num_classes=num_classes)
+        self.conv_blocks = nn.Sequential(
+            nn.Conv3d(in_channels, in_channels, kernel_size=3, padding=1),
+            nn.LeakyReLU(negative_slope=0.1, inplace=True),
+            nn.Conv3d(in_channels, in_channels, kernel_size=3, padding=1),
+            nn.LeakyReLU(negative_slope=0.1, inplace=True),
+            nn.Conv3d(in_channels, num_classes, kernel_size=1)
+        )
+
+
+class ConvUpsampleSegAdaptor(nn.Module):
+    def __init__(self, target_shape=None, in_channels=32, num_classes=2):
+        super().__init__()
+        self.target_shape = target_shape
+        self.in_channels = in_channels
+        self.conv_blocks = nn.Sequential(
+            nn.Conv3d(in_channels, num_classes, kernel_size=3, padding=1) 
+        )
+
+    def forward(self, x):
+        C = self.in_channels
+        B, feat_len = x.shape
+        if feat_len % C != 0:
+            raise ValueError(
+            f"[Adaptor] Embedding length {feat_len} must be divisible by in_channels={C}."
+        )
+
+        flat = x.shape[1] // C
+
+        D_ref, H_ref, W_ref = self.target_shape
+        ref_ratio = D_ref * H_ref * W_ref
+
+        k = (flat / ref_ratio) ** (1 / 3)
+
+        D = round(D_ref * k)
+        H = round(H_ref * k)
+        W = round(W_ref * k)
+
+        if D * H * W != flat:
+            D, H, W = exact_triplet_from_ref(flat, (D_ref, H_ref, W_ref))
+
+        x = x.view(B, C, D, H, W)
+        x = self.conv_blocks(x)
+        x = F.interpolate(x, size=self.target_shape, mode="trilinear", align_corners=False)
+        return x
 
 
 class LinearUpsampleConv3D(SegmentationUpsampling3D):
@@ -1339,12 +1541,12 @@ class LinearUpsampleConv3D(SegmentationUpsampling3D):
         patch_size : Size of each 3D patch.
         return_binary : Whether to threshold predictions into binary segmentation masks.
     """
-    def __init__(self, *args, conv_then_upsample: bool = False, **kwargs):
+    def __init__(self, *args, decoder_cls: Type[nn.Module] = UpsampleConvSegAdaptor, **kwargs):
         super().__init__(*args, **kwargs)
         self.is_task11 = False
         self.is_task06 = False
-        self.conv_then_upsample = conv_then_upsample
-        
+        self.decoder_cls = decoder_cls
+
     def fit(self):
         # build training data and loader
         train_data = construct_data_with_labels(
@@ -1352,9 +1554,11 @@ class LinearUpsampleConv3D(SegmentationUpsampling3D):
             embeddings=self.shot_features,
             cases=self.shot_names,
             patch_size=self.patch_size,
+            patch_spacing=self.patch_spacing,
             labels=self.shot_labels,
         )
-        train_loader = load_patch_data(train_data, batch_size=1)
+
+        train_loader = load_patch_data(train_data, batch_size=1, balance_bg=self.balance_bg)
 
         max_class = max_class_label_from_labels(self.shot_labels)
         if max_class >= 100:
@@ -1363,33 +1567,30 @@ class LinearUpsampleConv3D(SegmentationUpsampling3D):
         elif max_class > 1:
             self.is_task06 = True
             num_classes = 2
+            self.return_binary = False  # Do not threshold predictions for task 06
+            # TODO: implement this choice more elegantly
         else:
             num_classes = max_class + 1
 
         # set up device and model
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        if self.conv_then_upsample:   # True → Conv→Upsample
-            decoder = ConvUpsampleSegAdaptor(
-                target_shape=self.patch_size[::-1],  # (D, H, W)
-                num_classes=num_classes,
-            )
-        else:                         # False → Upsample→Conv
-            decoder = UpsampleConvSegAdaptor(
-                target_shape=self.patch_size[::-1],
-                num_classes=num_classes,
-            )
+        decoder = self.decoder_cls(
+            target_shape=self.patch_size[::-1],  # (D, H, W)
+            num_classes=num_classes,
+        )
 
         print(f"Training decoder with {num_classes} classes")
         decoder.to(self.device)
         self.decoder = train_seg_adaptor3d(decoder, train_loader, self.device, is_task11=self.is_task11, is_task06=self.is_task06)
 
-    def predict(self) -> np.ndarray:
+    def predict(self) -> list:
         # build test data and loader
         test_data = construct_data_with_labels(
             coordinates=self.test_coordinates,
             embeddings=self.test_features,
             cases=self.test_cases,
             patch_size=self.patch_size,
+            patch_spacing=self.patch_spacing,
             image_sizes=self.test_image_sizes,
             image_origins=self.test_image_origins,
             image_spacings=self.test_image_spacings,
@@ -1397,9 +1598,68 @@ class LinearUpsampleConv3D(SegmentationUpsampling3D):
         )
 
         test_loader = load_patch_data(test_data, batch_size=1)
-        # run inference using the trained decoder
 
-        return inference3d_softmax(self.decoder, test_loader, self.device, self.return_binary, self.test_cases, self.test_label_sizes, self.test_label_spacing, self.test_label_origins, self.test_label_directions, is_task11=self.is_task11)
+        # run inference using the trained decoder
+        return inference3d_softmax(
+            decoder=self.decoder,
+            data_loader=test_loader,
+            device=self.device,
+            return_binary=self.return_binary,
+            test_cases=self.test_cases,
+            test_label_sizes=self.test_label_sizes,
+            test_label_spacing=self.test_label_spacing,
+            test_label_origins=self.test_label_origins,
+            test_label_directions=self.test_label_directions,
+            is_task11=self.is_task11
+        )
+
+
+class LinearUpsampleConv3D_V2(LinearUpsampleConv3D):
+    """
+    Adapts LinearUpsampleConv3D:
+    - Enable balanced background sampling by default
+    - Use a different training strategy
+    - Set batch size to 8
+    """
+    def __init__(self, *args, balance_bg: bool = True, **kwargs):
+        super().__init__(*args, balance_bg=balance_bg, **kwargs)
+
+    def fit(self):
+        # build training data and loader
+        train_data = construct_data_with_labels(
+            coordinates=self.shot_coordinates,
+            embeddings=self.shot_features,
+            cases=self.shot_names,
+            patch_size=self.patch_size,
+            patch_spacing=self.patch_spacing,
+            labels=self.shot_labels,
+        )
+
+        train_loader = load_patch_data(train_data, batch_size=8, balance_bg=self.balance_bg)
+
+        max_class = max_class_label_from_labels(self.shot_labels)
+        if max_class >= 100:
+            self.is_task11 = True
+            num_classes = 4
+        elif max_class > 1:
+            self.is_task06 = True
+            num_classes = 2
+            self.return_binary = False  # Do not threshold predictions for task 06
+            # TODO: implement this choice more elegantly
+        else:
+            num_classes = max_class + 1
+
+        # set up device and model
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        decoder = self.decoder_cls(
+            target_shape=self.patch_size[::-1],  # (D, H, W)
+            num_classes=num_classes,
+        )
+
+        print(f"Training decoder with {num_classes} classes")
+        decoder.to(self.device)
+        self.decoder = train_seg_adaptor3d_v2(decoder, train_loader, self.device, is_task11=self.is_task11, is_task06=self.is_task06)
+
 
 def expand_instance_labels(y: np.ndarray) -> np.ndarray:
     """
@@ -1454,12 +1714,12 @@ def expand_instance_labels(y: np.ndarray) -> np.ndarray:
     return out
 
 
-def inference3d_softmax(decoder, data_loader, device, return_binary,  test_cases, test_label_sizes, test_label_spacing, test_label_origins, test_label_directions, is_task11=False):
+def inference3d_softmax(*, decoder, data_loader, device, return_binary, test_cases, test_label_sizes, test_label_spacing, test_label_origins, test_label_directions, is_task11=False):
     decoder.eval()
     with torch.no_grad():
         grouped_predictions = defaultdict(lambda: defaultdict(list))
 
-        for batch in data_loader:
+        for batch in tqdm(data_loader, desc="Inference"):
             inputs = batch["patch"].to(device)  # shape: [B, ...]
             coords = batch["coordinates"]  # list of 3 tensors
             image_idxs = batch["case_number"]
@@ -1485,6 +1745,10 @@ def inference3d_softmax(decoder, data_loader, device, return_binary,  test_cases
                         "patch_size": [
                             int(batch["patch_size"][j][i])
                             for j in range(len(batch["patch_size"]))
+                        ],
+                        "patch_spacing": [
+                            float(batch["patch_spacing"][j][i])
+                            for j in range(len(batch["patch_spacing"]))
                         ],
                         "image_size": [
                             int(batch["image_size"][j][i])
@@ -1518,6 +1782,7 @@ def inference3d_softmax(decoder, data_loader, device, return_binary,  test_cases
                         "coord": list(coord),
                         "features": avg_features,
                         "patch_size": patches[0]["patch_size"],
+                        "patch_spacing": patches[0]["patch_spacing"],
                         "image_size": patches[0]["image_size"],
                         "image_origin": patches[0]["image_origin"],
                         "image_spacing": patches[0]["image_spacing"],
@@ -1666,7 +1931,7 @@ def map_labels(y: torch.Tensor) -> torch.Tensor:
     return y_new
 
 
-def train_seg_adaptor3d(decoder, data_loader, device, num_epochs = 3, is_task11=False, is_task06=False):
+def train_seg_adaptor3d(decoder, data_loader, device, num_epochs = 3, iterations_per_epoch: int | None = None, is_task11=False, is_task06=False, verbose: bool = True):
     ce_loss = nn.CrossEntropyLoss()
     optimizer = optim.Adam(decoder.parameters(), lr=1e-3)
     # Train decoder
@@ -1675,7 +1940,7 @@ def train_seg_adaptor3d(decoder, data_loader, device, num_epochs = 3, is_task11=
         epoch_loss = 0.0
 
         # batch progress
-        batch_iter = tqdm(data_loader, desc=f"Epoch {epoch+1}/{num_epochs}", leave=False)
+        batch_iter = tqdm(data_loader, total=iterations_per_epoch, desc=f"Epoch {epoch+1}/{num_epochs}", leave=False, disable=not verbose)
         iteration_count = 0
     
         for batch in batch_iter:
@@ -1702,11 +1967,105 @@ def train_seg_adaptor3d(decoder, data_loader, device, num_epochs = 3, is_task11=
 
             epoch_loss += loss.item()
 
-            # tqdm description 
+            # Update progress bar with current loss and running average
             batch_iter.set_postfix(loss=f"{loss.item():.4f}", avg=f"{epoch_loss / iteration_count:.4f}")
 
-        print(f"Epoch {epoch+1}: Avg total loss = {epoch_loss / iteration_count:.4f}")                               
+            if iterations_per_epoch is not None and iteration_count >= iterations_per_epoch:
+                break
 
+        tqdm.write(f"Epoch {epoch+1}: Avg total loss = {epoch_loss / iteration_count:.4f}")
+
+    return decoder
+
+
+def train_seg_adaptor3d_v2(decoder, data_loader, device, num_iterations = 10_000, is_task11=False, is_task06=False, verbose: bool = True, debug: bool = False):
+    # Use weighted CrossEntropyLoss and focal loss components
+    ce_loss = nn.CrossEntropyLoss()
+    optimizer = optim.Adam(decoder.parameters(), lr=1e-3, weight_decay=1e-4)
+
+    decoder.train()
+
+    epoch_loss = 0.0
+    iteration_count = 0
+    epoch_iterations = 0
+
+    # Create an infinite iterator over the data loader
+    data_iter = iter(data_loader)
+
+    # Progress bar for total iterations
+    progress_bar = tqdm(total=num_iterations, desc="Training", disable=not verbose)
+
+    # Train decoder
+    while iteration_count < num_iterations:
+        try:
+            batch = next(data_iter)
+        except StopIteration:
+            # Reset iterator when data loader is exhausted
+            data_iter = iter(data_loader)
+            batch = next(data_iter)
+
+        iteration_count += 1
+        epoch_iterations += 1
+
+        patch_emb = batch["patch"].to(device)
+        patch_label = batch["patch_label"].to(device).long()
+
+        if is_task11 or is_task06:
+            patch_label = map_labels(patch_label)
+
+        optimizer.zero_grad()
+        de_output = decoder(patch_emb) 
+
+        ce = ce_loss(de_output, patch_label) 
+        if is_task06:
+            loss = ce
+        else:
+            dice = dice_loss(de_output, patch_label)
+            loss = ce + dice
+
+        loss.backward()
+
+        if debug:
+            # Track predictions and labels for monitoring
+            with torch.no_grad():
+                pred_softmax = torch.softmax(de_output, dim=1)[:, 1]
+                mean_pred = pred_softmax.mean().item()
+                mean_label = patch_label.float().mean().item()
+
+            # Check gradient norms before clipping
+            total_grad_norm = 0.0
+            for param in decoder.parameters():
+                if param.grad is not None:
+                    param_norm = param.grad.data.norm(2)
+                    total_grad_norm += param_norm.item() ** 2
+            total_grad_norm = total_grad_norm ** (1. / 2)
+
+            # Check for gradient issues and apply clipping
+            if total_grad_norm > 10:
+                tqdm.write(f"WARNING: High gradient norm at iteration {iteration_count}: {total_grad_norm:.5f}")
+            elif total_grad_norm < 0.0001:
+                tqdm.write(f"WARNING: Very low gradient norm at iteration {iteration_count}: {total_grad_norm:.5f} (vanishing gradients?)")
+
+        # Gradient clipping to prevent exploding gradients
+        clip_grad_norm_(decoder.parameters(), max_norm=1.0)
+
+        optimizer.step()
+
+        step_loss = loss.item()
+        epoch_loss += step_loss
+
+        # Update progress bar with current loss and running average
+        progress_bar.set_postfix(loss=f"{step_loss:.5e}", avg=f"{epoch_loss / epoch_iterations:.5e}")
+        progress_bar.update(1)
+
+        if iteration_count % 100 == 0:
+            avg_loss = epoch_loss / epoch_iterations
+            tqdm.write(f"Iteration {iteration_count}: avg_loss={avg_loss:.5e}")
+
+            epoch_loss = 0.0
+            epoch_iterations = 0
+
+    progress_bar.close()
 
     return decoder
 
@@ -1752,82 +2111,6 @@ def exact_triplet_from_ref(flat: int, ref: tuple[int, int, int]) -> tuple[int, i
     return D, H, W
 
 
-class UpsampleConvSegAdaptor(nn.Module):
-    def __init__(self, target_shape=None, in_channels=32, num_classes=2):
-        super().__init__()
-        self.target_shape = target_shape
-        self.in_channels = in_channels
-        # Two intermediate conv layers + final prediction layer
-        self.conv_blocks = nn.Sequential(
-            nn.Conv3d(in_channels, in_channels, kernel_size=3, padding=1),
-            nn.ReLU(inplace=True),
-            nn.Conv3d(in_channels, in_channels, kernel_size=3, padding=1),
-            nn.ReLU(inplace=True),
-            nn.Conv3d(in_channels, num_classes, kernel_size=1)
-        )
-
-    def forward(self, x):
-        C = self.in_channels
-        B, feat_len = x.shape
-        if feat_len % C != 0:
-            raise ValueError(
-            f"[Adaptor] Embedding length {feat_len} must be divisible by in_channels={C}."
-        )
-
-        flat = feat_len // C
-
-        D_ref, H_ref, W_ref = self.target_shape
-        ref_ratio = D_ref * H_ref * W_ref
-
-        k = (flat / ref_ratio) ** (1 / 3)
-        D = round(D_ref * k)
-        H = round(H_ref * k)
-        W = round(W_ref * k)
-        
-        if D * H * W != flat:
-            D, H, W = exact_triplet_from_ref(flat, (D_ref, H_ref, W_ref))
-        
-        x = x.view(B, C, D, H, W)
-        x = F.interpolate(x, size=self.target_shape, mode="trilinear", align_corners=False)
-        x = self.conv_blocks(x)
-        return x
-    
-class ConvUpsampleSegAdaptor(nn.Module):
-    def __init__(self, target_shape=None, in_channels=32, num_classes=2):
-        super().__init__()
-        self.target_shape = target_shape
-        self.in_channels = in_channels
-        self.conv_blocks = nn.Sequential(
-            nn.Conv3d(in_channels, num_classes, kernel_size=3, padding=1) 
-        )
-
-    def forward(self, x):
-        C = self.in_channels
-        B, feat_len = x.shape
-        if feat_len % C != 0:
-            raise ValueError(
-            f"[Adaptor] Embedding length {feat_len} must be divisible by in_channels={C}."
-        )
-
-        flat = x.shape[1] // C
-
-        D_ref, H_ref, W_ref = self.target_shape
-        ref_ratio = D_ref * H_ref * W_ref
-
-        k = (flat / ref_ratio) ** (1 / 3)
-
-        D = round(D_ref * k)
-        H = round(H_ref * k)
-        W = round(W_ref * k)
-
-        if D * H * W != flat:
-            D, H, W = exact_triplet_from_ref(flat, (D_ref, H_ref, W_ref))
-
-        x = x.view(B, C, D, H, W)
-        x = self.conv_blocks(x)
-        x = F.interpolate(x, size=self.target_shape, mode="trilinear", align_corners=False)
-        return x
-    
 def dice_loss(pred, target, smooth=1e-5):
     num_classes = pred.shape[1]
     pred = F.softmax(pred, dim=1)
