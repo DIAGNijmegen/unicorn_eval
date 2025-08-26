@@ -1635,7 +1635,7 @@ class LinearUpsampleConv3D_V2(LinearUpsampleConv3D):
             labels=self.shot_labels,
         )
 
-        train_loader = load_patch_data(train_data, batch_size=8, balance_bg=self.balance_bg)
+        train_loader = load_patch_data(train_data, batch_size=2, balance_bg=self.balance_bg)
 
         max_class = max_class_label_from_labels(self.shot_labels)
         if max_class >= 100:
@@ -1978,7 +1978,7 @@ def train_seg_adaptor3d(decoder, data_loader, device, num_epochs = 3, iterations
     return decoder
 
 
-def train_seg_adaptor3d_v2(decoder, data_loader, device, num_iterations = 10_000, is_task11=False, is_task06=False, verbose: bool = True, debug: bool = False):
+def train_seg_adaptor3d_v2(decoder, data_loader, device, num_iterations = 5_000, is_task11=False, is_task06=False, verbose: bool = True, debug: bool = False):
     # Use weighted CrossEntropyLoss and focal loss components
     ce_loss = nn.CrossEntropyLoss()
     optimizer = optim.Adam(decoder.parameters(), lr=1e-3, weight_decay=1e-4)
