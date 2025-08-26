@@ -1978,7 +1978,7 @@ def train_seg_adaptor3d(decoder, data_loader, device, num_epochs = 3, iterations
     return decoder
 
 
-def train_seg_adaptor3d_v2(decoder, data_loader, device, num_iterations = 5_000, is_task11=False, is_task06=False, verbose: bool = True, debug: bool = False):
+def train_seg_adaptor3d_v2(decoder, data_loader, device, num_iterations = 15_000, is_task11=False, is_task06=False, verbose: bool = True):
     # Use weighted CrossEntropyLoss and focal loss components
     ce_loss = nn.CrossEntropyLoss()
     optimizer = optim.Adam(decoder.parameters(), lr=1e-3, weight_decay=1e-4)
@@ -2024,27 +2024,6 @@ def train_seg_adaptor3d_v2(decoder, data_loader, device, num_iterations = 5_000,
             loss = ce + dice
 
         loss.backward()
-
-        if debug:
-            # Track predictions and labels for monitoring
-            with torch.no_grad():
-                pred_softmax = torch.softmax(de_output, dim=1)[:, 1]
-                mean_pred = pred_softmax.mean().item()
-                mean_label = patch_label.float().mean().item()
-
-            # Check gradient norms before clipping
-            total_grad_norm = 0.0
-            for param in decoder.parameters():
-                if param.grad is not None:
-                    param_norm = param.grad.data.norm(2)
-                    total_grad_norm += param_norm.item() ** 2
-            total_grad_norm = total_grad_norm ** (1. / 2)
-
-            # Check for gradient issues and apply clipping
-            if total_grad_norm > 10:
-                tqdm.write(f"WARNING: High gradient norm at iteration {iteration_count}: {total_grad_norm:.5f}")
-            elif total_grad_norm < 0.0001:
-                tqdm.write(f"WARNING: Very low gradient norm at iteration {iteration_count}: {total_grad_norm:.5f} (vanishing gradients?)")
 
         # Gradient clipping to prevent exploding gradients
         clip_grad_norm_(decoder.parameters(), max_norm=1.0)
