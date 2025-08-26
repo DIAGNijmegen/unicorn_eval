@@ -57,7 +57,6 @@ def download_predictions(
 
 if __name__ == "__main__":
     download_predictions(
-        algorithm_slug="unicorn-pathology-encoder",
-        output_dir=Path("/Users/joeranbosma/repos/unicorn_eval/tests/predictions-test-all"),
-        predictions_path=Path("/Users/joeranbosma/repos/unicorn_eval/tests/vision/input/predictions-test-all.json"),
+        algorithm_slug="unicorn-radiology-mr",
+        output_dir=Path("/Users/joeranbosma/repos/unicorn_eval/tests/vision/input-task11-check"),
     )
