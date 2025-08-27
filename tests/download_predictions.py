@@ -8,7 +8,6 @@ from tqdm import tqdm
 
 # paths
 def download_predictions(
-    algorithm_slug: str,
     output_dir: Path = Path("predictions"),
     predictions_path: Path | None = None,
 ):
@@ -22,23 +21,10 @@ def download_predictions(
     token = os.environ["GC_TOKEN"]
     client = gcapi.Client(token=token)
 
-    # retrieve the algorithm, providing the slug
-    algorithm = client.algorithms.detail(slug=algorithm_slug)
-
-    # extract details
-    params = {'algorithm_image__algorithm': algorithm["pk"]}
-    algorithm_predictions = client.algorithm_jobs.iterate_all(params=params)
-
-    # wanted results
-    wanted_results = [pred["pk"] for pred in predictions]
-
     # retrieve predictions from the submission
-    for pred in tqdm(algorithm_predictions):
-        if pred["pk"] not in wanted_results:
-            continue
-
+    for pred in tqdm(predictions):
         # create output folder
-        out_dir = output_dir / pred["pk"] / "output"
+        out_dir: Path = output_dir / pred["pk"] / "output"
         out_dir.mkdir(parents=True, exist_ok=True)
 
         # download results
@@ -57,7 +43,5 @@ def download_predictions(
 
 if __name__ == "__main__":
     download_predictions(
-        algorithm_slug="unicorn-pathology-encoder",
-        output_dir=Path("/Users/joeranbosma/repos/unicorn_eval/tests/predictions-test-all"),
-        predictions_path=Path("/Users/joeranbosma/repos/unicorn_eval/tests/vision/input/predictions-test-all.json"),
+        output_dir=Path("/Users/joeranbosma/repos/unicorn_eval/tests/vision/input-task10-val"),
     )
