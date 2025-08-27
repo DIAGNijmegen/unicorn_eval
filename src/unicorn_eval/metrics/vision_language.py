@@ -19,7 +19,6 @@ from pycocoevalcap.bleu.bleu import Bleu
 from pycocoevalcap.cider.cider import Cider
 from pycocoevalcap.meteor.meteor import Meteor
 from pycocoevalcap.rouge.rouge import Rouge
-from tqdm import tqdm
 from pathlib import Path
 from transformers import logging
 
@@ -131,7 +130,7 @@ def compute_bert_score(reports_true, reports_pred):
         reports_pred (list of str): List of hypothesis texts.
 
     Returns:
-        dict: containing 'precision', 'recall', 'f1' (all floats averaged across items).
+        float: F1 score averaged across items.
     """
     # Sanitize text
     refs = [sanitize_text(r) for r in reports_true]
