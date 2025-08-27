@@ -505,6 +505,7 @@ def adapt_features(
             test_label_origins=test_label_origins,
             test_label_directions=test_label_directions,
             patch_size=patch_size,
+            patch_spacing=patch_spacing,
             return_binary=False,
         )
 
@@ -533,6 +534,7 @@ def adapt_features(
             test_label_origins=test_label_origins,
             test_label_directions=test_label_directions,
             patch_size=patch_size,
+            patch_spacing=patch_spacing,
             return_binary=False,
             decoder=ConvUpsampleSegAdaptor,
         )
