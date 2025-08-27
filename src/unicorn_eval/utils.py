@@ -30,9 +30,9 @@ from unicorn_eval.adaptors import (KNN, ConvDetector, ConvSegmentation3D,
                                    SegmentationUpsampling3D, WeightedKNN,
                                    WeightedKNNRegressor)
 from unicorn_eval.adaptors.aimhi_linear_upsample_conv3d.v1 import \
-    LinearUpsampleConv3D as LinearUpsampleConv3D_V1
+    LinearUpsampleConv3D_V1
 from unicorn_eval.adaptors.aimhi_linear_upsample_conv3d.v2 import \
-    LinearUpsampleConv3D as LinearUpsampleConv3D_V2
+    LinearUpsampleConv3D_V2
 from unicorn_eval.adaptors.segmentation import ConvUpsampleSegAdaptor
 from unicorn_eval.adaptors.unicorn_baseline_linear_upsample_conv3d.v1 import \
     UnicornLinearUpsampleConv3D_V1

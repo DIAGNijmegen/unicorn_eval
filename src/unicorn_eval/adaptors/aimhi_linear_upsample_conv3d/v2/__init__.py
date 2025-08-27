@@ -102,7 +102,7 @@ class ConvUpsampleSegAdaptor(nn.Module):
         return x
 
 
-class LinearUpsampleConv3D(SegmentationUpsampling3D):
+class LinearUpsampleConv3D_V2(SegmentationUpsampling3D):
     """
     Patch-level adaptor that performs segmentation by linearly upsampling 
     3D patch-level features followed by convolutional refinement.

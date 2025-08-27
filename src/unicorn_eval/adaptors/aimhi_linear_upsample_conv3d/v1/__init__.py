@@ -100,7 +100,7 @@ def world_to_voxel(coord, origin, spacing, inv_direction):
     return np.round(voxel).astype(int)
 
 
-class LinearUpsampleConv3D(PatchLevelTaskAdaptor):
+class LinearUpsampleConv3D_V1(PatchLevelTaskAdaptor):
     """
     Patch-level adaptor that performs segmentation by linearly upsampling 
     3D patch-level features followed by convolutional refinement.

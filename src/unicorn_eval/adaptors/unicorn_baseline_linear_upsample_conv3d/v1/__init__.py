@@ -25,7 +25,7 @@ from tqdm import tqdm
 
 from unicorn_eval.adaptors.aimhi_linear_upsample_conv3d.v1 import dice_loss
 from unicorn_eval.adaptors.aimhi_linear_upsample_conv3d.v2 import (
-    LinearUpsampleConv3D, map_labels, max_class_label_from_labels)
+    LinearUpsampleConv3D_V2, map_labels, max_class_label_from_labels)
 from unicorn_eval.adaptors.segmentation import (construct_data_with_labels,
                                                 load_patch_data)
 
@@ -94,7 +94,7 @@ class BalancedSegmentationDataset(Dataset):
         return data_dict
 
 
-class UnicornLinearUpsampleConv3D_V1(LinearUpsampleConv3D):
+class UnicornLinearUpsampleConv3D_V1(LinearUpsampleConv3D_V2):
     """
     Adapts LinearUpsampleConv3D:
     - Enable balanced background sampling by default
