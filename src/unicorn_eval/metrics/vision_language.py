@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 import numpy as np
+import re
 from bert_score import BERTScorer
 from pycocoevalcap.bleu.bleu import Bleu
 from pycocoevalcap.cider.cider import Cider
@@ -23,6 +24,19 @@ from pathlib import Path
 from transformers import logging
 
 logging.set_verbosity_error()
+
+_WS = re.compile(r"\s+")
+_CTRL = re.compile(r"[\x00-\x1f\x7f]")
+
+
+def _sanitize_text(s: str) -> str:
+    if not isinstance(s, str):
+        return ""
+    s = s.replace("|||", " ")
+    s = _CTRL.sub(" ", s)
+    s = s.replace("\n", " ").replace("\r", " ").replace("\t", " ")
+    s = _WS.sub(" ", s).strip()
+    return s
 
 
 def compute_cider_score(references, predictions):
@@ -129,6 +143,31 @@ def compute_meteor_score(reports_true, reports_pred):
 
     return meteor_score
 
+def compute_meteor_score(reports_true, reports_pred):
+    """
+    Compute the average METEOR score between reference and predicted reports.
+
+    Args:
+        reports_true (list of str): List of reference texts.
+        reports_pred (list of str): List of hypothesis texts.
+
+    Returns:
+        float: The average METEOR score across all report pairs.
+    """
+    # Initialize scorers
+    scorer_m = Meteor()
+
+    # Prepare data in the required format and sanitize text
+    gts = {
+        i: [_sanitize_text(refs)] if isinstance(refs, str) else [_sanitize_text(r) for r in refs]
+        for i, refs in enumerate(reports_true)
+    }
+    res = {i: [_sanitize_text(pred)] for i, pred in enumerate(reports_pred)}
+
+    # Compute METEOR score
+    meteor_score, _ = scorer_m.compute_score(gts, res)
+
+    return meteor_score
 
 def compute_bert_score(reports_true, reports_pred):
     """
