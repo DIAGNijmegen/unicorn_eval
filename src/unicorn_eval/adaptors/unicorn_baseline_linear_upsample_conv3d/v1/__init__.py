@@ -25,7 +25,8 @@ from tqdm import tqdm
 
 from unicorn_eval.adaptors.aimhi_linear_upsample_conv3d.v1 import dice_loss
 from unicorn_eval.adaptors.aimhi_linear_upsample_conv3d.v2 import (
-    LinearUpsampleConv3D_V2, map_labels, max_class_label_from_labels)
+    LinearUpsampleConv3D_V2, UpsampleConvSegAdaptor, map_labels,
+    max_class_label_from_labels)
 from unicorn_eval.adaptors.segmentation import (construct_data_with_labels,
                                                 load_patch_data)
 
@@ -140,6 +141,17 @@ class UnicornLinearUpsampleConv3D_V1(LinearUpsampleConv3D_V2):
         decoder.to(self.device)
         self.decoder = train_seg_adaptor3d_v2(decoder, train_loader, self.device, is_task11=self.is_task11, is_task06=self.is_task06)
 
+
+class UpsampleConvSegAdaptorLeakyReLU(UpsampleConvSegAdaptor):
+    def __init__(self, target_shape=None, in_channels=32, num_classes=2):
+        super().__init__(target_shape=target_shape, in_channels=in_channels, num_classes=num_classes)
+        self.conv_blocks = nn.Sequential(
+            nn.Conv3d(in_channels, in_channels, kernel_size=3, padding=1),
+            nn.LeakyReLU(negative_slope=0.1, inplace=True),
+            nn.Conv3d(in_channels, in_channels, kernel_size=3, padding=1),
+            nn.LeakyReLU(negative_slope=0.1, inplace=True),
+            nn.Conv3d(in_channels, num_classes, kernel_size=1)
+        )
 
 
 def train_seg_adaptor3d_v2(decoder, data_loader, device, num_iterations = 5_000, is_task11=False, is_task06=False, verbose: bool = True):
