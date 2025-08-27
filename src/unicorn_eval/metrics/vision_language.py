@@ -28,8 +28,10 @@ logging.set_verbosity_error()
 _WS = re.compile(r"\s+")
 _CTRL = re.compile(r"[\x00-\x1f\x7f]")
 
-
-def _sanitize_text(s: str) -> str:
+def sanitize_text(s: str) -> str:
+    """Sanitize a string to remove special characters."""
+    if s is None:
+        return ""
     if not isinstance(s, str):
         return ""
     s = s.replace("|||", " ")
@@ -38,8 +40,23 @@ def _sanitize_text(s: str) -> str:
     s = _WS.sub(" ", s).strip()
     return s
 
+def sanitize_list(lst):
+    """Sanitize a list of strings, allowing for nested lists (per-image multi-refs)."""
+    if isinstance(lst, str):
+        return [sanitize_text(lst)]
+    return [sanitize_text(x) for x in lst]
 
-def compute_cider_score(references, predictions):
+def prepare_pycoco_inputs(reports_true, reports_pred):
+    """
+    Returns (gts, res) dictionaries as expected by pycocoevalcap:
+    gts: {idx: [ref1, ref2, ...]}, res: {idx: [hyp]}
+    Both sanitized.
+    """
+    gts = {i: sanitize_list(refs) for i, refs in enumerate(reports_true)}
+    res = {i: [sanitize_text(pred)] for i, pred in enumerate(reports_pred)}
+    return gts, res
+    
+def compute_cider_score(reports_true, reports_pred):
     """
     Compute CIDEr score for generated captions.
 
@@ -52,16 +69,9 @@ def compute_cider_score(references, predictions):
     """
 
     scorer = Cider()
-
-    gts = {
-        i: ([refs] if isinstance(refs, str) else refs)
-        for i, refs in enumerate(references)
-    }
-    res = {i: [pred] for i, pred in enumerate(predictions)}
-
+    gts, res = prepare_pycoco_inputs(reports_true, reports_pred)
     score, _ = scorer.compute_score(gts, res)
     return score
-
 
 def compute_bleu_score(reports_true, reports_pred):
     """
@@ -74,21 +84,10 @@ def compute_bleu_score(reports_true, reports_pred):
     Returns:
         float: The average BLEU score across all report pairs.
     """
-    # Initialize scorers
-    scorer_b = Bleu(4)
-
-    # Prepare data in the required format
-    gts = {
-        i: [refs] if isinstance(refs, str) else refs
-        for i, refs in enumerate(reports_true)
-    }
-    res = {i: [pred] for i, pred in enumerate(reports_pred)}
-
-    # Compute BLEU scores
-    bleu_scores, _ = scorer_b.compute_score(gts, res)
-
-    return bleu_scores[3]
-
+    scorer = Bleu(4)
+    gts, res = prepare_pycoco_inputs(reports_true, reports_pred)
+    bleu_scores, _ = scorer.compute_score(gts, res)
+    return bleu_scores[3]  # BLEU-4
 
 def compute_rouge_score(reports_true, reports_pred):
     """
@@ -101,21 +100,10 @@ def compute_rouge_score(reports_true, reports_pred):
     Returns:
         float: The average ROUGE-L score across all report pairs.
     """
-    # Initialize scorers
-    scorer_r = Rouge()
-
-    # Prepare data in the required format
-    gts = {
-        i: [refs] if isinstance(refs, str) else refs
-        for i, refs in enumerate(reports_true)
-    }
-    res = {i: [pred] for i, pred in enumerate(reports_pred)}
-
-    # Compute ROUGE-L score
-    rouge_score, _ = scorer_r.compute_score(gts, res)
-
-    return rouge_score
-
+    scorer = Rouge()
+    gts, res = prepare_pycoco_inputs(reports_true, reports_pred)
+    rouge_l, _ = scorer.compute_score(gts, res)
+    return rouge_l
 
 def compute_meteor_score(reports_true, reports_pred):
     """
@@ -128,80 +116,45 @@ def compute_meteor_score(reports_true, reports_pred):
     Returns:
         float: The average METEOR score across all report pairs.
     """
-    # Initialize scorers
-    scorer_m = Meteor()
+    scorer = Meteor()
+    gts, res = prepare_pycoco_inputs(reports_true, reports_pred)
+    meteor, _ = scorer.compute_score(gts, res)
+    return meteor
 
-    # Prepare data in the required format
-    gts = {
-        i: [refs] if isinstance(refs, str) else refs
-        for i, refs in enumerate(reports_true)
-    }
-    res = {i: [pred] for i, pred in enumerate(reports_pred)}
-
-    # Compute METEOR score
-    meteor_score, _ = scorer_m.compute_score(gts, res)
-
-    return meteor_score
-
-def compute_meteor_score(reports_true, reports_pred):
-    """
-    Compute the average METEOR score between reference and predicted reports.
-
-    Args:
-        reports_true (list of str): List of reference texts.
-        reports_pred (list of str): List of hypothesis texts.
-
-    Returns:
-        float: The average METEOR score across all report pairs.
-    """
-    # Initialize scorers
-    scorer_m = Meteor()
-
-    # Prepare data in the required format and sanitize text
-    gts = {
-        i: [_sanitize_text(refs)] if isinstance(refs, str) else [_sanitize_text(r) for r in refs]
-        for i, refs in enumerate(reports_true)
-    }
-    res = {i: [_sanitize_text(pred)] for i, pred in enumerate(reports_pred)}
-
-    # Compute METEOR score
-    meteor_score, _ = scorer_m.compute_score(gts, res)
-
-    return meteor_score
 
 def compute_bert_score(reports_true, reports_pred):
     """
-    Compute BERTScore (Precision, Recall, F1) for generated text using DeBERTa.
+    Compute BERTScore (Precision, Recall, F1) for generated text using a local DeBERTa model.
 
     Args:
         reports_true (list of str): List of reference texts.
         reports_pred (list of str): List of hypothesis texts.
 
     Returns:
-        Tuple containing lists of precision, recall, and F1 scores.
+        dict: containing 'precision', 'recall', 'f1' (all floats averaged across items).
     """
-    p_list, r_list, f1_list = [], [], []
+    # Sanitize text
+    refs = [sanitize_text(r) for r in reports_true]
+    cands = [sanitize_text(p) for p in reports_pred]
 
     model_directory = "/opt/app/unicorn_eval/models/dragon-bert-base-mixed-domain"
-    # ensure the model directory exists
-    assert Path(
-        model_directory
-    ).exists(), f"Model directory {model_directory} does not exist."
+    assert Path(model_directory).exists(), f"Model directory {model_directory} does not exist."
 
+    # Load scorer once
     scorer = BERTScorer(
-        model_type=model_directory, num_layers=12, lang="nl", device="cpu"  # local path
+        model_type=model_directory,
+        num_layers=12,
+        lang="nl",
+        device="cpu"
     )
-    for text_true, text_pred in tqdm(zip(reports_true, reports_pred)):
-        p, r, f1 = scorer.score([text_true], [text_pred])
-        p_list.append(p.cpu().numpy().item())
-        r_list.append(r.cpu().numpy().item())
-        f1_list.append(f1.cpu().numpy().item())
-    f1_list = np.array(f1_list)  #
-    p_list = np.array(p_list)
-    r_list = np.array(r_list)
 
-    average_f1 = f1_list.mean().item()
-    return average_f1
+    # Vectorized scoring 
+    _, _, F1 = scorer.score(cands, refs)
+
+    # Convert to numpy arrays
+    f1_list = F1.cpu().numpy()
+
+    return float(f1_list.mean())
 
 
 def compute_average_language_metric(reports_true, reports_pred):
@@ -215,7 +168,7 @@ def compute_average_language_metric(reports_true, reports_pred):
     Returns:
         dict: Dictionary containing averaged scores for CIDEr, BLEU, ROUGE-L, METEOR, and BERTScore F1.
     """
-
+    
     metrics, normalized_metrics = {}, {}
 
     metric_info = {
