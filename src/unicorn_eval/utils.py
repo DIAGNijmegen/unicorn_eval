@@ -29,12 +29,11 @@ from unicorn_eval.adaptors import (KNN, ConvDetector, ConvSegmentation3D,
                                    SegmentationUpsampling,
                                    SegmentationUpsampling3D, WeightedKNN,
                                    WeightedKNNRegressor)
-from unicorn_eval.adaptors.aimhi_linear_upsample_conv3d.v1 import \
+from unicorn_eval.adaptors.segmentation.aimhi_linear_upsample_conv3d.v1 import \
     LinearUpsampleConv3D_V1
-from unicorn_eval.adaptors.aimhi_linear_upsample_conv3d.v2 import \
-    LinearUpsampleConv3D_V2
-from unicorn_eval.adaptors.segmentation import ConvUpsampleSegAdaptor
-from unicorn_eval.adaptors.unicorn_baseline_linear_upsample_conv3d.v1 import \
+from unicorn_eval.adaptors.segmentation.aimhi_linear_upsample_conv3d.v2 import (
+    ConvUpsampleSegAdaptor, LinearUpsampleConv3D_V2)
+from unicorn_eval.adaptors.segmentation.baseline_linear_upsample_conv3d.v1 import \
     UnicornLinearUpsampleConv3D_V1
 from unicorn_eval.metrics.dice import compute_dice_score
 from unicorn_eval.metrics.f1_score import compute_f1
@@ -427,7 +426,7 @@ def adapt_features(
             shot_image_directions=shot_image_directions,
         )
     elif adaptor_name == "conv3d-linear-upsample":
-        adaptor = LinearUpsampleConv3D(
+        adaptor = LinearUpsampleConv3D_V2(
             shot_features=shot_features,
             shot_coordinates=shot_coordinates,
             shot_names=shot_names,
@@ -513,7 +512,7 @@ def adapt_features(
         )
 
     elif adaptor_name == "detection-by-linear-upsample-conv3d":
-        adaptor = LinearUpsampleConv3D(
+        adaptor = LinearUpsampleConv3D_V2(
             shot_features=shot_features,
             shot_coordinates=shot_coordinates,
             shot_names=shot_names,
@@ -542,7 +541,7 @@ def adapt_features(
         )
 
     elif adaptor_name == "detection-by-conv3d-linear-upsample":
-        adaptor = LinearUpsampleConv3D(
+        adaptor = LinearUpsampleConv3D_V2(
             shot_features=shot_features,
             shot_coordinates=shot_coordinates,
             shot_names=shot_names,
