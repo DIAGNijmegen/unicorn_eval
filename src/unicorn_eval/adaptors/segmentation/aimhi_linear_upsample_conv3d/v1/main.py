@@ -14,8 +14,9 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from unicorn_eval.adaptors.base import PatchLevelTaskAdaptor
-from unicorn_eval.adaptors.segmentation import (
-    PatchLevelTaskAdaptor, make_patch_level_neural_representation)
+from unicorn_eval.adaptors.segmentation.adaptors import PatchLevelTaskAdaptor
+from unicorn_eval.adaptors.segmentation.data_handling import \
+    make_patch_level_neural_representation
 
 
 def construct_data_with_labels(

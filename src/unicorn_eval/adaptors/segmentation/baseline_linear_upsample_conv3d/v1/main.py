@@ -23,12 +23,13 @@ from torch.nn.utils.clip_grad import clip_grad_norm_
 from torch.utils.data import Dataset
 from tqdm import tqdm
 
-from unicorn_eval.adaptors.aimhi_linear_upsample_conv3d.v1 import dice_loss
-from unicorn_eval.adaptors.aimhi_linear_upsample_conv3d.v2 import (
-    LinearUpsampleConv3D_V2, UpsampleConvSegAdaptor, map_labels,
-    max_class_label_from_labels)
 from unicorn_eval.adaptors.segmentation import (construct_data_with_labels,
                                                 load_patch_data)
+from unicorn_eval.adaptors.segmentation.aimhi_linear_upsample_conv3d.v1.main import \
+    dice_loss
+from unicorn_eval.adaptors.segmentation.aimhi_linear_upsample_conv3d.v2.main import (
+    LinearUpsampleConv3D_V2, UpsampleConvSegAdaptor, map_labels,
+    max_class_label_from_labels)
 
 
 class BalancedSegmentationDataset(Dataset):
