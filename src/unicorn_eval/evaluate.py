@@ -447,12 +447,6 @@ def load_mha_file(*, path: Path | str):
     )
 
 
-def write_metrics(*, metrics):
-    # write a json document used for ranking results on the leaderboard
-    with open(OUTPUT_DIRECTORY / "metrics.json", "w") as f:
-        f.write(json.dumps(metrics, indent=4))
-
-
 def write_combined_metrics(
     *, metric_dict: dict[str, dict], save_predictions: bool = True
 ) -> None:

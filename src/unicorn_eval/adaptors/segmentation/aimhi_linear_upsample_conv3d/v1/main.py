@@ -8,97 +8,14 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-from monai.data.dataloader import DataLoader as dataloader_monai
-from monai.data.dataset import Dataset as dataset_monai
-from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from unicorn_eval.adaptors.base import PatchLevelTaskAdaptor
 from unicorn_eval.adaptors.segmentation.adaptors import PatchLevelTaskAdaptor
-from unicorn_eval.adaptors.segmentation.data_handling import \
-    make_patch_level_neural_representation
-
-
-def construct_data_with_labels(
-    coordinates,
-    embeddings,
-    cases,
-    patch_size,
-    labels=None,
-    image_sizes=None,
-    image_origins=None,
-    image_spacings=None,
-    image_directions=None,
-):
-    data_array = []
-
-    for case_idx, case in enumerate(cases):
-        # patch_spacing = img_feat['meta']['patch-spacing']
-        case_embeddings = embeddings[case_idx]
-        patch_coordinates = coordinates[case_idx]
-
-        lbl_feat = labels[case_idx] if labels is not None else None
-
-        if len(case_embeddings) != len(patch_coordinates):
-            patch_coordinates = np.repeat(
-                patch_coordinates, repeats=len(case_embeddings), axis=0
-            )
-
-        if lbl_feat is not None:
-            if len(case_embeddings) != len(lbl_feat["patches"]):
-                lbl_feat["patches"] = np.repeat(
-                    lbl_feat["patches"], repeats=len(case_embeddings), axis=0
-                )
-
-        for i, patch_img in enumerate(case_embeddings):
-            data_dict = {
-                "patch": np.array(patch_img, dtype=np.float32),
-                "coordinates": patch_coordinates[i],
-                "patch_size": patch_size,
-                "case_number": case_idx,
-            }
-
-            if lbl_feat is not None:
-                patch_lbl = lbl_feat["patches"][i]
-                assert np.allclose(
-                    patch_coordinates[i], patch_lbl["coordinates"]
-                ), "Coordinates don't match!"
-                data_dict["patch_label"] = np.array(
-                    patch_lbl["features"], dtype=np.float32
-                )
-
-            if (
-                (image_sizes is not None)
-                and (image_origins is not None)
-                and (image_spacings is not None)
-                and (image_directions is not None)
-            ):
-                image_size = image_sizes[case]
-                image_origin = image_origins[case]
-                image_spacing = image_spacings[case]
-                image_direction = image_directions[case]
-
-                data_dict["image_size"] = image_size
-                data_dict["image_origin"] = (image_origin,)
-                data_dict["image_spacing"] = (image_spacing,)
-                data_dict["image_direction"] = image_direction
-
-            data_array.append(data_dict)
-
-    return data_array
-
-
-def load_patch_data(data_array: np.ndarray, batch_size: int = 80) -> DataLoader:
-    train_ds = dataset_monai(data=data_array)
-    train_loader = dataloader_monai(train_ds, batch_size=batch_size, shuffle=False)
-    return train_loader
-
-
-def world_to_voxel(coord, origin, spacing, inv_direction):
-    relative = np.array(coord) - origin
-    voxel = inv_direction @ relative
-    voxel = voxel / spacing
-    return np.round(voxel).astype(int)
+from unicorn_eval.adaptors.segmentation.data_handling import (
+    construct_data_with_labels, load_patch_data,
+    make_patch_level_neural_representation)
+from unicorn_eval.adaptors.segmentation.inference import world_to_voxel
 
 
 class LinearUpsampleConv3D_V1(PatchLevelTaskAdaptor):
@@ -200,6 +117,7 @@ class LinearUpsampleConv3D_V1(PatchLevelTaskAdaptor):
         self.test_label_origins = test_label_origins
         self.test_label_directions = test_label_directions
         self.patch_size = patch_size
+        self.patch_spacing = patch_spacing
         self.decoder = None
         self.return_binary = return_binary
 
@@ -210,6 +128,7 @@ class LinearUpsampleConv3D_V1(PatchLevelTaskAdaptor):
             embeddings=self.shot_features,
             cases=self.shot_names,
             patch_size=self.patch_size,
+            patch_spacing=self.patch_spacing,
             labels=self.shot_labels,
         )
         train_loader = load_patch_data(train_data, batch_size=1)
@@ -230,6 +149,7 @@ class LinearUpsampleConv3D_V1(PatchLevelTaskAdaptor):
             embeddings=self.test_features,
             cases=self.test_cases,
             patch_size=self.patch_size,
+            patch_spacing=self.patch_spacing,
             image_sizes=self.test_image_sizes,
             image_origins=self.test_image_origins,
             image_spacings=self.test_image_spacings,
