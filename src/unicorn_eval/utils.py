@@ -451,7 +451,7 @@ def adapt_features(
             shot_image_spacing=shot_image_spacing,
             shot_image_origins=shot_image_origins,
             shot_image_directions=shot_image_directions,
-            decoder=ConvUpsampleSegAdaptor,
+            decoder_cls=ConvUpsampleSegAdaptor,
         )
 
     elif adaptor_name == "segmentation-upsampling-3d":
@@ -567,7 +567,7 @@ def adapt_features(
             patch_size=patch_size,
             patch_spacing=patch_spacing,
             return_binary=False,
-            decoder=ConvUpsampleSegAdaptor,
+            decoder_cls=ConvUpsampleSegAdaptor,
         )
 
     elif adaptor_name == "detection-by-segmentation-upsampling-3d":

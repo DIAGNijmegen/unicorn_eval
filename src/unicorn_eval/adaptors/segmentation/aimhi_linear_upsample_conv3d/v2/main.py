@@ -62,7 +62,8 @@ class UpsampleConvSegAdaptor(nn.Module):
         x = F.interpolate(x, size=self.target_shape, mode="trilinear", align_corners=False)
         x = self.conv_blocks(x)
         return x
-    
+
+
 class ConvUpsampleSegAdaptor(nn.Module):
     def __init__(self, target_shape=None, in_channels=32, num_classes=2):
         super().__init__()
