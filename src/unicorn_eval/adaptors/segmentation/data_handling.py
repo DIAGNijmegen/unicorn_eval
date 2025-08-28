@@ -13,6 +13,7 @@
 #  limitations under the License.
 from __future__ import annotations
 
+import logging
 from typing import Iterable
 
 import numpy as np
@@ -137,14 +138,20 @@ def construct_data_with_labels(
         lbl_feat = labels[case_idx] if labels is not None else None
 
         if len(case_embeddings) != len(patch_coordinates):
-            K = len(case_embeddings) / len(patch_coordinates) 
+            K = len(case_embeddings) / len(patch_coordinates)
+            logging.warning(
+                f"Number of embeddings ({len(case_embeddings)}) does not match number of coordinates ({len(patch_coordinates)}) for case {case}. Repeating coordinates {K} times."
+            )
             patch_coordinates = np.repeat(
                 patch_coordinates, repeats=K, axis=0
             )
 
         if lbl_feat is not None:
             if len(case_embeddings) != len(lbl_feat["patches"]):
-                K = len(case_embeddings) / len(lbl_feat["patches"]) 
+                K = len(case_embeddings) / len(lbl_feat["patches"])
+                logging.warning(
+                    f"Number of embeddings ({len(case_embeddings)}) does not match number of label patches ({len(lbl_feat['patches'])}) for case {case}. Repeating label patches {K} times."
+                )
                 lbl_feat["patches"] = np.repeat(
                     lbl_feat["patches"], repeats=K, axis=0
                 )
