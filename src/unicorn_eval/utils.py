@@ -22,16 +22,19 @@ from sksurv.metrics import concordance_index_censored
 
 from unicorn_eval.adaptors import (KNN, ConvDetector, ConvSegmentation3D,
                                    DensityMap, KNNRegressor, LinearProbing,
-                                   LinearProbingRegressor,
-                                   LinearUpsampleConv3D, LogisticRegression,
+                                   LinearProbingRegressor, LogisticRegression,
                                    MultiLayerPerceptron,
                                    MultiLayerPerceptronRegressor,
                                    PatchNoduleRegressor,
                                    SegmentationUpsampling,
                                    SegmentationUpsampling3D, WeightedKNN,
                                    WeightedKNNRegressor)
-from unicorn_eval.adaptors.segmentation import (ConvUpsampleSegAdaptor,
-                                                LinearUpsampleConv3D_V2)
+from unicorn_eval.adaptors.segmentation.aimhi_linear_upsample_conv3d.v1 import \
+    LinearUpsampleConv3D_V1
+from unicorn_eval.adaptors.segmentation.aimhi_linear_upsample_conv3d.v2 import (
+    ConvUpsampleSegAdaptor, LinearUpsampleConv3D_V2)
+from unicorn_eval.adaptors.segmentation.baseline_linear_upsample_conv3d.v1 import \
+    UnicornLinearUpsampleConv3D_V1
 from unicorn_eval.metrics.dice import compute_dice_score
 from unicorn_eval.metrics.f1_score import compute_f1
 from unicorn_eval.metrics.picai_score import compute_picai_score
@@ -342,7 +345,7 @@ def adapt_features(
             patch_spacing=patch_spacing[0],
         )
     elif adaptor_name == "linear-upsample-conv3d":
-        adaptor = LinearUpsampleConv3D(
+        adaptor = LinearUpsampleConv3D_V1(
             shot_features=shot_features,
             shot_coordinates=shot_coordinates,
             shot_names=shot_names,
@@ -395,8 +398,8 @@ def adapt_features(
             shot_image_origins=shot_image_origins,
             shot_image_directions=shot_image_directions,
         )
-    elif adaptor_name == "conv3d-linear-upsample":
-        adaptor = LinearUpsampleConv3D(
+    elif adaptor_name == "unicorn-linear-upsample-conv3d-v1":
+        adaptor = UnicornLinearUpsampleConv3D_V1(
             shot_features=shot_features,
             shot_coordinates=shot_coordinates,
             shot_names=shot_names,
@@ -421,7 +424,34 @@ def adapt_features(
             shot_image_spacing=shot_image_spacing,
             shot_image_origins=shot_image_origins,
             shot_image_directions=shot_image_directions,
-            decoder=ConvUpsampleSegAdaptor,
+        )
+    elif adaptor_name == "conv3d-linear-upsample":
+        adaptor = LinearUpsampleConv3D_V2(
+            shot_features=shot_features,
+            shot_coordinates=shot_coordinates,
+            shot_names=shot_names,
+            shot_labels=shot_labels,
+            shot_label_spacing=shot_label_spacing,
+            shot_label_origins=shot_label_origins,
+            shot_label_directions=shot_label_directions,
+            test_features=test_features,
+            test_coordinates=test_coordinates,
+            test_names=test_names,  # try to remove this input
+            test_image_sizes=test_image_sizes,
+            test_image_origins=test_image_origins,
+            test_image_spacings=test_image_spacing,
+            test_image_directions=test_image_directions,
+            test_label_sizes=test_label_sizes,
+            test_label_spacing=test_label_spacing,
+            test_label_origins=test_label_origins,
+            test_label_directions=test_label_directions,
+            patch_size=patch_size,
+            patch_spacing=patch_spacing,
+            shot_image_sizes=shot_image_sizes,
+            shot_image_spacing=shot_image_spacing,
+            shot_image_origins=shot_image_origins,
+            shot_image_directions=shot_image_directions,
+            decoder_cls=ConvUpsampleSegAdaptor,
         )
 
     elif adaptor_name == "segmentation-upsampling-3d":
@@ -482,7 +512,7 @@ def adapt_features(
         )
 
     elif adaptor_name == "detection-by-linear-upsample-conv3d":
-        adaptor = LinearUpsampleConv3D(
+        adaptor = LinearUpsampleConv3D_V2(
             shot_features=shot_features,
             shot_coordinates=shot_coordinates,
             shot_names=shot_names,
@@ -511,7 +541,7 @@ def adapt_features(
         )
 
     elif adaptor_name == "detection-by-conv3d-linear-upsample":
-        adaptor = LinearUpsampleConv3D(
+        adaptor = LinearUpsampleConv3D_V2(
             shot_features=shot_features,
             shot_coordinates=shot_coordinates,
             shot_names=shot_names,
@@ -537,7 +567,7 @@ def adapt_features(
             patch_size=patch_size,
             patch_spacing=patch_spacing,
             return_binary=False,
-            decoder=ConvUpsampleSegAdaptor,
+            decoder_cls=ConvUpsampleSegAdaptor,
         )
 
     elif adaptor_name == "detection-by-segmentation-upsampling-3d":
