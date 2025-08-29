@@ -131,7 +131,8 @@ LABEL_SLUG_DICT = {
 
 EXTRA_LABEL_SLUG_DICT = {
     "Task03_predicting_the_time_to_biochemical_recurrence_in_he_prostatectomies": [
-        "event.json"
+        "event.json",
+        "cohort.json"
     ],
     "Task07_detecting_lung_nodules_in_thoracic_ct": ["diameter.json"],
 }
