@@ -16,16 +16,11 @@ from __future__ import annotations
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.optim as optim
-from torch.nn.utils.clip_grad import clip_grad_norm_
-from tqdm import tqdm
 
 from unicorn_eval.adaptors.segmentation.adaptors import \
     SegmentationUpsampling3D
-from unicorn_eval.adaptors.segmentation.aimhi_linear_upsample_conv3d.v1.main import \
-    dice_loss
 from unicorn_eval.adaptors.segmentation.aimhi_linear_upsample_conv3d.v2.main import (
-    LinearUpsampleConv3D_V2, UpsampleConvSegAdaptor, map_labels,
+    LinearUpsampleConv3D_V2, UpsampleConvSegAdaptor,
     max_class_label_from_labels)
 from unicorn_eval.adaptors.segmentation.data_handling import (
     construct_data_with_labels, load_patch_data)

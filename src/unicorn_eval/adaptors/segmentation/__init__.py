@@ -12,19 +12,21 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from unicorn_eval.adaptors.segmentation.adaptors import (
-    ConvSegmentation3D, SegmentationUpsampling, SegmentationUpsampling3D)
+from unicorn_eval.adaptors.segmentation.baseline_segmentation_upsampling_3d.v1 import (
+    SegmentationUpsampling, SegmentationUpsampling3D)
 from unicorn_eval.adaptors.segmentation.data_handling import (
     SegmentationDataset, assign_mask_to_patch, construct_data_with_labels,
     construct_segmentation_labels, custom_collate, extract_patch_labels,
     load_patch_data, make_patch_level_neural_representation)
 from unicorn_eval.adaptors.segmentation.decoders import (
-    ConvDecoder3D, Decoder3D, SegmentationDecoder, SegResNetDecoderOnly,
-    VectorToTensor, build_deconv_layers, compute_num_upsample_layers)
+    Decoder3D, SegmentationDecoder, SegResNetDecoderOnly, VectorToTensor,
+    build_deconv_layers, compute_num_upsample_layers)
 from unicorn_eval.adaptors.segmentation.inference import (create_grid,
                                                           inference,
                                                           inference3d,
                                                           world_to_voxel)
+from unicorn_eval.adaptors.segmentation.mevis_conv_segmentation_3d.main import (
+    ConvDecoder3D, ConvSegmentation3D)
 from unicorn_eval.adaptors.segmentation.training import (train_decoder,
                                                          train_decoder3d)
 

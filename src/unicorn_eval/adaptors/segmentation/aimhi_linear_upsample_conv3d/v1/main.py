@@ -11,7 +11,6 @@ import torch.optim as optim
 from tqdm import tqdm
 
 from unicorn_eval.adaptors.base import PatchLevelTaskAdaptor
-from unicorn_eval.adaptors.segmentation.adaptors import PatchLevelTaskAdaptor
 from unicorn_eval.adaptors.segmentation.data_handling import (
     construct_data_with_labels, load_patch_data,
     make_patch_level_neural_representation)
