@@ -30,8 +30,6 @@ from unicorn_eval.adaptors.segmentation.aimhi_linear_upsample_conv3d.v1 import \
     LinearUpsampleConv3D_V1
 from unicorn_eval.adaptors.segmentation.aimhi_linear_upsample_conv3d.v2 import (
     ConvUpsampleSegAdaptor, LinearUpsampleConv3D_V2)
-from unicorn_eval.adaptors.segmentation.baseline_linear_upsample_conv3d.v1 import \
-    UnicornLinearUpsampleConv3D_V1
 from unicorn_eval.adaptors.segmentation.baseline_segmentation_upsampling_3d.v1 import (
     SegmentationUpsampling, SegmentationUpsampling3D)
 from unicorn_eval.adaptors.segmentation.mevis_conv_segmentation_3d import \
