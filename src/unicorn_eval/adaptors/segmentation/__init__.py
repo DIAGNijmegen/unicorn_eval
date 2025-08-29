@@ -25,7 +25,7 @@ from unicorn_eval.adaptors.segmentation.inference import (create_grid,
                                                           inference,
                                                           inference3d,
                                                           world_to_voxel)
-from unicorn_eval.adaptors.segmentation.mevis_conv_segmentation_3d.main import (
+from unicorn_eval.adaptors.segmentation.mevis_conv_segmentation_3d.v1.main import (
     ConvDecoder3D, ConvSegmentation3D)
 from unicorn_eval.adaptors.segmentation.training import (train_decoder,
                                                          train_decoder3d)

@@ -34,7 +34,7 @@ from unicorn_eval.adaptors.segmentation.baseline_segmentation_upsampling_3d.v1 i
     SegmentationUpsampling, SegmentationUpsampling3D)
 from unicorn_eval.adaptors.segmentation.baseline_segmentation_upsampling_3d.v2.main import \
     SegmentationUpsampling3D_V2
-from unicorn_eval.adaptors.segmentation.mevis_conv_segmentation_3d import \
+from unicorn_eval.adaptors.segmentation.mevis_conv_segmentation_3d.v1.main import \
     ConvSegmentation3D
 from unicorn_eval.metrics.dice import compute_dice_score
 from unicorn_eval.metrics.f1_score import compute_f1
