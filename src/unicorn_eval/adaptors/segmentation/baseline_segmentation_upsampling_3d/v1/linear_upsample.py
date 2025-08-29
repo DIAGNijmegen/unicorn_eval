@@ -11,21 +11,29 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-
 from __future__ import annotations
 
 import numpy as np
 import torch
+import torch.nn as nn
+import torch.optim as optim
+from torch.nn.utils.clip_grad import clip_grad_norm_
 from tqdm import tqdm
 
-from unicorn_eval.adaptors.base import PatchLevelTaskAdaptor
+from unicorn_eval.adaptors.segmentation.adaptors import \
+    SegmentationUpsampling3D
+from unicorn_eval.adaptors.segmentation.aimhi_linear_upsample_conv3d.v1.main import \
+    dice_loss
+from unicorn_eval.adaptors.segmentation.aimhi_linear_upsample_conv3d.v2.main import (
+    LinearUpsampleConv3D_V2, UpsampleConvSegAdaptor, map_labels,
+    max_class_label_from_labels)
 from unicorn_eval.adaptors.segmentation.data_handling import (
-    construct_data_with_labels, extract_patch_labels, load_patch_data)
+    construct_data_with_labels, load_patch_data)
 from unicorn_eval.adaptors.segmentation.decoders import Decoder3D
 from unicorn_eval.adaptors.segmentation.inference import inference3d
 
 
-class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
+class SegmentationUpsampling3D_V2(SegmentationUpsampling3D):
     """
     Patch-level adaptor that trains a 3D upsampling decoder for segmentation.
 
@@ -56,81 +64,6 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
         balance_bg : Whether to balance background and foreground patches using inverse probability weighting.
     """
 
-    def __init__(
-        self,
-        shot_features,
-        shot_coordinates,
-        shot_names,
-        shot_labels,
-        shot_image_spacing,
-        shot_image_origins,
-        shot_image_directions,
-        shot_image_sizes,
-        shot_label_spacing,
-        shot_label_origins,
-        shot_label_directions,
-        test_features,
-        test_coordinates,
-        test_names,
-        test_image_sizes,
-        test_image_origins,
-        test_image_spacings,
-        test_image_directions,
-        test_label_sizes,
-        test_label_spacing,
-        test_label_origins,
-        test_label_directions,
-        patch_size,
-        patch_spacing,
-        return_binary=True,
-        balance_bg=False,
-    ):
-        label_patch_features = []
-        for idx, label in tqdm(enumerate(shot_labels), desc="Extracting patch labels"):
-            label_feats = extract_patch_labels(
-                label=label,
-                label_spacing=shot_label_spacing[shot_names[idx]],
-                label_origin=shot_label_origins[shot_names[idx]],
-                label_direction=shot_label_directions[shot_names[idx]],
-                image_size=shot_image_sizes[shot_names[idx]],
-                image_origin=shot_image_origins[shot_names[idx]],
-                image_spacing=shot_image_spacing[shot_names[idx]],
-                image_direction=shot_image_directions[shot_names[idx]],
-                start_coordinates=shot_coordinates[idx],
-                patch_size=patch_size,
-                patch_spacing=patch_spacing,
-            )
-            label_patch_features.append(label_feats)
-        label_patch_features = np.array(label_patch_features, dtype=object)
-
-        super().__init__(
-            shot_features=shot_features,
-            shot_labels=label_patch_features,
-            shot_coordinates=shot_coordinates,
-            test_features=test_features,
-            test_coordinates=test_coordinates,
-            shot_extra_labels=None,  # not used here
-        )
-
-        self.shot_names = shot_names
-        self.test_cases = test_names
-        self.test_image_sizes = test_image_sizes
-        self.test_image_origins = test_image_origins
-        self.test_image_spacings = test_image_spacings
-        self.test_image_directions = test_image_directions
-        self.shot_image_spacing = shot_image_spacing
-        self.shot_image_origins = shot_image_origins
-        self.shot_image_directions = shot_image_directions
-        self.test_label_sizes = test_label_sizes
-        self.test_label_spacing = test_label_spacing
-        self.test_label_origins = test_label_origins
-        self.test_label_directions = test_label_directions
-        self.patch_size = patch_size
-        self.patch_spacing = patch_spacing
-        self.decoder = None
-        self.return_binary = return_binary
-        self.balance_bg = balance_bg
-
     def fit(self):
         # build training data and loader
         train_data = construct_data_with_labels(
@@ -142,12 +75,13 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
             labels=self.shot_labels,
         )
 
-        train_loader = load_patch_data(train_data, batch_size=10, balance_bg=self.balance_bg)
+        train_loader = load_patch_data(train_data, batch_size=2, balance_bg=self.balance_bg)
         latent_dim = len(self.shot_features[0][0])
         blocks_up = (1, 1, 1, 1)  # number of upsampling blocks, each upsampling by factor 2
         target_patch_size = tuple(int(j / 2 ** len(blocks_up)) for j in self.patch_size)
+        latent_dim_reduce_factor = (np.prod(target_patch_size) * 16)
         target_shape = (
-            latent_dim,
+            latent_dim // latent_dim_reduce_factor,
             target_patch_size[2],
             target_patch_size[1],
             target_patch_size[0],
@@ -161,7 +95,7 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
             decoder_kwargs={
                 "spatial_dims": 3,
                 "init_filters": 32,
-                "latent_channels": latent_dim,
+                "latent_channels": latent_dim // latent_dim_reduce_factor,
                 "out_channels": 1,
                 "blocks_up": blocks_up,
                 "dsdepth": 1,
@@ -205,4 +139,63 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
             test_label_spacing=self.test_label_spacing,
             test_label_origins=self.test_label_origins,
             test_label_directions=self.test_label_directions
+        )
+
+
+class UnicornLinearUpsampleConv3D_V1(LinearUpsampleConv3D_V2):
+    """
+    Adapts LinearUpsampleConv3D:
+    - Enable balanced background sampling by default
+    - Use a different training strategy
+    - Set batch size to 8
+    """
+    def __init__(self, *args, balance_bg: bool = True, **kwargs):
+        super().__init__(*args, balance_bg=balance_bg, **kwargs)
+
+    def fit(self):
+        # build training data and loader
+        train_data = construct_data_with_labels(
+            coordinates=self.shot_coordinates,
+            embeddings=self.shot_features,
+            cases=self.shot_names,
+            patch_size=self.patch_size,
+            patch_spacing=self.patch_spacing,
+            labels=self.shot_labels,
+        )
+
+        train_loader = load_patch_data(train_data, batch_size=2, balance_bg=self.balance_bg)
+
+        max_class = max_class_label_from_labels(self.shot_labels)
+        if max_class >= 100:
+            self.is_task11 = True
+            num_classes = 4
+        elif max_class > 1:
+            self.is_task06 = True
+            num_classes = 2
+            self.return_binary = False  # Do not threshold predictions for task 06
+            # TODO: implement this choice more elegantly
+        else:
+            num_classes = max_class + 1
+
+        # set up device and model
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        decoder = self.decoder_cls(
+            target_shape=self.patch_size[::-1],  # (D, H, W)
+            num_classes=num_classes,
+        )
+
+        print(f"Training decoder with {num_classes} classes")
+        decoder.to(self.device)
+        self.decoder = train_seg_adaptor3d_v2(decoder, train_loader, self.device, is_task11=self.is_task11, is_task06=self.is_task06)
+
+
+class UpsampleConvSegAdaptorLeakyReLU(UpsampleConvSegAdaptor):
+    def __init__(self, target_shape=None, in_channels=32, num_classes=2):
+        super().__init__(target_shape=target_shape, in_channels=in_channels, num_classes=num_classes)
+        self.conv_blocks = nn.Sequential(
+            nn.Conv3d(in_channels, in_channels, kernel_size=3, padding=1),
+            nn.LeakyReLU(negative_slope=0.1, inplace=True),
+            nn.Conv3d(in_channels, in_channels, kernel_size=3, padding=1),
+            nn.LeakyReLU(negative_slope=0.1, inplace=True),
+            nn.Conv3d(in_channels, num_classes, kernel_size=1)
         )
