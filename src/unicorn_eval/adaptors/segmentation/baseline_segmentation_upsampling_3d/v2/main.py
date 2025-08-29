@@ -235,6 +235,6 @@ class SegmentationUpsampling3D_V2(PatchLevelTaskAdaptor):
         # Apply post-processing to the predicted mask
         if not self.return_binary:  # return raw scores
             assert self.num_classes == 2, f"Scores only implemented for binary segmentation"
-            return mask.softmax(dim=1)[:, 1, ...]#.unsqueeze(1)  # return the positive class scores
+            return mask.softmax(dim=1)[:, 1, ...]  # return the positive class scores
         else:  # return the predicted classes
-            return torch.argmax(mask, dim=1)#.unsqueeze(1)  # later code will squeeze second dim
+            return torch.argmax(mask, dim=1)  # later code will squeeze second dim
