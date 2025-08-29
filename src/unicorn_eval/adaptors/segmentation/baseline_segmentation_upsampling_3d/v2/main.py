@@ -19,13 +19,15 @@ import torch
 from tqdm import tqdm
 
 from unicorn_eval.adaptors.base import PatchLevelTaskAdaptor
+from unicorn_eval.adaptors.segmentation.baseline_segmentation_upsampling_3d.v2.training import \
+    train_decoder3d_v2
 from unicorn_eval.adaptors.segmentation.data_handling import (
     construct_data_with_labels, extract_patch_labels, load_patch_data)
 from unicorn_eval.adaptors.segmentation.decoders import Decoder3D
 from unicorn_eval.adaptors.segmentation.inference import inference3d
 
 
-class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
+class SegmentationUpsampling3D_V2(PatchLevelTaskAdaptor):
     """
     Patch-level adaptor that trains a 3D upsampling decoder for segmentation.
 
@@ -170,12 +172,10 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
         )
 
         decoder.to(self.device)
-        self.decoder = train_seg_adaptor3d_v2(
+        self.decoder = train_decoder3d_v2(
             decoder=decoder,
             data_loader=train_loader,
             device=self.device,
-            is_task06=False,
-            is_task11=True,
         )
 
     def predict(self) -> list:
