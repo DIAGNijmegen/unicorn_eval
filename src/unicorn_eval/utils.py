@@ -20,14 +20,11 @@ import numpy as np
 from sklearn.metrics import cohen_kappa_score, roc_auc_score
 from sksurv.metrics import concordance_index_censored
 
-from unicorn_eval.adaptors import (KNN, ConvDetector, ConvSegmentation3D,
-                                   DensityMap, KNNRegressor, LinearProbing,
-                                   LinearProbingRegressor, LogisticRegression,
-                                   MultiLayerPerceptron,
+from unicorn_eval.adaptors import (KNN, ConvDetector, DensityMap, KNNRegressor,
+                                   LinearProbing, LinearProbingRegressor,
+                                   LogisticRegression, MultiLayerPerceptron,
                                    MultiLayerPerceptronRegressor,
-                                   PatchNoduleRegressor,
-                                   SegmentationUpsampling,
-                                   SegmentationUpsampling3D, WeightedKNN,
+                                   PatchNoduleRegressor, WeightedKNN,
                                    WeightedKNNRegressor)
 from unicorn_eval.adaptors.segmentation.aimhi_linear_upsample_conv3d.v1 import \
     LinearUpsampleConv3D_V1
@@ -35,6 +32,10 @@ from unicorn_eval.adaptors.segmentation.aimhi_linear_upsample_conv3d.v2 import (
     ConvUpsampleSegAdaptor, LinearUpsampleConv3D_V2)
 from unicorn_eval.adaptors.segmentation.baseline_linear_upsample_conv3d.v1 import \
     UnicornLinearUpsampleConv3D_V1
+from unicorn_eval.adaptors.segmentation.baseline_segmentation_upsampling_3d.v1 import (
+    SegmentationUpsampling, SegmentationUpsampling3D)
+from unicorn_eval.adaptors.segmentation.mevis_conv_segmentation_3d import \
+    ConvSegmentation3D
 from unicorn_eval.metrics.dice import compute_dice_score
 from unicorn_eval.metrics.f1_score import compute_f1
 from unicorn_eval.metrics.picai_score import compute_picai_score
