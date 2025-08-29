@@ -123,7 +123,8 @@ class SegmentationUpsampling3D_V2(PatchLevelTaskAdaptor):
         self.test_image_origins = test_image_origins
         self.test_image_spacings = test_image_spacings
         self.test_image_directions = test_image_directions
-        self.shot_image_spacing = shot_image_spacing
+        self.shot_image_sizes = shot_image_sizes
+        self.shot_image_spacings = shot_image_spacing
         self.shot_image_origins = shot_image_origins
         self.shot_image_directions = shot_image_directions
         self.test_label_sizes = test_label_sizes
@@ -146,6 +147,10 @@ class SegmentationUpsampling3D_V2(PatchLevelTaskAdaptor):
             patch_size=self.patch_size,
             patch_spacing=self.patch_spacing,
             labels=self.shot_labels,
+            image_sizes=self.shot_image_sizes,
+            image_origins=self.shot_image_origins,
+            image_spacings=self.shot_image_spacings,
+            image_directions=self.shot_image_directions,
         )
 
         train_loader = load_patch_data(train_data, batch_size=10, balance_bg=self.balance_bg)
