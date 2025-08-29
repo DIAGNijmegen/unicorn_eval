@@ -17,11 +17,11 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from unicorn_eval.adaptors.segmentation.adaptors import \
-    SegmentationUpsampling3D
 from unicorn_eval.adaptors.segmentation.aimhi_linear_upsample_conv3d.v2.main import (
     LinearUpsampleConv3D_V2, UpsampleConvSegAdaptor,
     max_class_label_from_labels)
+from unicorn_eval.adaptors.segmentation.baseline_segmentation_upsampling_3d.v1 import \
+    SegmentationUpsampling3D
 from unicorn_eval.adaptors.segmentation.data_handling import (
     construct_data_with_labels, load_patch_data)
 from unicorn_eval.adaptors.segmentation.decoders import Decoder3D

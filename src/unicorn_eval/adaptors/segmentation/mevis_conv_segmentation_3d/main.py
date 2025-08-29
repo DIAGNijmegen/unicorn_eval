@@ -7,7 +7,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from monai.losses.dice import DiceFocalLoss
 
-from unicorn_eval.adaptors.segmentation.adaptors import \
+from unicorn_eval.adaptors.segmentation.baseline_segmentation_upsampling_3d.v1 import \
     SegmentationUpsampling3D
 from unicorn_eval.adaptors.segmentation.data_handling import (
     construct_data_with_labels, load_patch_data)
