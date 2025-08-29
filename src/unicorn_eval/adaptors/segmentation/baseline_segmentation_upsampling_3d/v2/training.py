@@ -62,12 +62,8 @@ def train_decoder3d_v2(
 
         optimizer.zero_grad()
         de_output = decoder(patch_emb)
-        if isinstance(loss_fn, nn.BCEWithLogitsLoss):
-            de_output = de_output.squeeze(1)
-        else:
-            patch_label = patch_label.long()
 
-        one_hot_target = F.one_hot(patch_label, num_classes=de_output.shape[1]).permute(0, 4, 1, 2, 3).float()
+        one_hot_target = F.one_hot(patch_label.long(), num_classes=de_output.shape[1]).permute(0, 4, 1, 2, 3).float()
         loss = loss_fn(de_output, one_hot_target)
 
         loss.backward()
