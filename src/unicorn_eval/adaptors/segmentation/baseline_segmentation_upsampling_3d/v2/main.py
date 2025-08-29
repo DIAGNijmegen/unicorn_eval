@@ -20,14 +20,32 @@ import torch.nn as nn
 from tqdm import tqdm
 
 from unicorn_eval.adaptors.base import PatchLevelTaskAdaptor
-from unicorn_eval.adaptors.segmentation.aimhi_linear_upsample_conv3d.v2.main import (
-    map_labels, max_class_label_from_labels)
+from unicorn_eval.adaptors.segmentation.aimhi_linear_upsample_conv3d.v2.main import \
+    max_class_label_from_labels
 from unicorn_eval.adaptors.segmentation.baseline_segmentation_upsampling_3d.v2.training import \
     train_decoder3d_v2
 from unicorn_eval.adaptors.segmentation.data_handling import (
     construct_data_with_labels, extract_patch_labels, load_patch_data)
 from unicorn_eval.adaptors.segmentation.decoders import Decoder3D
 from unicorn_eval.adaptors.segmentation.inference import inference3d
+
+
+def label_mapper(y: np.ndarray) -> np.ndarray:
+    """
+    Rules:
+      - y == 100      -> 2
+      - 1 <= y <= 99  -> 1
+      - y >= 201      -> 3
+      - else          -> 0
+    """
+
+    y_new = np.zeros_like(y)
+
+    y_new = np.where(y == 100, 2, y_new)
+    y_new = np.where((y >= 1) & (y <= 99), 1, y_new)
+    y_new = np.where(y >= 201, 3, y_new)
+
+    return y_new
 
 
 class SegmentationUpsampling3D_V2(PatchLevelTaskAdaptor):
@@ -151,20 +169,12 @@ class SegmentationUpsampling3D_V2(PatchLevelTaskAdaptor):
             image_origins=self.shot_image_origins,
             image_spacings=self.shot_image_spacings,
             image_directions=self.shot_image_directions,
+            label_mapper=label_mapper,
         )
 
         train_loader = load_patch_data(train_data, batch_size=10, balance_bg=self.balance_bg)
 
         max_class = max_class_label_from_labels(self.shot_labels)
-        label_mapper = None
-        if max_class >= 100:
-            # task 11
-            label_mapper = map_labels
-            max_class = 3
-        elif max_class > 1:
-            # task 6
-            label_mapper = map_labels
-            max_class = 1
         self.num_classes = max_class + 1
 
         latent_dim = len(self.shot_features[0][0])
@@ -179,18 +189,20 @@ class SegmentationUpsampling3D_V2(PatchLevelTaskAdaptor):
 
         # set up device and model
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        decoder_kwargs={
+            "spatial_dims": 3,
+            "init_filters": 32,
+            "latent_channels": latent_dim,
+            "out_channels": self.num_classes,
+            "blocks_up": blocks_up,
+            "dsdepth": 1,
+            "upsample_mode": "deconv",
+        }
+        print(f"Setting up decoder with: {latent_dim=}, {target_shape=}, {decoder_kwargs=}")
         decoder = Decoder3D(
             latent_dim=latent_dim,
             target_shape=target_shape,
-            decoder_kwargs={
-                "spatial_dims": 3,
-                "init_filters": 32,
-                "latent_channels": latent_dim,
-                "out_channels": self.num_classes,
-                "blocks_up": blocks_up,
-                "dsdepth": 1,
-                "upsample_mode": "deconv",
-            },
+            decoder_kwargs=decoder_kwargs,
         )
 
         decoder.to(self.device)
@@ -198,7 +210,6 @@ class SegmentationUpsampling3D_V2(PatchLevelTaskAdaptor):
             decoder=decoder,
             data_loader=train_loader,
             device=self.device,
-            label_mapper=label_mapper,
         )
 
     def predict(self) -> list:
