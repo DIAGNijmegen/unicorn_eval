@@ -23,7 +23,6 @@ from unicorn_eval.adaptors.segmentation.data_handling import (
     construct_data_with_labels, extract_patch_labels, load_patch_data)
 from unicorn_eval.adaptors.segmentation.decoders import Decoder3D
 from unicorn_eval.adaptors.segmentation.inference import inference3d
-from unicorn_eval.adaptors.segmentation.training import train_decoder3d
 
 
 class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
@@ -145,7 +144,8 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
 
         train_loader = load_patch_data(train_data, batch_size=10, balance_bg=self.balance_bg)
         latent_dim = len(self.shot_features[0][0])
-        target_patch_size = tuple(int(j / 16) for j in self.patch_size)
+        blocks_up = (1, 1, 1, 1)  # number of upsampling blocks, each upsampling by factor 2
+        target_patch_size = tuple(int(j / 2 ** len(blocks_up)) for j in self.patch_size)
         target_shape = (
             latent_dim,
             target_patch_size[2],
@@ -163,7 +163,7 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
                 "init_filters": 32,
                 "latent_channels": latent_dim,
                 "out_channels": 1,
-                "blocks_up": (1, 1, 1, 1),
+                "blocks_up": blocks_up,
                 "dsdepth": 1,
                 "upsample_mode": "deconv",
             },
