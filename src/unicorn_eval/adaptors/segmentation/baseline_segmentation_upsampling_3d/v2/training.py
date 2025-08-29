@@ -10,9 +10,6 @@ from monai.losses.dice import DiceCELoss
 from torch.nn.utils.clip_grad import clip_grad_norm_
 from tqdm import tqdm
 
-from unicorn_eval.adaptors.segmentation.aimhi_linear_upsample_conv3d.v2.main import \
-    map_labels
-
 
 def train_decoder3d_v2(
     decoder: nn.Module,
@@ -22,21 +19,13 @@ def train_decoder3d_v2(
     loss_fn: nn.Module | None = None,
     optimizer: optim.Optimizer | None = None,
     label_mapper: Callable | None = None,
-    is_task11: bool = False,
-    is_task06: bool = False,
     verbose: bool = True,
 ):
     if loss_fn is None:
-        if is_task06:
-            loss_fn = nn.CrossEntropyLoss()
-        else:
-            loss_fn = DiceCELoss(sigmoid=True)
+        loss_fn = DiceCELoss(sigmoid=True)
 
     if optimizer is None:
         optimizer = optim.Adam(decoder.parameters(), lr=1e-3, weight_decay=1e-4)
-
-    if label_mapper is None and (is_task11 or is_task06):
-        label_mapper = map_labels
 
     decoder.train()
 
@@ -62,18 +51,22 @@ def train_decoder3d_v2(
         iteration_count += 1
         epoch_iterations += 1
 
-        patch_emb = batch["patch"].to(device)
         patch_label = batch["patch_label"]
 
         if label_mapper is not None:
             patch_label = label_mapper(patch_label)
 
-        patch_label = patch_label.to(device).long()
+        patch_emb = batch["patch"].to(device)
+        patch_label = patch_label.to(device)
 
         optimizer.zero_grad()
-        de_output = decoder(patch_emb) 
+        de_output = decoder(patch_emb)
+        if isinstance(loss_fn, nn.BCEWithLogitsLoss):
+            de_output = de_output.squeeze(1)
+        else:
+            patch_label = patch_label.long()
 
-        loss = loss_fn(de_output.squeeze(1), patch_label)
+        loss = loss_fn(de_output, patch_label)
 
         loss.backward()
 

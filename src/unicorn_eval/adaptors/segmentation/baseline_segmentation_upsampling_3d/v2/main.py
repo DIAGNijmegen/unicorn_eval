@@ -16,9 +16,12 @@ from __future__ import annotations
 
 import numpy as np
 import torch
+import torch.nn as nn
 from tqdm import tqdm
 
 from unicorn_eval.adaptors.base import PatchLevelTaskAdaptor
+from unicorn_eval.adaptors.segmentation.aimhi_linear_upsample_conv3d.v2.main import (
+    map_labels, max_class_label_from_labels)
 from unicorn_eval.adaptors.segmentation.baseline_segmentation_upsampling_3d.v2.training import \
     train_decoder3d_v2
 from unicorn_eval.adaptors.segmentation.data_handling import (
@@ -145,6 +148,15 @@ class SegmentationUpsampling3D_V2(PatchLevelTaskAdaptor):
         )
 
         train_loader = load_patch_data(train_data, batch_size=10, balance_bg=self.balance_bg)
+
+        max_class = max_class_label_from_labels(self.shot_labels)
+        loss_fn = None
+        if max_class >= 100:
+            is_task11 = True
+        elif max_class > 1:
+            is_task06 = True
+            loss_fn = nn.BCEWithLogitsLoss()
+
         latent_dim = len(self.shot_features[0][0])
         blocks_up = (1, 1, 1, 1)  # number of upsampling blocks, each upsampling by factor 2
         target_patch_size = tuple(int(j / 2 ** len(blocks_up)) for j in self.patch_size)
@@ -176,6 +188,8 @@ class SegmentationUpsampling3D_V2(PatchLevelTaskAdaptor):
             decoder=decoder,
             data_loader=train_loader,
             device=self.device,
+            loss_fn=loss_fn,
+            label_mapper=map_labels if (is_task06 or is_task11) else None,
         )
 
     def predict(self) -> list:
