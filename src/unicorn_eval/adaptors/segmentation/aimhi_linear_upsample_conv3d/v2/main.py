@@ -13,11 +13,13 @@ import torch.optim as optim
 from scipy import ndimage as ndi
 from tqdm import tqdm
 
-from unicorn_eval.adaptors.segmentation import (SegmentationUpsampling3D,
-                                                construct_data_with_labels,
-                                                create_grid, load_patch_data)
 from unicorn_eval.adaptors.segmentation.aimhi_linear_upsample_conv3d.v1.main import \
     dice_loss
+from unicorn_eval.adaptors.segmentation.baseline_segmentation_upsampling_3d.v1 import \
+    SegmentationUpsampling3D
+from unicorn_eval.adaptors.segmentation.data_handling import (
+    construct_data_with_labels, load_patch_data)
+from unicorn_eval.adaptors.segmentation.inference import create_grid
 
 
 class UpsampleConvSegAdaptor(nn.Module):
