@@ -89,7 +89,7 @@ METRIC_DICT = {
     "Task09_segmenting_rois_in_breast_cancer_wsis": {
         "name": "dice",
         "fn": compute_dice_score,
-        "range": (0.25, 1),
+        "range": (0.2548, 1),
     },
     "Task10_segmenting_lesions_within_vois_in_ct": {
         "name": "uls_score",
@@ -123,11 +123,11 @@ METRIC_DICT = {
     },
     "Task17_predicting_lesion_size_measurements": {
         "name": "rsmape",
-        "range": (0, 1),
+        "range": (0.7580, 1),
     },
     "Task18_predicting_prostate_volume_psa_and_psa_density": {
         "name": "rsmape",
-        "range": (0, 1),
+        "range": (0.7668, 1),
     },
     "Task19_anonymizing_report": {
         "name": "redaction_score",
