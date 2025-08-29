@@ -22,7 +22,7 @@ def train_decoder3d_v2(
     verbose: bool = True,
 ):
     if loss_fn is None:
-        loss_fn = DiceCELoss(sigmoid=True)
+        loss_fn = nn.BCEWithLogitsLoss()
 
     if optimizer is None:
         optimizer = optim.Adam(decoder.parameters(), lr=1e-3, weight_decay=1e-4)

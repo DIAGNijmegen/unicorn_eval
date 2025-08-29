@@ -150,12 +150,13 @@ class SegmentationUpsampling3D_V2(PatchLevelTaskAdaptor):
         train_loader = load_patch_data(train_data, batch_size=10, balance_bg=self.balance_bg)
 
         max_class = max_class_label_from_labels(self.shot_labels)
-        loss_fn = None
+        label_mapper = None
         if max_class >= 100:
-            is_task11 = True
+            # task 11
+            label_mapper = map_labels
         elif max_class > 1:
-            is_task06 = True
-            loss_fn = nn.BCEWithLogitsLoss()
+            # task 6
+            label_mapper = map_labels
 
         latent_dim = len(self.shot_features[0][0])
         blocks_up = (1, 1, 1, 1)  # number of upsampling blocks, each upsampling by factor 2
@@ -188,8 +189,7 @@ class SegmentationUpsampling3D_V2(PatchLevelTaskAdaptor):
             decoder=decoder,
             data_loader=train_loader,
             device=self.device,
-            loss_fn=loss_fn,
-            label_mapper=map_labels if (is_task06 or is_task11) else None,
+            label_mapper=label_mapper,
         )
 
     def predict(self) -> list:
