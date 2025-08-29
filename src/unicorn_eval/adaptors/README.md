@@ -61,6 +61,7 @@ Below are the approved adaptors for each task type.
 
 - `segmentation-upsampling-3d` supported by [AIAH LAB](https://unicorn.grand-challenge.org/teams/4863/)
 - `linear-upsample-conv3d` contributed by [AIMHI](https://unicorn.grand-challenge.org/teams/4707/)
+- `linear-upsample-conv3d-v2` adapted from `linear-upsample-conv3d` by the organizers.
 - `conv3d-linear-upsample` contributed by [AIMHI](https://unicorn.grand-challenge.org/teams/4707/)
 - `conv-segmentation-3d` contributed by [MEVIS-M3](https://unicorn.grand-challenge.org/teams/4756/)
 

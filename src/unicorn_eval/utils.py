@@ -14,36 +14,36 @@
 
 import json
 from functools import partial
+from typing import Any
 
 import numpy as np
 from sklearn.metrics import cohen_kappa_score, roc_auc_score
 from sksurv.metrics import concordance_index_censored
 
-from unicorn_eval.adaptors import (
-    KNN,
-    DensityMap,
-    ConvDetector,
-    KNNRegressor,
-    LinearProbing,
-    LinearProbingRegressor,
-    LogisticRegression,
-    MultiLayerPerceptron,
-    MultiLayerPerceptronRegressor,
-    PatchNoduleRegressor,
-    SegmentationUpsampling,
-    SegmentationUpsampling3D,
-    ConvSegmentation3D,
-    LinearUpsampleConv3D,
-    WeightedKNN,
-    WeightedKNNRegressor,
-)
+from unicorn_eval.adaptors import (KNN, ConvDetector, DensityMap, KNNRegressor,
+                                   LinearProbing, LinearProbingRegressor,
+                                   LogisticRegression, MultiLayerPerceptron,
+                                   MultiLayerPerceptronRegressor,
+                                   PatchNoduleRegressor, WeightedKNN,
+                                   WeightedKNNRegressor)
+from unicorn_eval.adaptors.segmentation.aimhi_linear_upsample_conv3d.v1 import \
+    LinearUpsampleConv3D_V1
+from unicorn_eval.adaptors.segmentation.aimhi_linear_upsample_conv3d.v2 import (
+    ConvUpsampleSegAdaptor, LinearUpsampleConv3D_V2)
+from unicorn_eval.adaptors.segmentation.baseline_segmentation_upsampling_3d.v1 import (
+    SegmentationUpsampling, SegmentationUpsampling3D)
+from unicorn_eval.adaptors.segmentation.baseline_segmentation_upsampling_3d.v2.main import \
+    SegmentationUpsampling3D_V2
+from unicorn_eval.adaptors.segmentation.mevis_conv_segmentation_3d.v1.main import \
+    ConvSegmentation3D
 from unicorn_eval.metrics.dice import compute_dice_score
 from unicorn_eval.metrics.f1_score import compute_f1
 from unicorn_eval.metrics.picai_score import compute_picai_score
 from unicorn_eval.metrics.sensitivity import compute_cpm
 from unicorn_eval.metrics.spider import compute_spider_score
 from unicorn_eval.metrics.uls import compute_uls_score
-from unicorn_eval.metrics.vision_language import compute_average_language_metric
+from unicorn_eval.metrics.vision_language import \
+    compute_average_language_metric
 
 METRIC_DICT = {
     "Task01_classifying_he_prostate_biopsies_into_isup_scores": {
@@ -153,6 +153,7 @@ def adapt_features(
     shot_names=None,
     test_names=None,
     patch_size=224,
+    patch_spacing=None,
     feature_grid_resolution=None,
     test_image_sizes=None,
     test_image_spacing=None,
@@ -342,9 +343,10 @@ def adapt_features(
             test_names=test_names,
             test_image_sizes=test_image_sizes,
             patch_size=patch_size[0],
+            patch_spacing=patch_spacing[0],
         )
     elif adaptor_name == "linear-upsample-conv3d":
-        adaptor = LinearUpsampleConv3D(
+        adaptor = LinearUpsampleConv3D_V1(
             shot_features=shot_features,
             shot_coordinates=shot_coordinates,
             shot_names=shot_names,
@@ -364,13 +366,41 @@ def adapt_features(
             test_label_origins=test_label_origins,
             test_label_directions=test_label_directions,
             patch_size=patch_size,
+            patch_spacing=patch_spacing,
+            shot_image_sizes=shot_image_sizes,
+            shot_image_spacing=shot_image_spacing,
+            shot_image_origins=shot_image_origins,
+            shot_image_directions=shot_image_directions,
+        )
+    elif adaptor_name == "linear-upsample-conv3d-v2":
+        adaptor = LinearUpsampleConv3D_V2(
+            shot_features=shot_features,
+            shot_coordinates=shot_coordinates,
+            shot_names=shot_names,
+            shot_labels=shot_labels,
+            shot_label_spacing=shot_label_spacing,
+            shot_label_origins=shot_label_origins,
+            shot_label_directions=shot_label_directions,
+            test_features=test_features,
+            test_coordinates=test_coordinates,
+            test_names=test_names,  # try to remove this input
+            test_image_sizes=test_image_sizes,
+            test_image_origins=test_image_origins,
+            test_image_spacings=test_image_spacing,
+            test_image_directions=test_image_directions,
+            test_label_sizes=test_label_sizes,
+            test_label_spacing=test_label_spacing,
+            test_label_origins=test_label_origins,
+            test_label_directions=test_label_directions,
+            patch_size=patch_size,
+            patch_spacing=patch_spacing,
             shot_image_sizes=shot_image_sizes,
             shot_image_spacing=shot_image_spacing,
             shot_image_origins=shot_image_origins,
             shot_image_directions=shot_image_directions,
         )
     elif adaptor_name == "conv3d-linear-upsample":
-        adaptor = LinearUpsampleConv3D(
+        adaptor = LinearUpsampleConv3D_V2(
             shot_features=shot_features,
             shot_coordinates=shot_coordinates,
             shot_names=shot_names,
@@ -390,11 +420,12 @@ def adapt_features(
             test_label_origins=test_label_origins,
             test_label_directions=test_label_directions,
             patch_size=patch_size,
+            patch_spacing=patch_spacing,
             shot_image_sizes=shot_image_sizes,
             shot_image_spacing=shot_image_spacing,
             shot_image_origins=shot_image_origins,
             shot_image_directions=shot_image_directions,
-            conv_then_upsample=True
+            decoder_cls=ConvUpsampleSegAdaptor,
         )
 
     elif adaptor_name == "segmentation-upsampling-3d":
@@ -418,6 +449,35 @@ def adapt_features(
             test_label_origins=test_label_origins,
             test_label_directions=test_label_directions,
             patch_size=patch_size,
+            patch_spacing=patch_spacing,
+            shot_image_sizes=shot_image_sizes,
+            shot_image_spacing=shot_image_spacing,
+            shot_image_origins=shot_image_origins,
+            shot_image_directions=shot_image_directions,
+        )
+
+    elif adaptor_name == "segmentation-upsampling-3d-v2":
+        adaptor = SegmentationUpsampling3D_V2(
+            shot_features=shot_features,
+            shot_coordinates=shot_coordinates,
+            shot_names=shot_names,
+            shot_labels=shot_labels,
+            shot_label_spacing=shot_label_spacing,
+            shot_label_origins=shot_label_origins,
+            shot_label_directions=shot_label_directions,
+            test_features=test_features,
+            test_coordinates=test_coordinates,
+            test_names=test_names,  # try to remove this input
+            test_image_sizes=test_image_sizes,
+            test_image_origins=test_image_origins,
+            test_image_spacings=test_image_spacing,
+            test_image_directions=test_image_directions,
+            test_label_sizes=test_label_sizes,
+            test_label_spacing=test_label_spacing,
+            test_label_origins=test_label_origins,
+            test_label_directions=test_label_directions,
+            patch_size=patch_size,
+            patch_spacing=patch_spacing,
             shot_image_sizes=shot_image_sizes,
             shot_image_spacing=shot_image_spacing,
             shot_image_origins=shot_image_origins,
@@ -445,7 +505,8 @@ def adapt_features(
             test_label_origins=test_label_origins,
             test_label_directions=test_label_directions,
             patch_size=patch_size,
-            feature_grid_resolution = feature_grid_resolution,
+            patch_spacing=patch_spacing,
+            feature_grid_resolution=feature_grid_resolution,
             shot_image_sizes=shot_image_sizes,
             shot_image_spacing=shot_image_spacing,
             shot_image_origins=shot_image_origins,
@@ -453,7 +514,7 @@ def adapt_features(
         )
 
     elif adaptor_name == "detection-by-linear-upsample-conv3d":
-        adaptor = LinearUpsampleConv3D(
+        adaptor = LinearUpsampleConv3D_V2(
             shot_features=shot_features,
             shot_coordinates=shot_coordinates,
             shot_names=shot_names,
@@ -477,11 +538,12 @@ def adapt_features(
             test_label_origins=test_label_origins,
             test_label_directions=test_label_directions,
             patch_size=patch_size,
+            patch_spacing=patch_spacing,
             return_binary=False,
         )
 
     elif adaptor_name == "detection-by-conv3d-linear-upsample":
-        adaptor = LinearUpsampleConv3D(
+        adaptor = LinearUpsampleConv3D_V2(
             shot_features=shot_features,
             shot_coordinates=shot_coordinates,
             shot_names=shot_names,
@@ -505,8 +567,9 @@ def adapt_features(
             test_label_origins=test_label_origins,
             test_label_directions=test_label_directions,
             patch_size=patch_size,
+            patch_spacing=patch_spacing,
             return_binary=False,
-            conv_then_upsample=True,
+            decoder_cls=ConvUpsampleSegAdaptor,
         )
 
     elif adaptor_name == "detection-by-segmentation-upsampling-3d":
@@ -534,6 +597,36 @@ def adapt_features(
             test_label_origins=test_label_origins,
             test_label_directions=test_label_directions,
             patch_size=patch_size,
+            patch_spacing=patch_spacing,
+            return_binary=False,
+        )
+
+    elif adaptor_name == "detection-by-segmentation-upsampling-3d-v2":
+        adaptor = SegmentationUpsampling3D_V2(
+            shot_features=shot_features,
+            shot_coordinates=shot_coordinates,
+            shot_names=shot_names,
+            shot_image_sizes=shot_image_sizes,
+            shot_image_spacing=shot_image_spacing,
+            shot_image_origins=shot_image_origins,
+            shot_image_directions=shot_image_directions,
+            shot_labels=shot_labels,
+            shot_label_spacing=shot_label_spacing,
+            shot_label_origins=shot_label_origins,
+            shot_label_directions=shot_label_directions,
+            test_features=test_features,
+            test_coordinates=test_coordinates,
+            test_names=test_names,
+            test_image_sizes=test_image_sizes,
+            test_image_origins=test_image_origins,
+            test_image_spacings=test_image_spacing,
+            test_image_directions=test_image_directions,
+            test_label_sizes=test_label_sizes,
+            test_label_spacing=test_label_spacing,
+            test_label_origins=test_label_origins,
+            test_label_directions=test_label_directions,
+            patch_size=patch_size,
+            patch_spacing=patch_spacing,
             return_binary=False,
         )
 
@@ -562,7 +655,8 @@ def adapt_features(
             test_label_origins=test_label_origins,
             test_label_directions=test_label_directions,
             patch_size=patch_size,
-            feature_grid_resolution = feature_grid_resolution,
+            patch_spacing=patch_spacing,
+            feature_grid_resolution=feature_grid_resolution,
             return_binary=False,
         )
 
@@ -845,6 +939,7 @@ def extract_embeddings_and_labels(processed_results, task_name):
         "domain": None,
         "spacing": None,
         "patch_size": None,
+        "patch_spacing": None,
         "feature_grid_resolution": None,
         "prediction": [],
         "shot_embeddings": [],
@@ -895,6 +990,7 @@ def extract_embeddings_and_labels(processed_results, task_name):
             task_data["domain"] = result["domain"]
             task_data["spacing"] = result["spacing"]
             task_data["patch_size"] = result["patch_size"]
+            task_data["patch_spacing"] = result["patch_spacing"]
             task_data["feature_grid_resolution"] = result["feature_grid_resolution"]
 
         if result["split"] == "shot":
@@ -941,22 +1037,26 @@ def extract_embeddings_and_labels(processed_results, task_name):
     elif task_type == "detection":
         if task_domain == "pathology":
             task_data = process_detection_pathology(task_data)
-        elif (task_domain == "CT") | (task_domain == "MR"):
+        elif task_domain in ["CT", "MR"]:
             if task_name != "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams":
                 task_data = process_detection_radiology(task_data, task_name)
+        else:
+            raise ValueError(f"Unknown task domain: {task_domain}")
 
     return task_data
 
 
 def extract_data(patch_neural_representation):
     # Extract metadata
-    spacing = patch_neural_representation["meta"]["patch-spacing"]
-    patch_size = patch_neural_representation["meta"]["patch-size"]
-    feature_grid_resolution = patch_neural_representation["meta"]["feature-grid-resolution"]
-    image_size = patch_neural_representation["meta"]["image-size"]
-    image_spacing = patch_neural_representation["meta"]["image-spacing"]
-    image_origin = patch_neural_representation["meta"]["image-origin"]
-    image_direction = patch_neural_representation["meta"]["image-direction"]
+    metadata: dict[str, Any] = patch_neural_representation["meta"]
+    spacing = metadata["patch-spacing"]
+    patch_size = metadata["patch-size"]
+    patch_spacing = metadata["patch-spacing"]
+    feature_grid_resolution = metadata.get("feature-grid-resolution", [1]*len(patch_size))
+    image_size = metadata["image-size"]
+    image_spacing = metadata["image-spacing"]
+    image_origin = metadata["image-origin"]
+    image_direction = metadata["image-direction"]
 
     # Extract patches
     patches = patch_neural_representation["patches"]
@@ -970,6 +1070,7 @@ def extract_data(patch_neural_representation):
         coordinates,
         spacing,
         patch_size,
+        patch_spacing,
         feature_grid_resolution,
         image_size,
         image_spacing,

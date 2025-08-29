@@ -14,10 +14,10 @@
 
 import gc
 import json
+from collections import defaultdict
 from multiprocessing import Pool
 from pathlib import Path
 from pprint import pformat
-from collections import defaultdict
 
 import numpy as np
 import openslide
@@ -25,17 +25,11 @@ import pandas as pd
 import SimpleITK as sitk
 from dragon_eval import DragonEval
 from dragon_eval.evaluation import REGRESSION_EPSILON, TASK_TYPE, EvalType
-from picai_prep.preprocessing import PreprocessingSettings, Sample
 
 from unicorn_eval.helpers import get_max_workers
-from unicorn_eval.utils import (
-    adapt_features,
-    evaluate_predictions,
-    extract_data,
-    extract_embeddings_and_labels,
-    normalize_metric,
-    write_json_file,
-)
+from unicorn_eval.utils import (adapt_features, evaluate_predictions,
+                                extract_data, extract_embeddings_and_labels,
+                                normalize_metric, write_json_file)
 
 INPUT_DIRECTORY = Path("/input")
 OUTPUT_DIRECTORY = Path("/output")
@@ -180,9 +174,17 @@ REGRESSION_EPSILON.update(
 def process(job):
     """Processes a single algorithm job, looking at the outputs"""
 
-    embeddings = coordinates = spacing = patch_size = None
-    image_size = image_spacing = prediction = None
-    image_origin = image_direction = None
+    embeddings = None
+    prediction = None
+    coordinates = None
+    spacing = None
+    patch_size = None
+    patch_spacing = None
+    image_size = None
+    image_spacing = None
+    image_origin = None
+    image_direction = None
+    feature_grid_resolution = None
 
     report = "Processing:\n"
     report += pformat(job)
@@ -248,15 +250,6 @@ def process(job):
                 feature = np.array(feature).astype(np.float32)
                 features.append(feature)
             embeddings = np.concatenate(features)
-            (
-                coordinates,
-                spacing,
-                patch_size,
-                image_size,
-                image_spacing,
-                image_origin,
-                image_direction,
-            ) = (None, None, None, None, None, None, None)
 
         elif slug_embedding == "patch-neural-representation":
             # TODO: better handle the case when there are multiple encoded inputs for a case
@@ -269,6 +262,7 @@ def process(job):
                     curr_coordinates,
                     curr_spacing,
                     curr_patch_size,
+                    curr_patch_spacing,
                     curr_feature_grid_resolution,
                     curr_image_size,
                     curr_image_spacing,
@@ -280,12 +274,22 @@ def process(job):
                     coordinates = curr_coordinates
                     spacing = curr_spacing
                     patch_size = curr_patch_size
+                    patch_spacing = curr_patch_spacing
                     feature_grid_resolution = curr_feature_grid_resolution
                     image_size = curr_image_size
                     image_spacing = curr_image_spacing
                     image_origin = curr_image_origin
                     image_direction = curr_image_direction
                     first = False
+                else:
+                    assert np.all(coordinates == curr_coordinates), "Coordinates do not match between images"
+                    assert np.all(spacing == curr_spacing), "Spacing does not match between images"
+                    assert np.all(patch_size == curr_patch_size), "Patch size does not match between images"
+                    assert np.all(patch_spacing == curr_patch_spacing), "Patch spacing does not match between images"
+                    assert np.all(image_size == curr_image_size), "Image size does not match between images"
+                    assert np.all(image_spacing == curr_image_spacing), "Image spacing does not match between images"
+                    assert np.all(image_origin == curr_image_origin), "Image origin does not match between images"
+                    assert np.all(image_direction == curr_image_direction), "Image direction does not match between images"
             embeddings = np.concatenate(features)
 
     elif modality == "vision-language":
@@ -318,7 +322,7 @@ def process(job):
     elif label_path.suffix == ".mha":
         label_path = Path(str(label_path).replace("{case_id}", case_name))
         label, label_size, label_origin, label_spacing, label_direction = load_mha_file(
-            location=label_path
+            path=label_path,
         )
     else:
         raise ValueError(f"Unsupported file format: {label_path.suffix}")
@@ -350,6 +354,7 @@ def process(job):
     case_info_dict["image_origin"] = image_origin
     case_info_dict["image_direction"] = image_direction
     case_info_dict["patch_size"] = patch_size
+    case_info_dict["patch_spacing"] = patch_spacing
     case_info_dict["feature_grid_resolution"] = feature_grid_resolution
     case_info_dict["prediction"] = prediction
     case_info_dict["label"] = label
@@ -428,18 +433,12 @@ def load_tif_file(*, location):
     return class_labels
 
 
-def load_mha_file(*, location):
-    class_labels = sitk.ReadImage(location)
-    if "transverse-cspca-label" in str(location):
-        pat_case = Sample(
-            scans=[class_labels],
-            lbl=class_labels,
-            settings=PreprocessingSettings(
-                spacing=[3, 1.5, 1.5], matrix_size=[16, 256, 256]
-            ),
-        )
-        pat_case.preprocess()
-        class_labels = pat_case.lbl
+def load_mha_file(*, path: Path | str):
+    class_labels = sitk.ReadImage(str(path))
+
+    if class_labels is None:
+        raise ValueError("Failed to load class labels from MHA file.")
+
     return (
         sitk.GetArrayFromImage(class_labels),
         list(class_labels.GetSize()),
@@ -449,14 +448,8 @@ def load_mha_file(*, location):
     )
 
 
-def write_metrics(*, metrics):
-    # write a json document used for ranking results on the leaderboard
-    with open(OUTPUT_DIRECTORY / "metrics.json", "w") as f:
-        f.write(json.dumps(metrics, indent=4))
-
-
 def write_combined_metrics(
-    *, metric_dict: dict[dict], save_predictions: bool = True
+    *, metric_dict: dict[str, dict], save_predictions: bool = True
 ) -> None:
     metrics = {"metrics": {}, "normalized_metrics": {}}
     predictions = {"predictions": []}
@@ -689,11 +682,14 @@ def main():
         task_type = task_results["task_type"]
 
         if modality == "vision":
-
+            if task_name not in adaptors:
+                raise Exception(f"No adaptor found for task {task_name}")
             adaptor_name = adaptors[task_name]
+            print(f"Using adaptor: {adaptor_name}")
             return_probabilities = REQUIRES_PROBABILITIES_DICT[task_name]
 
             patch_size = task_results["patch_size"]
+            patch_spacing = task_results["patch_spacing"]
             feature_grid_resolution = task_results["feature_grid_resolution"]
 
             shot_embeddings = task_results["shot_embeddings"]
@@ -737,6 +733,7 @@ def main():
                 test_coordinates=task_results["cases_coordinates"],
                 test_names=case_ids,
                 patch_size=patch_size,
+                patch_spacing=patch_spacing,
                 feature_grid_resolution=feature_grid_resolution,
                 test_image_sizes=case_image_sizes,
                 shot_extra_labels=shot_extra_labels,
@@ -767,13 +764,14 @@ def main():
                 case_label_spacings, case_label_origins, case_label_directions
             )
             gc.collect()
-
         elif modality == "vision-language":
             predictions = [pred["text"] for pred in task_results["prediction"]]
             case_labels = [
                 label["text"] for case in task_results["case_labels"] for label in case
             ]
             case_extra_labels = None
+        else:
+            raise ValueError(f"Unsupported modality: {modality}")
 
         metrics = evaluate_predictions(
             task_name=task_name,
