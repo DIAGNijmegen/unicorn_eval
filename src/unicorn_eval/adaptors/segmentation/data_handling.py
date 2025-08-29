@@ -24,6 +24,8 @@ from torch.utils.data import Dataset
 from torch.utils.data._utils.collate import default_collate
 
 from unicorn_eval.adaptors.patch_extraction import extract_patches
+from unicorn_eval.adaptors.segmentation.baseline_segmentation_upsampling_3d.v2.data_handling import \
+    BalancedSegmentationDataset
 
 
 def assign_mask_to_patch(mask_data, x_patch, y_patch, patch_size, padding_value=0):
@@ -302,9 +304,3 @@ def load_patch_data(data_array: np.ndarray, batch_size: int = 80, balance_bg: bo
         train_ds = dataset_monai(data=data_array)
 
     return dataloader_monai(train_ds, batch_size=batch_size, shuffle=False)
-
-
-class BalancedSegmentationDataset:
-    """Placeholder for balanced segmentation dataset - implementation would go here"""
-    def __init__(self, data):
-        self.data = data
