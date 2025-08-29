@@ -4,6 +4,7 @@ from typing import Callable
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.optim as optim
 from monai.data.dataloader import DataLoader
 from monai.losses.dice import DiceCELoss
@@ -22,7 +23,7 @@ def train_decoder3d_v2(
     verbose: bool = True,
 ):
     if loss_fn is None:
-        loss_fn = nn.CrossEntropyLoss() #DiceCELoss(softmax=True, to_onehot_y=True)
+        loss_fn = DiceCELoss(softmax=True, lambda_dice=0.25)
 
     if optimizer is None:
         optimizer = optim.Adam(decoder.parameters(), lr=1e-3, weight_decay=1e-4)
@@ -66,10 +67,8 @@ def train_decoder3d_v2(
         else:
             patch_label = patch_label.long()
 
-        #create one-hot encoding
-        # patch_label = torch.nn.functional.one_hot(patch_label, num_classes=de_output.shape[1]).permute(0, 4, 1, 2, 3)
-
-        loss = loss_fn(de_output, patch_label)
+        one_hot_target = F.one_hot(patch_label, num_classes=de_output.shape[1]).permute(0, 4, 1, 2, 3).float()
+        loss = loss_fn(de_output, one_hot_target)
 
         loss.backward()
 
