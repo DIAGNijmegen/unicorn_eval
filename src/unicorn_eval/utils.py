@@ -601,6 +601,35 @@ def adapt_features(
             return_binary=False,
         )
 
+    elif adaptor_name == "detection-by-segmentation-upsampling-3d-v2":
+        adaptor = SegmentationUpsampling3D_V2(
+            shot_features=shot_features,
+            shot_coordinates=shot_coordinates,
+            shot_names=shot_names,
+            shot_image_sizes=shot_image_sizes,
+            shot_image_spacing=shot_image_spacing,
+            shot_image_origins=shot_image_origins,
+            shot_image_directions=shot_image_directions,
+            shot_labels=shot_labels,
+            shot_label_spacing=shot_label_spacing,
+            shot_label_origins=shot_label_origins,
+            shot_label_directions=shot_label_directions,
+            test_features=test_features,
+            test_coordinates=test_coordinates,
+            test_names=test_names,
+            test_image_sizes=test_image_sizes,
+            test_image_origins=test_image_origins,
+            test_image_spacings=test_image_spacing,
+            test_image_directions=test_image_directions,
+            test_label_sizes=test_label_sizes,
+            test_label_spacing=test_label_spacing,
+            test_label_origins=test_label_origins,
+            test_label_directions=test_label_directions,
+            patch_size=patch_size,
+            patch_spacing=patch_spacing,
+            return_binary=False,
+        )
+
     elif adaptor_name == "conv-detection-segmentation-3d":
         adaptor = ConvSegmentation3D(  # All args copied from detection-by-segmentation-upsampling-3d
             shot_features=shot_features,
