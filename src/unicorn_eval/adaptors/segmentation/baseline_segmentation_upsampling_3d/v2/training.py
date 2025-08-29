@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import torch
 import torch.nn as nn
 import torch.optim as optim
+from monai.data.dataloader import DataLoader
 from monai.losses.dice import DiceCELoss
 from torch.nn.utils.clip_grad import clip_grad_norm_
 from tqdm import tqdm
@@ -12,7 +14,17 @@ from unicorn_eval.adaptors.segmentation.aimhi_linear_upsample_conv3d.v2.main imp
     map_labels
 
 
-def train_decoder3d_v2(decoder, data_loader, device, num_epochs: int = 3, iterations_per_epoch: int | None = None, loss_fn=None, optimizer=None, label_mapper=None, verbose: bool = True):
+def train_decoder3d_v2(
+    decoder: nn.Module,
+    data_loader: DataLoader,
+    device: torch.device,
+    num_epochs: int = 3,
+    iterations_per_epoch: int | None = None,
+    loss_fn=None,
+    optimizer=None,
+    label_mapper=None,
+    verbose: bool = True
+):
     if loss_fn is None:
         loss_fn = DiceCELoss(sigmoid=True)
     if optimizer is None:
@@ -53,7 +65,15 @@ def train_decoder3d_v2(decoder, data_loader, device, num_epochs: int = 3, iterat
     return decoder
 
 
-def train_seg_adaptor3d_v2(decoder, data_loader, device, num_iterations = 5_000, is_task11=False, is_task06=False, verbose: bool = True):
+def train_seg_adaptor3d_v2(
+    decoder: nn.Module,
+    data_loader: DataLoader,
+    device: torch.device,
+    num_iterations: int = 5_000,
+    is_task11: bool = False,
+    is_task06: bool = False,
+    verbose: bool = True
+):
     # Use weighted CrossEntropyLoss and focal loss components
     ce_loss = nn.CrossEntropyLoss()
     optimizer = optim.Adam(decoder.parameters(), lr=1e-3, weight_decay=1e-4)

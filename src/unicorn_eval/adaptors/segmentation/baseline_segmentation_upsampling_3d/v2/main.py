@@ -85,7 +85,7 @@ class SegmentationUpsampling3D_V2(PatchLevelTaskAdaptor):
         patch_size,
         patch_spacing,
         return_binary=True,
-        balance_bg=False,
+        balance_bg=True,
     ):
         label_patch_features = []
         for idx, label in tqdm(enumerate(shot_labels), desc="Extracting patch labels"):

@@ -485,6 +485,7 @@ def map_labels(y: torch.Tensor) -> torch.Tensor:
 def train_seg_adaptor3d(decoder, data_loader, device, num_epochs = 3, iterations_per_epoch: int | None = None, is_task11=False, is_task06=False, verbose: bool = True):
     ce_loss = nn.CrossEntropyLoss()
     optimizer = optim.Adam(decoder.parameters(), lr=1e-3)
+
     # Train decoder
     for epoch in range(num_epochs):
         decoder.train()
