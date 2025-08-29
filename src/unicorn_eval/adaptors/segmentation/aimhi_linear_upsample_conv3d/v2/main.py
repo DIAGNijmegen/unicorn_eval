@@ -13,11 +13,13 @@ import torch.optim as optim
 from scipy import ndimage as ndi
 from tqdm import tqdm
 
-from unicorn_eval.adaptors.segmentation import (SegmentationUpsampling3D,
-                                                construct_data_with_labels,
-                                                create_grid, load_patch_data)
 from unicorn_eval.adaptors.segmentation.aimhi_linear_upsample_conv3d.v1.main import \
     dice_loss
+from unicorn_eval.adaptors.segmentation.baseline_segmentation_upsampling_3d.v1 import \
+    SegmentationUpsampling3D
+from unicorn_eval.adaptors.segmentation.data_handling import (
+    construct_data_with_labels, load_patch_data)
+from unicorn_eval.adaptors.segmentation.inference import create_grid
 
 
 class UpsampleConvSegAdaptor(nn.Module):
@@ -483,6 +485,7 @@ def map_labels(y: torch.Tensor) -> torch.Tensor:
 def train_seg_adaptor3d(decoder, data_loader, device, num_epochs = 3, iterations_per_epoch: int | None = None, is_task11=False, is_task06=False, verbose: bool = True):
     ce_loss = nn.CrossEntropyLoss()
     optimizer = optim.Adam(decoder.parameters(), lr=1e-3)
+
     # Train decoder
     for epoch in range(num_epochs):
         decoder.train()
