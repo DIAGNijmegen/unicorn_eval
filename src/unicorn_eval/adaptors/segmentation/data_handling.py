@@ -118,11 +118,11 @@ def custom_collate(batch):
 
 
 def construct_data_with_labels(
-    coordinates,
-    embeddings,
-    cases,
-    patch_size,
-    patch_spacing,
+    coordinates: list[np.ndarray],
+    embeddings: list[np.ndarray],
+    case_names: list[str],
+    patch_size: list[int],
+    patch_spacing: list[float],
     labels=None,
     image_sizes=None,
     image_origins=None,
@@ -131,7 +131,7 @@ def construct_data_with_labels(
 ):
     data_array = []
 
-    for case_idx, case in enumerate(cases):
+    for case_idx, case_name in enumerate(case_names):
         # patch_spacing = img_feat['meta']['patch-spacing']
         case_embeddings = embeddings[case_idx]
         patch_coordinates = coordinates[case_idx]
@@ -141,7 +141,7 @@ def construct_data_with_labels(
         if len(case_embeddings) != len(patch_coordinates):
             K = len(case_embeddings) / len(patch_coordinates)
             logging.warning(
-                f"Number of embeddings ({len(case_embeddings)}) does not match number of coordinates ({len(patch_coordinates)}) for case {case}. Repeating coordinates {K} times."
+                f"Number of embeddings ({len(case_embeddings)}) does not match number of coordinates ({len(patch_coordinates)}) for case {case_name}. Repeating coordinates {K} times."
             )
             patch_coordinates = np.repeat(
                 patch_coordinates, repeats=K, axis=0
@@ -151,7 +151,7 @@ def construct_data_with_labels(
             if len(case_embeddings) != len(lbl_feat["patches"]):
                 K = len(case_embeddings) / len(lbl_feat["patches"])
                 logging.warning(
-                    f"Number of embeddings ({len(case_embeddings)}) does not match number of label patches ({len(lbl_feat['patches'])}) for case {case}. Repeating label patches {K} times."
+                    f"Number of embeddings ({len(case_embeddings)}) does not match number of label patches ({len(lbl_feat['patches'])}) for case {case_name}. Repeating label patches {K} times."
                 )
                 lbl_feat["patches"] = np.repeat(
                     lbl_feat["patches"], repeats=K, axis=0
@@ -180,10 +180,10 @@ def construct_data_with_labels(
                 and (image_spacings is not None)
                 and (image_directions is not None)
             ):
-                image_size = image_sizes[case]
-                image_origin = image_origins[case]
-                image_spacing = image_spacings[case]
-                image_direction = image_directions[case]
+                image_size = image_sizes[case_name]
+                image_origin = image_origins[case_name]
+                image_spacing = image_spacings[case_name]
+                image_direction = image_directions[case_name]
 
                 data_dict["image_size"] = image_size
                 data_dict["image_origin"] = (image_origin,)
