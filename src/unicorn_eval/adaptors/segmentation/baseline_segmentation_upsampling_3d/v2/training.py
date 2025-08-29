@@ -22,7 +22,7 @@ def train_decoder3d_v2(
     verbose: bool = True,
 ):
     if loss_fn is None:
-        loss_fn = nn.BCEWithLogitsLoss()
+        loss_fn = nn.CrossEntropyLoss() #DiceCELoss(softmax=True, to_onehot_y=True)
 
     if optimizer is None:
         optimizer = optim.Adam(decoder.parameters(), lr=1e-3, weight_decay=1e-4)
@@ -65,6 +65,9 @@ def train_decoder3d_v2(
             de_output = de_output.squeeze(1)
         else:
             patch_label = patch_label.long()
+
+        #create one-hot encoding
+        # patch_label = torch.nn.functional.one_hot(patch_label, num_classes=de_output.shape[1]).permute(0, 4, 1, 2, 3)
 
         loss = loss_fn(de_output, patch_label)
 

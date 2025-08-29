@@ -135,6 +135,7 @@ class SegmentationUpsampling3D_V2(PatchLevelTaskAdaptor):
         self.decoder = None
         self.return_binary = return_binary
         self.balance_bg = balance_bg
+        self.num_classes = -1
 
     def fit(self):
         # build training data and loader
@@ -154,9 +155,12 @@ class SegmentationUpsampling3D_V2(PatchLevelTaskAdaptor):
         if max_class >= 100:
             # task 11
             label_mapper = map_labels
+            max_class = 3
         elif max_class > 1:
             # task 6
             label_mapper = map_labels
+            max_class = 1
+        self.num_classes = max_class + 1
 
         latent_dim = len(self.shot_features[0][0])
         blocks_up = (1, 1, 1, 1)  # number of upsampling blocks, each upsampling by factor 2
@@ -177,7 +181,7 @@ class SegmentationUpsampling3D_V2(PatchLevelTaskAdaptor):
                 "spatial_dims": 3,
                 "init_filters": 32,
                 "latent_channels": latent_dim,
-                "out_channels": 1,
+                "out_channels": self.num_classes,
                 "blocks_up": blocks_up,
                 "dsdepth": 1,
                 "upsample_mode": "deconv",
@@ -218,5 +222,14 @@ class SegmentationUpsampling3D_V2(PatchLevelTaskAdaptor):
             test_label_sizes=self.test_label_sizes,
             test_label_spacing=self.test_label_spacing,
             test_label_origins=self.test_label_origins,
-            test_label_directions=self.test_label_directions
+            test_label_directions=self.test_label_directions,
+            inference_postprocessor=self.inference_postprocessor,
         )
+
+    def inference_postprocessor(self, mask: torch.Tensor) -> torch.Tensor:
+        # Apply post-processing to the predicted mask
+        if not self.return_binary:  # return raw scores
+            assert self.num_classes == 2, f"Scores only implemented for binary segmentation"
+            return mask.softmax(dim=1)[:, 1, ...]#.unsqueeze(1)  # return the positive class scores
+        else:  # return the predicted classes
+            return torch.argmax(mask, dim=1)#.unsqueeze(1)  # later code will squeeze second dim
