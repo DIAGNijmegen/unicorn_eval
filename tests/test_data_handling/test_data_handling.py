@@ -146,8 +146,6 @@ def test_end_to_end_data_handling(
         # confirmed: original_label_image equals the original label
 
         # Step B: choose coordinates, patch size and spacing based on the original label
-        patch_spacing = label_spacing
-        patch_size = [1, 16, 16]   # TODO: back to patch_size
         _, coordinates, _ = extract_patches(
             image=original_label_image,
             patch_size=patch_size,
@@ -300,6 +298,7 @@ def test_end_to_end_data_handling(
             else:
                 print("  ERROR: Shape mismatch between original and reconstructed labels")
 
+        print("+=+" * 20)
 
 if __name__ == "__main__":
     test_end_to_end_data_handling(
