@@ -120,7 +120,7 @@ def test_end_to_end_data_handling(
     case_ids = task_results["case_ids"]
 
     # Test on first few cases
-    num_test_cases = min(3, len(case_ids))
+    num_test_cases = min(5, len(case_ids))
 
     for case_idx in range(num_test_cases):
         case_name = case_ids[case_idx]
@@ -133,31 +133,26 @@ def test_end_to_end_data_handling(
         label_spacing = task_results["cases_label_spacings"][case_name]
         label_origin = task_results["cases_label_origins"][case_name]
         label_direction = task_results["cases_label_directions"][case_name]
-        shot_coordinates = task_results["shot_coordinates"][case_idx]
+        patch_coordinates = task_results["cases_coordinates"][case_idx]
         patch_size = task_results["patch_size"]
         patch_spacing = task_results["patch_spacing"]
         original_label = task_results["case_labels"][case_idx]
 
-        # Step A: convert original label to SimpleITK image
-        original_label_image = sitk.GetImageFromArray(original_label)
-        original_label_image.SetSpacing(label_spacing)
-        original_label_image.SetOrigin(label_origin)
-        original_label_image.SetDirection(label_direction)
-        # confirmed: original_label_image equals the original label
+        # # Step A: convert original label to SimpleITK image
+        # original_label_image = sitk.GetImageFromArray(original_label)
+        # original_label_image.SetSpacing(label_spacing)
+        # original_label_image.SetOrigin(label_origin)
+        # original_label_image.SetDirection(label_direction)
+        # # confirmed: original_label_image equals the original label
 
-        # Step B: choose coordinates, patch size and spacing based on the original label
-        _, coordinates, _ = extract_patches(
-            image=original_label_image,
-            patch_size=patch_size,
-            spacing=patch_spacing,
-        )
+        # # Step B: choose coordinates, patch size and spacing based on the original label
+        # _, coordinates, _ = extract_patches(
+        #     image=original_label_image,
+        #     patch_size=patch_size,
+        #     spacing=patch_spacing,
+        # )
 
         # Step 2: Extract patch labels using extract_patch_labels
-        patch_coordinates = [c[0] for c in coordinates]  # TODO: back to shot_coordinates[case_idx]
-        image_size = original_label_image.GetSize()  # TODO: back to image_size
-        image_spacing = original_label_image.GetSpacing()  # TODO: back to image_spacing
-        image_origin = original_label_image.GetOrigin()  # TODO: back to image_origin
-        image_direction = original_label_image.GetDirection()  # TODO: back to image_direction
         patch_labels_dict = extract_patch_labels(
             label=original_label,
             label_spacing=label_spacing,
@@ -295,8 +290,10 @@ def test_end_to_end_data_handling(
                         dice_flip = 2 * intersection_flip / (np.sum(original_resampled_array) + np.sum(flipped)) if (np.sum(original_resampled_array) + np.sum(flipped)) > 0 else 0
                         if dice_flip > dice:
                             print(f"    Flipping axis {axis} improves Dice to {dice_flip:.4f}")
+
+                    raise ValueError("  ERROR: Low Dice coefficient - possible orientation issue")
             else:
-                print("  ERROR: Shape mismatch between original and reconstructed labels")
+                raise ValueError("  ERROR: Shape mismatch between original and reconstructed labels")
 
         print("+=+" * 20)
 
