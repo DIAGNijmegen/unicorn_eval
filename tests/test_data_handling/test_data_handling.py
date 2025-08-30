@@ -147,14 +147,12 @@ def test_end_to_end_data_handling(
 
         # Step B: choose coordinates, patch size and spacing based on the original label
         patch_spacing = label_spacing
-        patch_size = (1, 16, 16)   # TODO: back to patch_size
+        patch_size = [1, 16, 16]   # TODO: back to patch_size
         _, coordinates, _ = extract_patches(
             image=original_label_image,
             patch_size=patch_size,
             spacing=patch_spacing,
         )
-
-        pass
 
         # Step 2: Extract patch labels using extract_patch_labels
         patch_coordinates = [c[0] for c in coordinates]  # TODO: back to shot_coordinates[case_idx]
@@ -185,7 +183,6 @@ def test_end_to_end_data_handling(
             patch_data["image_direction"] = image_direction
 
         reconstructed_label = stitch_patches_fast(patch_labels_dict["patches"])
-
         sitk.WriteImage(reconstructed_label, Path(__file__).parent / f"extracted_label_{case_name}.nii.gz")
 
         # Step 3: Construct data with labels using construct_data_with_labels
@@ -215,8 +212,7 @@ def test_end_to_end_data_handling(
 
         # Check that all cases have positive patches (non-zero labels)
         for case_number, patches in case_data.items():
-            case_name = case_ids[case_number] if case_number < len(case_ids) else f"case_{case_number}"
-            print(f"Case {case_name} (case_number={case_number}):")
+            print(f"Case {case_name} ({case_idx=}):")
 
             positive_patch_count = 0
             total_patches = len(patches)
@@ -235,10 +231,15 @@ def test_end_to_end_data_handling(
 
         # Process each case individually
         for case_number in case_data.keys():
-            case_name = case_ids[case_number] if case_number < len(case_ids) else f"case_{case_number}"
+            print(f"Case {case_name} ({case_idx=}):")
 
             # Step 4: Stitch patches using stitch_patches_fast
             reconstructed_label = stitch_patches_fast(case_data[case_number])
+
+            # Save reconstructed label for manual inspection
+            output_path = Path(__file__).parent / f"reconstructed_label_{case_name}.nii.gz"
+            sitk.WriteImage(reconstructed_label, str(output_path))
+            print(f"  Saved reconstructed label: {output_path}")
 
             # Step 5: Compare reconstructed label with original label
             reconstructed_array = sitk.GetArrayFromImage(reconstructed_label)
@@ -255,6 +256,10 @@ def test_end_to_end_data_handling(
             # directly resample the original label to the reconstructed label's space
             original_resampled = sitk.Resample(original_sitk, reconstructed_label)
             original_resampled_array = sitk.GetArrayFromImage(original_resampled)
+
+            output_path = Path(__file__).parent / f"original_resampled_label_{case_name}.nii.gz"
+            sitk.WriteImage(original_resampled, str(output_path))
+            print(f"  Saved original resampled label: {output_path}")
 
             # Check if shapes match
             print(f"\nCase {case_name} reconstruction comparison:")
@@ -294,14 +299,6 @@ def test_end_to_end_data_handling(
                             print(f"    Flipping axis {axis} improves Dice to {dice_flip:.4f}")
             else:
                 print("  ERROR: Shape mismatch between original and reconstructed labels")
-
-            # Save reconstructed label for manual inspection
-            output_path = Path(__file__).parent / f"reconstructed_label_{case_name}.nii.gz"
-            sitk.WriteImage(reconstructed_label, str(output_path))
-            print(f"  Saved reconstructed label: {output_path}")
-            output_path = Path(__file__).parent / f"original_resampled_label_{case_name}.nii.gz"
-            sitk.WriteImage(original_resampled, str(output_path))
-            print(f"  Saved original resampled label: {output_path}")
 
 
 if __name__ == "__main__":
