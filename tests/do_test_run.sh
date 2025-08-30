@@ -54,6 +54,7 @@ docker run --rm \
   --volume "$INPUT_DIR":/input:ro \
   --volume "$GROUND_TRUTH_DIR":/opt/ml/input/data/ground_truth:ro \
   --volume "$OUTPUT_DIR":/output \
+  --gpus all \
   "$DOCKER_IMAGE_TAG"
 
 echo "=+= Wrote results to ${OUTPUT_DIR}"
