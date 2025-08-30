@@ -191,7 +191,7 @@ def test_end_to_end_data_handling(
         # Step 3: Construct data with labels using construct_data_with_labels
         data_array = construct_data_with_labels(
             coordinates=[np.asarray(patch_coordinates)],
-            embeddings=[np.random.rand(len(patch_coordinates), 512)],
+            embeddings=[np.random.rand(len(patch_coordinates), 32)],
             case_names=[case_name],
             patch_size=patch_size,
             patch_spacing=patch_spacing,
@@ -202,106 +202,106 @@ def test_end_to_end_data_handling(
             image_directions=task_results["cases_image_directions"],
         )
 
-    # Prepare case data for stitching in the format expected by stitch_patches_fast for ALL cases
-    case_data = {}
-    for patch_data in data_array:
-        # Modify patch_data to match expected format
-        patch_data["features"] = patch_data["patch_label"]
-        patch_data["coord"] = patch_data["coordinates"]
-        case_number = patch_data["case_number"]
-        if case_number not in case_data:
-            case_data[case_number] = []
-        case_data[case_number].append(patch_data)
+        # Prepare case data for stitching in the format expected by stitch_patches_fast for ALL cases
+        case_data = {}
+        for patch_data in data_array:
+            # Modify patch_data to match expected format
+            patch_data["features"] = patch_data["patch_label"]
+            patch_data["coord"] = patch_data["coordinates"]
+            case_number = patch_data["case_number"]
+            if case_number not in case_data:
+                case_data[case_number] = []
+            case_data[case_number].append(patch_data)
 
-    # Check that all cases have positive patches (non-zero labels)
-    for case_number, patches in case_data.items():
-        case_name = case_ids[case_number] if case_number < len(case_ids) else f"case_{case_number}"
-        print(f"Case {case_name} (case_number={case_number}):")
+        # Check that all cases have positive patches (non-zero labels)
+        for case_number, patches in case_data.items():
+            case_name = case_ids[case_number] if case_number < len(case_ids) else f"case_{case_number}"
+            print(f"Case {case_name} (case_number={case_number}):")
 
-        positive_patch_count = 0
-        total_patches = len(patches)
+            positive_patch_count = 0
+            total_patches = len(patches)
 
-        for patch in patches:
-            patch_label = patch["features"]
-            if np.any(patch_label > 0):
-                positive_patch_count += 1
+            for patch in patches:
+                patch_label = patch["features"]
+                if np.any(patch_label > 0):
+                    positive_patch_count += 1
 
-        print(f"  Total patches: {total_patches}")
-        print(f"  Positive patches: {positive_patch_count}")
-        print(f"  Positive patch ratio: {positive_patch_count/total_patches:.2%}")
+            print(f"  Total patches: {total_patches}")
+            print(f"  Positive patches: {positive_patch_count}")
+            print(f"  Positive patch ratio: {positive_patch_count/total_patches:.2%}")
 
-        if positive_patch_count == 0:
-            raise ValueError(f"No positive patches found for case {case_name}")
+            if positive_patch_count == 0:
+                raise ValueError(f"No positive patches found for case {case_name}")
 
-    # Process each case individually
-    for case_number in case_data.keys():
-        case_name = case_ids[case_number] if case_number < len(case_ids) else f"case_{case_number}"
+        # Process each case individually
+        for case_number in case_data.keys():
+            case_name = case_ids[case_number] if case_number < len(case_ids) else f"case_{case_number}"
 
-        # Step 4: Stitch patches using stitch_patches_fast
-        reconstructed_label = stitch_patches_fast(case_data[case_number])
+            # Step 4: Stitch patches using stitch_patches_fast
+            reconstructed_label = stitch_patches_fast(case_data[case_number])
 
-        # Step 5: Compare reconstructed label with original label
-        reconstructed_array = sitk.GetArrayFromImage(reconstructed_label)
+            # Step 5: Compare reconstructed label with original label
+            reconstructed_array = sitk.GetArrayFromImage(reconstructed_label)
 
-        # Load original label for comparison
-        ground_truth_path = Path(label_path_pattern.as_posix().format(case_id=case_name))
+            # Load original label for comparison
+            ground_truth_path = Path(label_path_pattern.as_posix().format(case_id=case_name))
 
-        if not ground_truth_path.exists():
-            raise FileNotFoundError(f"Ground truth file not found: {ground_truth_path}")
+            if not ground_truth_path.exists():
+                raise FileNotFoundError(f"Ground truth file not found: {ground_truth_path}")
 
-        original_sitk = sitk.ReadImage(str(ground_truth_path))
-        original_array = sitk.GetArrayFromImage(original_sitk)
+            original_sitk = sitk.ReadImage(str(ground_truth_path))
+            original_array = sitk.GetArrayFromImage(original_sitk)
 
-        # directly resample the original label to the reconstructed label's space
-        original_resampled = sitk.Resample(original_sitk, reconstructed_label)
-        original_resampled_array = sitk.GetArrayFromImage(original_resampled)
+            # directly resample the original label to the reconstructed label's space
+            original_resampled = sitk.Resample(original_sitk, reconstructed_label)
+            original_resampled_array = sitk.GetArrayFromImage(original_resampled)
 
-        # Check if shapes match
-        print(f"\nCase {case_name} reconstruction comparison:")
-        print(f"  Original shape: {original_array.shape}")
-        print(f"  Reconstructed shape: {reconstructed_array.shape}")
-        print(f"  Original resampled shape: {original_resampled_array.shape}")
+            # Check if shapes match
+            print(f"\nCase {case_name} reconstruction comparison:")
+            print(f"  Original shape: {original_array.shape}")
+            print(f"  Reconstructed shape: {reconstructed_array.shape}")
+            print(f"  Original resampled shape: {original_resampled_array.shape}")
 
-        # Compare image properties
-        print(f"  Original spacing: {original_sitk.GetSpacing()}")
-        print(f"  Reconstructed spacing: {reconstructed_label.GetSpacing()}")
-        print(f"  Original resampled spacing: {original_resampled.GetSpacing()}")
+            # Compare image properties
+            print(f"  Original spacing: {original_sitk.GetSpacing()}")
+            print(f"  Reconstructed spacing: {reconstructed_label.GetSpacing()}")
+            print(f"  Original resampled spacing: {original_resampled.GetSpacing()}")
 
-        print(f"  Original direction: {original_sitk.GetDirection()}")
-        print(f"  Reconstructed direction: {reconstructed_label.GetDirection()}")
-        print(f"  Original resampled direction: {original_resampled.GetDirection()}")
+            print(f"  Original direction: {original_sitk.GetDirection()}")
+            print(f"  Reconstructed direction: {reconstructed_label.GetDirection()}")
+            print(f"  Original resampled direction: {original_resampled.GetDirection()}")
 
-        print(f"  Original origin: {original_sitk.GetOrigin()}")
-        print(f"  Reconstructed origin: {reconstructed_label.GetOrigin()}")
-        print(f"  Original resampled origin: {original_resampled.GetOrigin()}")
+            print(f"  Original origin: {original_sitk.GetOrigin()}")
+            print(f"  Reconstructed origin: {reconstructed_label.GetOrigin()}")
+            print(f"  Original resampled origin: {original_resampled.GetOrigin()}")
 
-        # Check overlap/similarity if shapes match
-        if original_resampled_array.shape == reconstructed_array.shape:
-            # Calculate Dice coefficient
-            dice = dice_coefficient(original_resampled_array, reconstructed_array)
-            print(f"  Dice coefficient: {dice:.4f}")
+            # Check overlap/similarity if shapes match
+            if original_resampled_array.shape == reconstructed_array.shape:
+                # Calculate Dice coefficient
+                dice = dice_coefficient(original_resampled_array, reconstructed_array)
+                print(f"  Dice coefficient: {dice:.4f}")
 
-            # For debugging: check if there's an orientation issue
-            if dice < 0.5:
-                print("  WARNING: Low Dice coefficient - possible orientation issue")
+                # For debugging: check if there's an orientation issue
+                if dice < 0.5:
+                    print("  WARNING: Low Dice coefficient - possible orientation issue")
 
-                # Try different axis flips to check for orientation issues
-                for axis in range(3):
-                    flipped = np.flip(reconstructed_array, axis=axis)
-                    intersection_flip = np.sum(original_resampled_array * flipped)
-                    dice_flip = 2 * intersection_flip / (np.sum(original_resampled_array) + np.sum(flipped)) if (np.sum(original_resampled_array) + np.sum(flipped)) > 0 else 0
-                    if dice_flip > dice:
-                        print(f"    Flipping axis {axis} improves Dice to {dice_flip:.4f}")
-        else:
-            print("  ERROR: Shape mismatch between original and reconstructed labels")
+                    # Try different axis flips to check for orientation issues
+                    for axis in range(3):
+                        flipped = np.flip(reconstructed_array, axis=axis)
+                        intersection_flip = np.sum(original_resampled_array * flipped)
+                        dice_flip = 2 * intersection_flip / (np.sum(original_resampled_array) + np.sum(flipped)) if (np.sum(original_resampled_array) + np.sum(flipped)) > 0 else 0
+                        if dice_flip > dice:
+                            print(f"    Flipping axis {axis} improves Dice to {dice_flip:.4f}")
+            else:
+                print("  ERROR: Shape mismatch between original and reconstructed labels")
 
-        # Save reconstructed label for manual inspection
-        output_path = Path(__file__).parent / f"reconstructed_label_{case_name}.nii.gz"
-        sitk.WriteImage(reconstructed_label, str(output_path))
-        print(f"  Saved reconstructed label: {output_path}")
-        output_path = Path(__file__).parent / f"original_resampled_label_{case_name}.nii.gz"
-        sitk.WriteImage(original_resampled, str(output_path))
-        print(f"  Saved original resampled label: {output_path}")
+            # Save reconstructed label for manual inspection
+            output_path = Path(__file__).parent / f"reconstructed_label_{case_name}.nii.gz"
+            sitk.WriteImage(reconstructed_label, str(output_path))
+            print(f"  Saved reconstructed label: {output_path}")
+            output_path = Path(__file__).parent / f"original_resampled_label_{case_name}.nii.gz"
+            sitk.WriteImage(original_resampled, str(output_path))
+            print(f"  Saved original resampled label: {output_path}")
 
 
 if __name__ == "__main__":
