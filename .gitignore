@@ -178,10 +178,8 @@ models/**/*.bin
 
 # MacOS
 .DS_Store
-/tests/vision/ground_truth-all
-/tests/vision/ground_truth-task6-val
-/tests/vision/input-task10-val
-/tests/vision/input-task6-val
-/tests/vision/predictions-test-all
+/tests/vision
+!/tests/vision/ground_truth
+/tests/vision/input
 tests/test_data_handling/*.pkl
 tests/test_data_handling/*.nii.gz
