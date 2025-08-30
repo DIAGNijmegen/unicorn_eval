@@ -120,9 +120,9 @@ def test_end_to_end_data_handling(
     case_ids = task_results["case_ids"]
 
     # Test on first few cases
-    num_test_cases = min(5, len(case_ids))
+    cases_to_test = [2]
 
-    for case_idx in range(num_test_cases):
+    for case_idx in cases_to_test:
         case_name = case_ids[case_idx]
 
         # unpack metadata
@@ -138,19 +138,21 @@ def test_end_to_end_data_handling(
         patch_spacing = task_results["patch_spacing"]
         original_label = task_results["case_labels"][case_idx]
 
-        # # Step A: convert original label to SimpleITK image
-        # original_label_image = sitk.GetImageFromArray(original_label)
-        # original_label_image.SetSpacing(label_spacing)
-        # original_label_image.SetOrigin(label_origin)
-        # original_label_image.SetDirection(label_direction)
-        # # confirmed: original_label_image equals the original label
+        # Step A: convert original label to SimpleITK image
+        original_label_image = sitk.GetImageFromArray(original_label)
+        original_label_image.SetSpacing(label_spacing)
+        original_label_image.SetOrigin(label_origin)
+        original_label_image.SetDirection(label_direction)
+        output_path = Path(__file__).parent / f"original_label_{case_name}.nii.gz"
+        sitk.WriteImage(original_label_image, output_path)
 
-        # # Step B: choose coordinates, patch size and spacing based on the original label
-        # _, coordinates, _ = extract_patches(
-        #     image=original_label_image,
-        #     patch_size=patch_size,
-        #     spacing=patch_spacing,
-        # )
+        # Step B: choose coordinates, patch size and spacing based on the original label
+        _, coordinates, _ = extract_patches(
+            image=original_label_image,
+            patch_size=patch_size,
+            spacing=patch_spacing,
+        )
+        patch_coordinates = [c[0] for c in coordinates]
 
         # Step 2: Extract patch labels using extract_patch_labels
         patch_labels_dict = extract_patch_labels(
@@ -256,9 +258,9 @@ def test_end_to_end_data_handling(
 
             # Check if shapes match
             print(f"\nCase {case_name} reconstruction comparison:")
-            print(f"  Original shape: {original_array.shape}")
-            print(f"  Reconstructed shape: {reconstructed_array.shape}")
-            print(f"  Original resampled shape: {original_resampled_array.shape}")
+            print(f"  Original shape: {original_sitk.GetSize()}")
+            print(f"  Reconstructed shape: {reconstructed_label.GetSize()}")
+            print(f"  Original resampled shape: {original_resampled.GetSize()}")
 
             # Compare image properties
             print(f"  Original spacing: {original_sitk.GetSpacing()}")
@@ -298,11 +300,11 @@ def test_end_to_end_data_handling(
         print("+=+" * 20)
 
 if __name__ == "__main__":
-    test_end_to_end_data_handling(
-        task_results_path=Path(__file__).parent / "task_results_spider.pkl",
-        label_path_pattern=Path(__file__).parent.parent / "vision" / "ground_truth-task11-val" / "Task11_segmenting_three_anatomical_structures_in_lumbar_spine_mri" / r"{case_id}" / "images" / "sagittal-spine-mr-segmentation" / f"{{case_id}}.mha"
-    )
     # test_end_to_end_data_handling(
-    #     task_results_path=Path(__file__).parent / "task_results_uls.pkl",
-    #     label_path_pattern=Path(__file__).parent.parent / "vision" / "ground_truth-task10-val" / "Task10_segmenting_lesions_within_vois_in_ct" / r"{case_id}" / "images" / "ct-binary-uls" / f"{{case_id}}.mha"
+    #     task_results_path=Path(__file__).parent / "task_results_spider.pkl",
+    #     label_path_pattern=Path(__file__).parent.parent / "vision" / "ground_truth-task11-val" / "Task11_segmenting_three_anatomical_structures_in_lumbar_spine_mri" / r"{case_id}" / "images" / "sagittal-spine-mr-segmentation" / f"{{case_id}}.mha"
     # )
+    test_end_to_end_data_handling(
+        task_results_path=Path(__file__).parent / "task_results_uls.pkl",
+        label_path_pattern=Path(__file__).parent.parent / "vision" / "ground_truth-task10-val" / "Task10_segmenting_lesions_within_vois_in_ct" / r"{case_id}" / "images" / "ct-binary-uls" / f"{{case_id}}.mha"
+    )
