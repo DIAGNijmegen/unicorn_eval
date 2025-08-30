@@ -125,7 +125,7 @@ class LinearUpsampleConv3D_V1(PatchLevelTaskAdaptor):
         train_data = construct_data_with_labels(
             coordinates=self.shot_coordinates,
             embeddings=self.shot_features,
-            cases=self.shot_names,
+            case_names=self.shot_names,
             patch_size=self.patch_size,
             patch_spacing=self.patch_spacing,
             labels=self.shot_labels,
@@ -146,7 +146,7 @@ class LinearUpsampleConv3D_V1(PatchLevelTaskAdaptor):
         test_data = construct_data_with_labels(
             coordinates=self.test_coordinates,
             embeddings=self.test_features,
-            cases=self.test_cases,
+            case_names=self.test_cases,
             patch_size=self.patch_size,
             patch_spacing=self.patch_spacing,
             image_sizes=self.test_image_sizes,

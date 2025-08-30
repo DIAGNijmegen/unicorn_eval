@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import logging
 import random
-from typing import Iterable
+from typing import Callable, Iterable
 
 import numpy as np
 import SimpleITK as sitk
@@ -118,20 +118,21 @@ def custom_collate(batch):
 
 
 def construct_data_with_labels(
-    coordinates,
-    embeddings,
-    cases,
-    patch_size,
-    patch_spacing,
+    coordinates: list[np.ndarray],
+    embeddings: list[np.ndarray],
+    case_names: list[str],
+    patch_size: list[int],
+    patch_spacing: list[float],
     labels=None,
     image_sizes=None,
     image_origins=None,
     image_spacings=None,
     image_directions=None,
+    label_mapper: Callable | None = None,
 ):
     data_array = []
 
-    for case_idx, case in enumerate(cases):
+    for case_idx, case_name in enumerate(case_names):
         # patch_spacing = img_feat['meta']['patch-spacing']
         case_embeddings = embeddings[case_idx]
         patch_coordinates = coordinates[case_idx]
@@ -141,7 +142,7 @@ def construct_data_with_labels(
         if len(case_embeddings) != len(patch_coordinates):
             K = len(case_embeddings) / len(patch_coordinates)
             logging.warning(
-                f"Number of embeddings ({len(case_embeddings)}) does not match number of coordinates ({len(patch_coordinates)}) for case {case}. Repeating coordinates {K} times."
+                f"Number of embeddings ({len(case_embeddings)}) does not match number of coordinates ({len(patch_coordinates)}) for case {case_name}. Repeating coordinates {K} times."
             )
             patch_coordinates = np.repeat(
                 patch_coordinates, repeats=K, axis=0
@@ -151,7 +152,7 @@ def construct_data_with_labels(
             if len(case_embeddings) != len(lbl_feat["patches"]):
                 K = len(case_embeddings) / len(lbl_feat["patches"])
                 logging.warning(
-                    f"Number of embeddings ({len(case_embeddings)}) does not match number of label patches ({len(lbl_feat['patches'])}) for case {case}. Repeating label patches {K} times."
+                    f"Number of embeddings ({len(case_embeddings)}) does not match number of label patches ({len(lbl_feat['patches'])}) for case {case_name}. Repeating label patches {K} times."
                 )
                 lbl_feat["patches"] = np.repeat(
                     lbl_feat["patches"], repeats=K, axis=0
@@ -167,6 +168,9 @@ def construct_data_with_labels(
             }
             if lbl_feat is not None:
                 patch_lbl = lbl_feat["patches"][i]
+                if label_mapper is not None:
+                    patch_lbl["features"] = label_mapper(patch_lbl["features"])
+
                 assert np.allclose(
                     patch_coordinates[i], patch_lbl["coordinates"]
                 ), "Coordinates don't match!"
@@ -180,10 +184,10 @@ def construct_data_with_labels(
                 and (image_spacings is not None)
                 and (image_directions is not None)
             ):
-                image_size = image_sizes[case]
-                image_origin = image_origins[case]
-                image_spacing = image_spacings[case]
-                image_direction = image_directions[case]
+                image_size = image_sizes[case_name]
+                image_origin = image_origins[case_name]
+                image_spacing = image_spacings[case_name]
+                image_direction = image_directions[case_name]
 
                 data_dict["image_size"] = image_size
                 data_dict["image_origin"] = (image_origin,)
@@ -315,49 +319,39 @@ class BalancedSegmentationDataset(Dataset):
         self.transform = transform
         self.rng = random.Random(random_seed)
     
-        # Separate positive and negative patches
-        self.positive_patches = []
-        self.negative_patches = []
+        # Keep track which patches contain which labels
+        self.patches_by_label: dict[int, list[dict]] = {}
     
         for data_dict in data:
             patch_label = data_dict["patch_label"]
-            if np.any(patch_label != 0):
-                self.positive_patches.append(data_dict)
-            else:
-                self.negative_patches.append(data_dict)
+            for label_value in np.unique(patch_label):
+                if label_value not in self.patches_by_label:
+                    self.patches_by_label[label_value] = []
 
-        self.num_positive = len(self.positive_patches)
-        self.num_negative = len(self.negative_patches)
+                self.patches_by_label[label_value].append(data_dict)
 
-        # Total length is twice the minimum class size to ensure balance
-        self.total_length = 2 * min(self.num_positive, self.num_negative) if min(self.num_positive, self.num_negative) > 0 else max(self.num_positive, self.num_negative)
+        self.total_length = len(data)
+        self.positive_classes = sorted(set(self.patches_by_label.keys()) - {0})
+        if not self.positive_classes:
+            raise ValueError("No positive classes found.")
 
-        print(f"BalancedSegmentationDataset: {self.num_positive} positive, {self.num_negative} negative patches")
+        num_patches_per_label = {k: len(v) for k, v in self.patches_by_label.items()}
+        print(f"BalancedSegmentationDataset: Num patches per class: {num_patches_per_label}")
         print(f"Total balanced dataset size: {self.total_length}")
 
     def __len__(self):
         return self.total_length
 
     def __getitem__(self, idx):
-        # Use inverse probability weighting: sample positive and negative with equal probability
-        if self.num_positive > 0 and self.num_negative > 0:
-            # 50% chance of sampling positive or negative
-            if self.rng.random() < 0.5:
-                # Sample positive patch
-                patch_idx = self.rng.randint(0, self.num_positive - 1)
-                data_dict = self.positive_patches[patch_idx]
-            else:
-                # Sample negative patch
-                patch_idx = self.rng.randint(0, self.num_negative - 1)
-                data_dict = self.negative_patches[patch_idx]
-        elif self.num_positive > 0:
-            # Only positive patches available
-            patch_idx = self.rng.randint(0, self.num_positive - 1)
-            data_dict = self.positive_patches[patch_idx]
+        # Sample a patch with foreground 90% of the time, equally distributed across classes
+        if self.rng.random() < 0.9:
+            class_to_sample = self.rng.choice(self.positive_classes)
         else:
-            # Only negative patches available
-            patch_idx = self.rng.randint(0, self.num_negative - 1)
-            data_dict = self.negative_patches[patch_idx]
+            class_to_sample = 0  # Sample a negative patch
+
+        # Select a random patch from the chosen class
+        patch_idx = self.rng.randint(0, len(self.patches_by_label[class_to_sample]) - 1)
+        data_dict = self.patches_by_label[class_to_sample][patch_idx]
 
         # Apply transform if provided
         if self.transform:

@@ -183,9 +183,11 @@ def stitch_patches_fast(patches: list[dict]):
     # Accumulate patches
     for p in patches:
         arr = np.asarray(p["features"], dtype=np.float64)
-        if arr.shape[0] != 1 or arr.ndim != 4:
-            raise ValueError("Expected arr shape (1, z, y, x)")
-        arr = arr[0]  # drop class dimension
+        if arr.ndim != 3:
+            if arr.ndim == 4 and arr.shape[0] == 1:
+                arr = arr[0]  # drop class dimension
+            else:
+                raise ValueError("Expected arr shape (1, z, y, x)")
 
         src = sitk.GetImageFromArray(arr)
         src.SetSpacing(ref_spacing)

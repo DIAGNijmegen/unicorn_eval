@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from typing import Callable
 
 import numpy as np
 import SimpleITK as sitk
@@ -163,8 +164,8 @@ def inference3d(
     test_label_spacing,
     test_label_origins,
     test_label_directions,
-    inference_postprocessor=None,
-    mask_postprocessor=None,
+    inference_postprocessor: Callable | None = None,
+    mask_postprocessor: Callable | None = None,
 ):
     decoder.eval()
     with torch.no_grad():
