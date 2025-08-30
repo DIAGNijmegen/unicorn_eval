@@ -1,8 +1,8 @@
 from collections import OrderedDict, defaultdict
+from typing import Iterable
+
 import numpy as np
 import pandas
-
-from typing import Iterable
 
 
 def dice_score(mask1: Iterable[bool], mask2: Iterable[bool]) -> float:
@@ -155,7 +155,7 @@ class Spider:
                 "std": df[metric_column].std(),
             }
 
-        return results_metric.get("OveralDiceScore").get("mean")
+        return results_metric["OverallDiceScore"]["mean"]
 
 
 def compute_spider_score(test_labels, test_predictions, case_ids):
