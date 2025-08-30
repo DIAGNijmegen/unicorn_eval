@@ -729,12 +729,12 @@ def evaluate_predictions(
         events = test_extra_labels["event"].astype(bool)
         cohorts = test_extra_labels["cohort"]
         if len(np.unique(cohorts)) > 1:
-            average_metric = 0
+            cohort_metrics = []
             for c in np.unique(cohorts):
                 cohort_mask = cohorts == c
                 cohort_metric = metric_fn(events[cohort_mask], test_labels[cohort_mask], -test_predictions[cohort_mask])[0]
-                average_metric += cohort_metric
-            metric_value = average_metric / len(np.unique(cohorts))
+                cohort_metrics.append(cohort_metric)
+            metric_value = np.mean(cohort_metrics)
         else:
             metric_value = metric_fn(events, test_labels, -test_predictions)[0]
         metric_dict[metric_name] = metric_value
