@@ -155,6 +155,7 @@ class SegmentationUpsampling3D_V2(PatchLevelTaskAdaptor):
         self.return_binary = return_binary
         self.balance_bg = balance_bg
         self.num_classes = -1
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     def fit(self):
         # build training data and loader
@@ -187,8 +188,7 @@ class SegmentationUpsampling3D_V2(PatchLevelTaskAdaptor):
             target_patch_size[0],
         )
 
-        # set up device and model
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        # set up decoder
         decoder_kwargs={
             "spatial_dims": 3,
             "init_filters": 32,
@@ -248,4 +248,4 @@ class SegmentationUpsampling3D_V2(PatchLevelTaskAdaptor):
             assert self.num_classes == 2, f"Scores only implemented for binary segmentation"
             return mask.softmax(dim=1)[:, 1, ...]  # return the positive class scores
         else:  # return the predicted classes
-            return torch.argmax(mask, dim=1)  # later code will squeeze second dim
+            return torch.argmax(mask, dim=1)
