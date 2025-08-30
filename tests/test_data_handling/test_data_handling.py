@@ -60,7 +60,7 @@ def extract_patches(
             ((x_start, y_start, z_start), (x_end, y_end, z_end)) in world coordinates.
             Each coordinate pair represents the start and end points of the patch in the original image's physical space.
     """
-    if spacing is not None and image.GetSpacing() != spacing:
+    if spacing is not None and not np.isclose(image.GetSpacing(), spacing).all():
         # resample image to specified spacing
         image = resample_img(
             image=image,
@@ -147,7 +147,7 @@ def test_end_to_end_data_handling(
 
         # Step B: choose coordinates, patch size and spacing based on the original label
         patch_spacing = label_spacing
-        patch_size = original_label_image.GetSize()
+        patch_size = (1, 16, 16)   # TODO: back to patch_size
         _, coordinates, _ = extract_patches(
             image=original_label_image,
             patch_size=patch_size,
@@ -157,7 +157,11 @@ def test_end_to_end_data_handling(
         pass
 
         # Step 2: Extract patch labels using extract_patch_labels
-        patch_coordinates = [c[0] for c in coordinates]  # shot_coordinates[case_idx]
+        patch_coordinates = [c[0] for c in coordinates]  # TODO: back to shot_coordinates[case_idx]
+        image_size = original_label_image.GetSize()  # TODO: back to image_size
+        image_spacing = original_label_image.GetSpacing()  # TODO: back to image_spacing
+        image_origin = original_label_image.GetOrigin()  # TODO: back to image_origin
+        image_direction = original_label_image.GetDirection()  # TODO: back to image_direction
         patch_labels_dict = extract_patch_labels(
             label=original_label,
             label_spacing=label_spacing,
@@ -173,11 +177,16 @@ def test_end_to_end_data_handling(
         )
 
         # check extracted label
-        arr = patch_labels_dict['patches'][0]['features']
-        img = sitk.GetImageFromArray(arr)
-        img.SetSpacing(label_spacing)
-        img.SetOrigin(label_origin)
-        img.SetDirection(label_direction)
+        for patch_data in patch_labels_dict["patches"]:
+            # Modify patch_data to match expected format
+            patch_data["coord"] = patch_data["coordinates"]
+            patch_data["patch_spacing"] = patch_spacing
+            patch_data["patch_size"] = patch_size
+            patch_data["image_direction"] = image_direction
+
+        reconstructed_label = stitch_patches_fast(patch_labels_dict["patches"])
+
+        sitk.WriteImage(reconstructed_label, Path(__file__).parent / f"extracted_label_{case_name}.nii.gz")
 
         # Step 3: Construct data with labels using construct_data_with_labels
         data_array = construct_data_with_labels(

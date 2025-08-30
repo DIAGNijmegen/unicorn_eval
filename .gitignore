@@ -183,7 +183,5 @@ models/**/*.bin
 /tests/vision/input-task10-val
 /tests/vision/input-task6-val
 /tests/vision/predictions-test-all
-tests/test_data_handling/task_results*.pkl
-tests/test_data_handling/reconstructed_label_*.nii.gz
-tests/test_data_handling/original_resampled_label_*.nii.gz
-tests/test_data_handling/original_label_image_*.nii.gz
+tests/test_data_handling/*.pkl
+tests/test_data_handling/*.nii.gz
