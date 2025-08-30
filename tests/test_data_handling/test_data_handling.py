@@ -123,18 +123,19 @@ def test_end_to_end_data_handling(
     num_test_cases = min(3, len(case_ids))
 
     for case_idx in range(num_test_cases):
+        case_name = case_ids[case_idx]
+
         # unpack metadata
-        image_size = task_results["cases_image_sizes"][case_idx]
-        image_spacing = task_results["cases_image_spacings"][case_idx]
-        image_origin = task_results["cases_image_origins"][case_idx]
-        image_direction = task_results["cases_image_directions"][case_idx]
-        label_spacing = task_results["cases_label_spacings"][case_idx]
-        label_origin = task_results["cases_label_origins"][case_idx]
-        label_direction = task_results["cases_label_directions"][case_idx]
+        image_size = task_results["cases_image_sizes"][case_name]
+        image_spacing = task_results["cases_image_spacings"][case_name]
+        image_origin = task_results["cases_image_origins"][case_name]
+        image_direction = task_results["cases_image_directions"][case_name]
+        label_spacing = task_results["cases_label_spacings"][case_name]
+        label_origin = task_results["cases_label_origins"][case_name]
+        label_direction = task_results["cases_label_directions"][case_name]
         shot_coordinates = task_results["shot_coordinates"][case_idx]
-        patch_size = task_results["patch_size"][case_idx]
-        patch_spacing = task_results["patch_spacing"][case_idx]
-        case_id = case_ids[case_idx]
+        patch_size = task_results["patch_size"]
+        patch_spacing = task_results["patch_spacing"]
         original_label = task_results["case_labels"][case_idx]
 
         # Step A: convert original label to SimpleITK image
@@ -182,7 +183,7 @@ def test_end_to_end_data_handling(
         data_array = construct_data_with_labels(
             coordinates=[np.asarray(patch_coordinates)],
             embeddings=[np.random.rand(len(patch_coordinates), 512)],
-            case_names=[case_id],
+            case_names=[case_name],
             patch_size=patch_size,
             patch_spacing=patch_spacing,
             labels=[patch_labels_dict],
@@ -205,8 +206,8 @@ def test_end_to_end_data_handling(
 
     # Check that all cases have positive patches (non-zero labels)
     for case_number, patches in case_data.items():
-        case_id = case_ids[case_number] if case_number < len(case_ids) else f"case_{case_number}"
-        print(f"Case {case_id} (case_number={case_number}):")
+        case_name = case_ids[case_number] if case_number < len(case_ids) else f"case_{case_number}"
+        print(f"Case {case_name} (case_number={case_number}):")
 
         positive_patch_count = 0
         total_patches = len(patches)
@@ -221,11 +222,11 @@ def test_end_to_end_data_handling(
         print(f"  Positive patch ratio: {positive_patch_count/total_patches:.2%}")
 
         if positive_patch_count == 0:
-            raise ValueError(f"No positive patches found for case {case_id}")
+            raise ValueError(f"No positive patches found for case {case_name}")
 
     # Process each case individually
     for case_number in case_data.keys():
-        case_id = case_ids[case_number] if case_number < len(case_ids) else f"case_{case_number}"
+        case_name = case_ids[case_number] if case_number < len(case_ids) else f"case_{case_number}"
 
         # Step 4: Stitch patches using stitch_patches_fast
         reconstructed_label = stitch_patches_fast(case_data[case_number])
@@ -234,7 +235,7 @@ def test_end_to_end_data_handling(
         reconstructed_array = sitk.GetArrayFromImage(reconstructed_label)
 
         # Load original label for comparison
-        ground_truth_path = Path(label_path_pattern.as_posix().format(case_id=case_id))
+        ground_truth_path = Path(label_path_pattern.as_posix().format(case_id=case_name))
 
         if not ground_truth_path.exists():
             raise FileNotFoundError(f"Ground truth file not found: {ground_truth_path}")
@@ -247,7 +248,7 @@ def test_end_to_end_data_handling(
         original_resampled_array = sitk.GetArrayFromImage(original_resampled)
 
         # Check if shapes match
-        print(f"\nCase {case_id} reconstruction comparison:")
+        print(f"\nCase {case_name} reconstruction comparison:")
         print(f"  Original shape: {original_array.shape}")
         print(f"  Reconstructed shape: {reconstructed_array.shape}")
         print(f"  Original resampled shape: {original_resampled_array.shape}")
@@ -286,10 +287,10 @@ def test_end_to_end_data_handling(
             print("  ERROR: Shape mismatch between original and reconstructed labels")
 
         # Save reconstructed label for manual inspection
-        output_path = Path(__file__).parent / f"reconstructed_label_{case_id}.nii.gz"
+        output_path = Path(__file__).parent / f"reconstructed_label_{case_name}.nii.gz"
         sitk.WriteImage(reconstructed_label, str(output_path))
         print(f"  Saved reconstructed label: {output_path}")
-        output_path = Path(__file__).parent / f"original_resampled_label_{case_id}.nii.gz"
+        output_path = Path(__file__).parent / f"original_resampled_label_{case_name}.nii.gz"
         sitk.WriteImage(original_resampled, str(output_path))
         print(f"  Saved original resampled label: {output_path}")
 
