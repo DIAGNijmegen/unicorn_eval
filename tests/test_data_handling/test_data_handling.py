@@ -8,9 +8,13 @@ import SimpleITK as sitk
 from unicorn_eval.adaptors.reconstruct_prediction import stitch_patches_fast
 from unicorn_eval.adaptors.segmentation.data_handling import (
     construct_data_with_labels, extract_patch_labels)
+from unicorn_eval.metrics.uls import dice_coefficient
 
 
-def test_end_to_end_data_handling():
+def test_end_to_end_data_handling(
+    task_results_path: Path,
+    label_path_pattern: Path,
+):
     """
     End-to-end test for data handling pipeline including:
     1. Load task_results from pickle
@@ -20,10 +24,9 @@ def test_end_to_end_data_handling():
     5. Compare reconstructed labels with original labels
     """
     # Step 1: Load task results from pickle file
-    task_results_path = Path(__file__).parent / "task_results.pkl"
     if not task_results_path.exists():
-        pytest.skip(f"Task results file not found: {task_results_path}")
-    
+        raise FileNotFoundError(f"Task results file not found: {task_results_path}")
+
     with open(task_results_path, "rb") as f:
         task_results = pickle.load(f)
     
@@ -65,7 +68,7 @@ def test_end_to_end_data_handling():
             patch_size=patch_size,
             patch_spacing=patch_spacing,
         )
-        
+
         # Step 3: Construct data with labels using construct_data_with_labels
         coords = shot_coordinates[case_idx]
         coords_array = np.array(coords)
@@ -125,64 +128,72 @@ def test_end_to_end_data_handling():
         reconstructed_array = sitk.GetArrayFromImage(reconstructed_label)
         
         # Load original label for comparison
-        ground_truth_path = Path(__file__).parent.parent / "vision" / "ground_truth-task10-val" / "Task10_segmenting_lesions_within_vois_in_ct" / case_id / "images" / "ct-binary-uls" / f"{case_id}.mha"
+        ground_truth_path = Path(label_path_pattern.as_posix().format(case_id=case_id))
+
+        if not ground_truth_path.exists():
+            raise FileNotFoundError(f"Ground truth file not found: {ground_truth_path}")
+    
+        original_sitk = sitk.ReadImage(str(ground_truth_path))
+        original_array = sitk.GetArrayFromImage(original_sitk)
         
-        if ground_truth_path.exists():
-            original_sitk = sitk.ReadImage(str(ground_truth_path))
-            original_array = sitk.GetArrayFromImage(original_sitk)
-            
-            # directly resample the original label to the reconstructed label's space
-            original_resampled = sitk.Resample(original_sitk, reconstructed_label)
-            original_resampled_array = sitk.GetArrayFromImage(original_resampled)
+        # directly resample the original label to the reconstructed label's space
+        original_resampled = sitk.Resample(original_sitk, reconstructed_label)
+        original_resampled_array = sitk.GetArrayFromImage(original_resampled)
 
-            # Check if shapes match
-            print(f"\nCase {case_id} reconstruction comparison:")
-            print(f"  Original shape: {original_array.shape}")
-            print(f"  Reconstructed shape: {reconstructed_array.shape}")
-            print(f"  Original resampled shape: {original_resampled_array.shape}")
+        # Check if shapes match
+        print(f"\nCase {case_id} reconstruction comparison:")
+        print(f"  Original shape: {original_array.shape}")
+        print(f"  Reconstructed shape: {reconstructed_array.shape}")
+        print(f"  Original resampled shape: {original_resampled_array.shape}")
 
-            # Compare image properties
-            print(f"  Original spacing: {original_sitk.GetSpacing()}")
-            print(f"  Reconstructed spacing: {reconstructed_label.GetSpacing()}")
-            print(f"  Original resampled spacing: {original_resampled.GetSpacing()}")
+        # Compare image properties
+        print(f"  Original spacing: {original_sitk.GetSpacing()}")
+        print(f"  Reconstructed spacing: {reconstructed_label.GetSpacing()}")
+        print(f"  Original resampled spacing: {original_resampled.GetSpacing()}")
 
-            print(f"  Original direction: {original_sitk.GetDirection()}")
-            print(f"  Reconstructed direction: {reconstructed_label.GetDirection()}")
-            print(f"  Original resampled direction: {original_resampled.GetDirection()}")
+        print(f"  Original direction: {original_sitk.GetDirection()}")
+        print(f"  Reconstructed direction: {reconstructed_label.GetDirection()}")
+        print(f"  Original resampled direction: {original_resampled.GetDirection()}")
 
-            print(f"  Original origin: {original_sitk.GetOrigin()}")
-            print(f"  Reconstructed origin: {reconstructed_label.GetOrigin()}")
-            print(f"  Original resampled origin: {original_resampled.GetOrigin()}")
+        print(f"  Original origin: {original_sitk.GetOrigin()}")
+        print(f"  Reconstructed origin: {reconstructed_label.GetOrigin()}")
+        print(f"  Original resampled origin: {original_resampled.GetOrigin()}")
 
-            # Check overlap/similarity if shapes match
-            if original_resampled_array.shape == reconstructed_array.shape:
-                # Calculate Dice coefficient
-                intersection = np.sum(original_resampled_array * reconstructed_array)
-                union = np.sum(original_resampled_array) + np.sum(reconstructed_array) - intersection
-                dice = 2 * intersection / union if union != 0 else 0
-                print(f"  Dice coefficient: {dice:.4f} ({intersection=}, {union=})")
-                
-                # For debugging: check if there's an orientation issue
-                if dice < 0.5:
-                    print("  WARNING: Low Dice coefficient - possible orientation issue")
-                    
-                    # Try different axis flips to check for orientation issues
-                    for axis in range(3):
-                        flipped = np.flip(reconstructed_array, axis=axis)
-                        intersection_flip = np.sum(original_resampled_array * flipped)
-                        dice_flip = 2 * intersection_flip / (np.sum(original_resampled_array) + np.sum(flipped)) if (np.sum(original_resampled_array) + np.sum(flipped)) > 0 else 0
-                        if dice_flip > dice:
-                            print(f"    Flipping axis {axis} improves Dice to {dice_flip:.4f}")
-            else:
-                print("  ERROR: Shape mismatch between original and reconstructed labels")
+        # Check overlap/similarity if shapes match
+        if original_resampled_array.shape == reconstructed_array.shape:
+            # Calculate Dice coefficient
+            dice = dice_coefficient(original_resampled_array, reconstructed_array)
+            print(f"  Dice coefficient: {dice:.4f}")
+
+            # For debugging: check if there's an orientation issue
+            if dice < 0.5:
+                print("  WARNING: Low Dice coefficient - possible orientation issue")
+
+                # Try different axis flips to check for orientation issues
+                for axis in range(3):
+                    flipped = np.flip(reconstructed_array, axis=axis)
+                    intersection_flip = np.sum(original_resampled_array * flipped)
+                    dice_flip = 2 * intersection_flip / (np.sum(original_resampled_array) + np.sum(flipped)) if (np.sum(original_resampled_array) + np.sum(flipped)) > 0 else 0
+                    if dice_flip > dice:
+                        print(f"    Flipping axis {axis} improves Dice to {dice_flip:.4f}")
         else:
-            print(f"  Ground truth file not found: {ground_truth_path}")
-            
+            print("  ERROR: Shape mismatch between original and reconstructed labels")
+
         # Save reconstructed label for manual inspection
         output_path = Path(__file__).parent / f"reconstructed_label_{case_id}.nii.gz"
         sitk.WriteImage(reconstructed_label, str(output_path))
         print(f"  Saved reconstructed label: {output_path}")
+        output_path = Path(__file__).parent / f"original_resampled_label_{case_id}.nii.gz"
+        sitk.WriteImage(original_resampled, str(output_path))
+        print(f"  Saved original resampled label: {output_path}")
 
 
 if __name__ == "__main__":
-    test_end_to_end_data_handling()
+    test_end_to_end_data_handling(
+        task_results_path=Path(__file__).parent / "task_results_spider.pkl",
+        label_path_pattern=Path(__file__).parent.parent / "vision" / "ground_truth-task11-val" / "Task11_segmenting_three_anatomical_structures_in_lumbar_spine_mri" / r"{case_id}" / "images" / "sagittal-spine-mr-segmentation" / f"{{case_id}}.mha"
+    )
+    # test_end_to_end_data_handling(
+    #     task_results_path=Path(__file__).parent / "task_results_uls.pkl",
+    #     label_path_pattern=Path(__file__).parent.parent / "vision" / "ground_truth-task10-val" / "Task10_segmenting_lesions_within_vois_in_ct" / r"{case_id}" / "images" / "ct-binary-uls" / f"{{case_id}}.mha"
+    # )
