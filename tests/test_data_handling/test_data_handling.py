@@ -246,7 +246,6 @@ def test_end_to_end_data_handling(
                 raise FileNotFoundError(f"Ground truth file not found: {ground_truth_path}")
 
             original_sitk = sitk.ReadImage(str(ground_truth_path))
-            original_array = sitk.GetArrayFromImage(original_sitk)
 
             # directly resample the original label to the reconstructed label's space
             original_resampled = sitk.Resample(original_sitk, reconstructed_label)
