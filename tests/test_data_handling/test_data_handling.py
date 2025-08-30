@@ -29,7 +29,7 @@ def test_end_to_end_data_handling(
 
     with open(task_results_path, "rb") as f:
         task_results = pickle.load(f)
-    
+
     # Extract required data from task_results
     case_labels = task_results["case_labels"]
     case_ids = task_results["case_ids"]
@@ -43,17 +43,14 @@ def test_end_to_end_data_handling(
     shot_coordinates = task_results["shot_coordinates"]
     patch_size = task_results["patch_size"]
     patch_spacing = task_results["patch_spacing"]
-    
-    if not case_labels or not case_ids:
-        pytest.skip("Required case data not found in task_results")
-    
+
     # Test on first few cases
     num_test_cases = min(3, len(case_ids))
-    
+
     for case_idx in range(num_test_cases):
         case_id = case_ids[case_idx]
         original_label = case_labels[case_idx]
-        
+
         # Step 2: Extract patch labels using extract_patch_labels
         patch_labels_dict = extract_patch_labels(
             label=original_label,
@@ -72,7 +69,7 @@ def test_end_to_end_data_handling(
         # Step 3: Construct data with labels using construct_data_with_labels
         coords = shot_coordinates[case_idx]
         coords_array = np.array(coords)
-        
+
         data_array = construct_data_with_labels(
             coordinates=[coords_array],
             embeddings=[np.random.rand(len(coords), 512)],
@@ -85,7 +82,7 @@ def test_end_to_end_data_handling(
             image_spacings=case_image_spacings,
             image_directions=case_image_directions,
         )
-        
+
     # Prepare case data for stitching in the format expected by stitch_patches_fast for ALL cases
     case_data = {}
     for patch_data in data_array:
@@ -96,46 +93,46 @@ def test_end_to_end_data_handling(
         if case_number not in case_data:
             case_data[case_number] = []
         case_data[case_number].append(patch_data)
-    
+
     # Check that all cases have positive patches (non-zero labels)
     for case_number, patches in case_data.items():
         case_id = case_ids[case_number] if case_number < len(case_ids) else f"case_{case_number}"
         print(f"Case {case_id} (case_number={case_number}):")
-        
+
         positive_patch_count = 0
         total_patches = len(patches)
-        
+
         for patch in patches:
             patch_label = patch["features"]
             if np.any(patch_label > 0):
                 positive_patch_count += 1
-        
+
         print(f"  Total patches: {total_patches}")
         print(f"  Positive patches: {positive_patch_count}")
         print(f"  Positive patch ratio: {positive_patch_count/total_patches:.2%}")
-        
+
         if positive_patch_count == 0:
             raise ValueError(f"No positive patches found for case {case_id}")
-    
+
     # Process each case individually
     for case_number in case_data.keys():
         case_id = case_ids[case_number] if case_number < len(case_ids) else f"case_{case_number}"
-        
+
         # Step 4: Stitch patches using stitch_patches_fast
         reconstructed_label = stitch_patches_fast(case_data[case_number])
-        
+
         # Step 5: Compare reconstructed label with original label
         reconstructed_array = sitk.GetArrayFromImage(reconstructed_label)
-        
+
         # Load original label for comparison
         ground_truth_path = Path(label_path_pattern.as_posix().format(case_id=case_id))
 
         if not ground_truth_path.exists():
             raise FileNotFoundError(f"Ground truth file not found: {ground_truth_path}")
-    
+
         original_sitk = sitk.ReadImage(str(ground_truth_path))
         original_array = sitk.GetArrayFromImage(original_sitk)
-        
+
         # directly resample the original label to the reconstructed label's space
         original_resampled = sitk.Resample(original_sitk, reconstructed_label)
         original_resampled_array = sitk.GetArrayFromImage(original_resampled)
