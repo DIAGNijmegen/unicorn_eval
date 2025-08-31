@@ -120,7 +120,7 @@ def test_end_to_end_data_handling(
     case_ids = task_results["case_ids"]
 
     # Test on first few cases
-    cases_to_test = [2]
+    cases_to_test = range(len(case_ids))
 
     for case_idx in cases_to_test:
         case_name = case_ids[case_idx]
@@ -134,8 +134,8 @@ def test_end_to_end_data_handling(
         label_origin = task_results["cases_label_origins"][case_name]
         label_direction = task_results["cases_label_directions"][case_name]
         patch_coordinates = task_results["cases_coordinates"][case_idx]
-        patch_size = task_results["patch_size"]
-        patch_spacing = task_results["patch_spacing"]
+        patch_size = task_results["cases_patch_sizes"][case_name]
+        patch_spacing = task_results["cases_patch_spacings"][case_name]
         original_label = task_results["case_labels"][case_idx]
 
         # Step A: convert original label to SimpleITK image
@@ -298,12 +298,14 @@ def test_end_to_end_data_handling(
 
         print("+=+" * 20)
 
+
 if __name__ == "__main__":
+    test_end_to_end_data_handling(
+        task_results_path=Path(__file__).parent / "task_results_Task10_segmenting_lesions_within_vois_in_ct.pkl",
+        label_path_pattern=Path(__file__).parent.parent / "vision" / "ground_truth-task10-check" / "Task10_segmenting_lesions_within_vois_in_ct" / r"{case_id}" / "images" / "ct-binary-uls" / f"{{case_id}}.mha"
+    )
+
     # test_end_to_end_data_handling(
-    #     task_results_path=Path(__file__).parent / "task_results_spider.pkl",
+    #     task_results_path=Path(__file__).parent / "task_results_Task11_segmenting_three_anatomical_structures_in_lumbar_spine_mri.pkl",
     #     label_path_pattern=Path(__file__).parent.parent / "vision" / "ground_truth-task11-val" / "Task11_segmenting_three_anatomical_structures_in_lumbar_spine_mri" / r"{case_id}" / "images" / "sagittal-spine-mr-segmentation" / f"{{case_id}}.mha"
     # )
-    test_end_to_end_data_handling(
-        task_results_path=Path(__file__).parent / "task_results_uls.pkl",
-        label_path_pattern=Path(__file__).parent.parent / "vision" / "ground_truth-task10-val" / "Task10_segmenting_lesions_within_vois_in_ct" / r"{case_id}" / "images" / "ct-binary-uls" / f"{{case_id}}.mha"
-    )
