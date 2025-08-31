@@ -152,8 +152,12 @@ def adapt_features(
     test_coordinates=None,
     shot_names=None,
     test_names=None,
-    patch_size=224,
-    patch_spacing=None,
+    global_patch_size: int | None = 224,
+    global_patch_spacing: int | None = None,
+    shot_patch_sizes: dict | None = None,
+    test_patch_sizes: dict | None = None,
+    shot_patch_spacings: dict | None = None,
+    test_patch_spacings: dict | None = None,
     feature_grid_resolution=None,
     test_image_sizes=None,
     test_image_spacing=None,
@@ -174,6 +178,14 @@ def adapt_features(
     return_probabilities=False,
 ):
     num_shots = len(shot_features)
+    
+    # Handle backward compatibility for global_patch_spacing
+    # If individual patch spacings are provided, use them; otherwise use the single value
+    if global_patch_spacing is None and shot_patch_spacings is not None and test_patch_spacings is not None:
+        # Use individual patch spacings - for now, use the first shot's patch spacing as fallback
+        # This maintains the same behavior as before for adaptors that need a single value
+        first_shot_id = shot_names[0] if shot_names else list(shot_patch_spacings.keys())[0]
+        global_patch_spacing = shot_patch_spacings[first_shot_id]
 
     if "-nn" in adaptor_name:
         k = int(adaptor_name.split("-")[0])
@@ -308,6 +320,7 @@ def adapt_features(
         )
 
     elif adaptor_name == "density-map":
+        assert global_patch_size is not None, f"Global patch size must be specified for {adaptor_name} adaptor."
         adaptor = DensityMap(
             shot_features=shot_features,
             shot_labels=shot_labels,
@@ -316,11 +329,12 @@ def adapt_features(
             test_features=test_features,
             test_coordinates=test_coordinates,
             test_names=test_names,
-            patch_size=patch_size[0],
+            patch_size=global_patch_size[0],
             heatmap_size=16,
         )
 
     elif adaptor_name == "conv-detector":
+        assert global_patch_size is not None, f"Global patch size must be specified for {adaptor_name} adaptor."
         adaptor = ConvDetector(
             shot_features=shot_features,
             shot_labels=shot_labels,
@@ -329,10 +343,11 @@ def adapt_features(
             test_features=test_features,
             test_coordinates=test_coordinates,
             test_names=test_names,
-            patch_sizes=patch_size,
+            patch_sizes=global_patch_size,
         )
 
     elif adaptor_name == "segmentation-upsampling":
+        assert global_patch_size is not None, f"Global patch size must be specified for {adaptor_name} adaptor."
         adaptor = SegmentationUpsampling(
             shot_features=shot_features,
             shot_labels=shot_labels,
@@ -342,8 +357,8 @@ def adapt_features(
             test_coordinates=test_coordinates,
             test_names=test_names,
             test_image_sizes=test_image_sizes,
-            patch_size=patch_size[0],
-            patch_spacing=patch_spacing[0],
+            patch_size=global_patch_size[0],
+            patch_spacing=global_patch_spacing[0],
         )
     elif adaptor_name == "linear-upsample-conv3d":
         adaptor = LinearUpsampleConv3D_V1(
@@ -365,8 +380,8 @@ def adapt_features(
             test_label_spacing=test_label_spacing,
             test_label_origins=test_label_origins,
             test_label_directions=test_label_directions,
-            patch_size=patch_size,
-            patch_spacing=patch_spacing,
+            patch_size=global_patch_size,
+            patch_spacing=global_patch_spacing,
             shot_image_sizes=shot_image_sizes,
             shot_image_spacing=shot_image_spacing,
             shot_image_origins=shot_image_origins,
@@ -392,7 +407,7 @@ def adapt_features(
             test_label_spacing=test_label_spacing,
             test_label_origins=test_label_origins,
             test_label_directions=test_label_directions,
-            patch_size=patch_size,
+            patch_size=global_patch_size,
             patch_spacing=None,
             shot_image_sizes=shot_image_sizes,
             shot_image_spacing=shot_image_spacing,
@@ -419,7 +434,7 @@ def adapt_features(
             test_label_spacing=test_label_spacing,
             test_label_origins=test_label_origins,
             test_label_directions=test_label_directions,
-            patch_size=patch_size,
+            patch_size=global_patch_size,
             patch_spacing=None,
             shot_image_sizes=shot_image_sizes,
             shot_image_spacing=shot_image_spacing,
@@ -448,8 +463,8 @@ def adapt_features(
             test_label_spacing=test_label_spacing,
             test_label_origins=test_label_origins,
             test_label_directions=test_label_directions,
-            patch_size=patch_size,
-            patch_spacing=patch_spacing,
+            patch_size=global_patch_size,
+            patch_spacing=global_patch_spacing,
             shot_image_sizes=shot_image_sizes,
             shot_image_spacing=shot_image_spacing,
             shot_image_origins=shot_image_origins,
@@ -476,8 +491,8 @@ def adapt_features(
             test_label_spacing=test_label_spacing,
             test_label_origins=test_label_origins,
             test_label_directions=test_label_directions,
-            patch_size=patch_size,
-            patch_spacing=patch_spacing,
+            patch_size=global_patch_size,
+            patch_spacing=global_patch_spacing,
             shot_image_sizes=shot_image_sizes,
             shot_image_spacing=shot_image_spacing,
             shot_image_origins=shot_image_origins,
@@ -504,8 +519,8 @@ def adapt_features(
             test_label_spacing=test_label_spacing,
             test_label_origins=test_label_origins,
             test_label_directions=test_label_directions,
-            patch_size=patch_size,
-            patch_spacing=patch_spacing,
+            patch_size=global_patch_size,
+            patch_spacing=global_patch_spacing,
             feature_grid_resolution=feature_grid_resolution,
             shot_image_sizes=shot_image_sizes,
             shot_image_spacing=shot_image_spacing,
@@ -537,7 +552,7 @@ def adapt_features(
             test_label_spacing=test_label_spacing,
             test_label_origins=test_label_origins,
             test_label_directions=test_label_directions,
-            patch_size=patch_size,
+            patch_size=global_patch_size,
             patch_spacing=None,
             return_binary=False,
         )
@@ -566,7 +581,7 @@ def adapt_features(
             test_label_spacing=test_label_spacing,
             test_label_origins=test_label_origins,
             test_label_directions=test_label_directions,
-            patch_size=patch_size,
+            patch_size=global_patch_size,
             patch_spacing=None,
             return_binary=False,
             decoder_cls=ConvUpsampleSegAdaptor,
@@ -596,8 +611,8 @@ def adapt_features(
             test_label_spacing=test_label_spacing,
             test_label_origins=test_label_origins,
             test_label_directions=test_label_directions,
-            patch_size=patch_size,
-            patch_spacing=patch_spacing,
+            patch_size=global_patch_size,
+            patch_spacing=global_patch_spacing,
             return_binary=False,
         )
 
@@ -625,8 +640,8 @@ def adapt_features(
             test_label_spacing=test_label_spacing,
             test_label_origins=test_label_origins,
             test_label_directions=test_label_directions,
-            patch_size=patch_size,
-            patch_spacing=patch_spacing,
+            patch_size=global_patch_size,
+            patch_spacing=global_patch_spacing,
             return_binary=False,
         )
 
@@ -654,8 +669,8 @@ def adapt_features(
             test_label_spacing=test_label_spacing,
             test_label_origins=test_label_origins,
             test_label_directions=test_label_directions,
-            patch_size=patch_size,
-            patch_spacing=patch_spacing,
+            patch_size=global_patch_size,
+            patch_spacing=global_patch_spacing,
             feature_grid_resolution=feature_grid_resolution,
             return_binary=False,
         )
@@ -948,6 +963,8 @@ def extract_embeddings_and_labels(processed_results, task_name):
         "shot_image_origins": {},
         "shot_image_directions": {},
         "shot_image_sizes": {},
+        "shot_patch_sizes": {},
+        "shot_patch_spacings": {},
         "shot_label_sizes": {},
         "shot_label_spacings": {},
         "shot_label_origins": {},
@@ -964,6 +981,8 @@ def extract_embeddings_and_labels(processed_results, task_name):
         "cases_image_spacings": {},
         "cases_image_origins": {},
         "cases_image_directions": {},
+        "cases_patch_sizes": {},
+        "cases_patch_spacings": {},
         "cases_label_sizes": {},
         "cases_label_spacings": {},
         "cases_label_origins": {},
@@ -1004,6 +1023,8 @@ def extract_embeddings_and_labels(processed_results, task_name):
             task_data["shot_image_spacings"][shot_id] = result["image_spacing"]
             task_data["shot_image_origins"][shot_id] = result["image_origin"]
             task_data["shot_image_directions"][shot_id] = result["image_direction"]
+            task_data["shot_patch_spacings"][shot_id] = result["patch_spacing"]
+            task_data["shot_patch_sizes"][shot_id] = result["patch_size"]
             task_data["shot_label_spacings"][shot_id] = result["label_spacing"]
             task_data["shot_label_sizes"][shot_id] = result["label_size"]
             task_data["shot_label_origins"][shot_id] = result["label_origin"]
@@ -1020,6 +1041,8 @@ def extract_embeddings_and_labels(processed_results, task_name):
             task_data["cases_image_sizes"][case_id] = result["image_size"]
             task_data["cases_image_origins"][case_id] = result["image_origin"]
             task_data["cases_image_directions"][case_id] = result["image_direction"]
+            task_data["cases_patch_sizes"][case_id] = result["patch_size"]
+            task_data["cases_patch_spacings"][case_id] = result["patch_spacing"]
             task_data["cases_label_spacings"][case_id] = result["label_spacing"]
             task_data["cases_label_sizes"][case_id] = result["label_size"]
             task_data["cases_label_origins"][case_id] = result["label_origin"]

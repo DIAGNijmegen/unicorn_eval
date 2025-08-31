@@ -480,6 +480,7 @@ def write_combined_metrics(
         [metric_value for _, metric_value in metrics["normalized_metrics"].items()]
     )
 
+    print(f"{metrics=}")
     write_json_file(
         location=OUTPUT_DIRECTORY / "metrics.json",
         content=metrics,
@@ -688,8 +689,14 @@ def main():
             print(f"Using adaptor: {adaptor_name}")
             return_probabilities = REQUIRES_PROBABILITIES_DICT[task_name]
 
-            patch_size = task_results["patch_size"]
-            patch_spacing = task_results["patch_spacing"]
+            # Check if all cases have the same patch size and spacing
+            all_patch_sizes = list(task_results["shot_patch_sizes"].values()) + list(task_results["cases_patch_sizes"].values())
+            all_patch_spacings = list(task_results["shot_patch_spacings"].values()) + list(task_results["cases_patch_spacings"].values())
+
+            # Set global values if all are the same, otherwise None
+            global_patch_size = all_patch_sizes[0] if all_patch_sizes and all(ps == all_patch_sizes[0] for ps in all_patch_sizes) else None
+            global_patch_spacing = all_patch_spacings[0] if all_patch_spacings and all(ps == all_patch_spacings[0] for ps in all_patch_spacings) else None
+
             feature_grid_resolution = task_results["feature_grid_resolution"]
 
             shot_embeddings = task_results["shot_embeddings"]
@@ -700,6 +707,7 @@ def main():
             shot_image_spacings = task_results["shot_image_spacings"]
             shot_image_origins = task_results["shot_image_origins"]
             shot_image_directions = task_results["shot_image_directions"]
+            shot_patch_sizes = task_results["shot_patch_sizes"]
             shot_patch_spacings = task_results["shot_patch_spacings"]
             shot_label_spacings = task_results["shot_label_spacings"]
             shot_label_origins = task_results["shot_label_origins"]
@@ -711,6 +719,7 @@ def main():
             case_image_spacings = task_results["cases_image_spacings"]
             case_image_origins = task_results["cases_image_origins"]
             case_image_directions = task_results["cases_image_directions"]
+            case_patch_sizes = task_results["cases_patch_sizes"]
             case_patch_spacings = task_results["cases_patch_spacings"]
             case_label_sizes = task_results["cases_label_sizes"]
             case_label_spacings = task_results["cases_label_spacings"]
@@ -734,8 +743,10 @@ def main():
                 shot_coordinates=task_results["shot_coordinates"],
                 test_coordinates=task_results["cases_coordinates"],
                 test_names=case_ids,
-                patch_size=patch_size,
-                patch_spacing=patch_spacing,
+                global_patch_size=global_patch_size,
+                global_patch_spacing=global_patch_spacing,
+                shot_patch_sizes=shot_patch_sizes,
+                test_patch_sizes=case_patch_sizes,
                 shot_patch_spacings=shot_patch_spacings,
                 test_patch_spacings=case_patch_spacings,
                 feature_grid_resolution=feature_grid_resolution,
@@ -762,9 +773,9 @@ def main():
             del (
                 shot_embeddings, case_embeddings, shot_labels, shot_extra_labels,
                 shot_ids, shot_image_sizes, shot_image_spacings, shot_image_origins,
-                shot_image_directions, shot_patch_spacings, shot_label_spacings, shot_label_origins,
+                shot_image_directions, shot_patch_sizes, shot_patch_spacings, shot_label_spacings, shot_label_origins,
                 shot_label_directions, case_image_sizes, case_image_spacings,
-                case_image_origins, case_image_directions, case_patch_spacings, case_label_sizes,
+                case_image_origins, case_image_directions, case_patch_sizes, case_patch_spacings, case_label_sizes,
                 case_label_spacings, case_label_origins, case_label_directions
             )
             gc.collect()
