@@ -150,7 +150,7 @@ class LinearUpsampleConv3D_V2(SegmentationUpsampling3D):
             embeddings=self.shot_features,
             case_names=self.shot_names,
             patch_size=self.patch_size,
-            patch_spacing=self.patch_spacing,
+            patch_spacing=[1.0, 1.0, 1.0],  # dummy, not used
             labels=self.shot_labels,
         )
 
@@ -186,12 +186,16 @@ class LinearUpsampleConv3D_V2(SegmentationUpsampling3D):
             embeddings=self.test_features,
             case_names=self.test_cases,
             patch_size=self.patch_size,
-            patch_spacing=self.patch_spacing,
+            patch_spacing=[1.0, 1.0, 1.0],  # dummy, not used
             image_sizes=self.test_image_sizes,
             image_origins=self.test_image_origins,
             image_spacings=self.test_image_spacings,
             image_directions=self.test_image_directions,
         )
+
+        # wrong patch spacing
+        for data in test_data:
+            data['patch_spacing'] = data['image_spacing'][0]
 
         test_loader = load_patch_data(test_data, batch_size=1)
 

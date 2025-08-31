@@ -393,7 +393,7 @@ def adapt_features(
             test_label_origins=test_label_origins,
             test_label_directions=test_label_directions,
             patch_size=patch_size,
-            patch_spacing=patch_spacing,
+            patch_spacing=None,
             shot_image_sizes=shot_image_sizes,
             shot_image_spacing=shot_image_spacing,
             shot_image_origins=shot_image_origins,
@@ -420,7 +420,7 @@ def adapt_features(
             test_label_origins=test_label_origins,
             test_label_directions=test_label_directions,
             patch_size=patch_size,
-            patch_spacing=patch_spacing,
+            patch_spacing=None,
             shot_image_sizes=shot_image_sizes,
             shot_image_spacing=shot_image_spacing,
             shot_image_origins=shot_image_origins,
@@ -538,7 +538,7 @@ def adapt_features(
             test_label_origins=test_label_origins,
             test_label_directions=test_label_directions,
             patch_size=patch_size,
-            patch_spacing=patch_spacing,
+            patch_spacing=None,
             return_binary=False,
         )
 
@@ -567,7 +567,7 @@ def adapt_features(
             test_label_origins=test_label_origins,
             test_label_directions=test_label_directions,
             patch_size=patch_size,
-            patch_spacing=patch_spacing,
+            patch_spacing=None,
             return_binary=False,
             decoder_cls=ConvUpsampleSegAdaptor,
         )
