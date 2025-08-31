@@ -164,8 +164,12 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
         test_label_spacing,
         test_label_origins,
         test_label_directions,
-        patch_size,
-        patch_spacing,
+        global_patch_size,
+        global_patch_spacing,
+        shot_patch_sizes=None,
+        test_patch_sizes=None,
+        shot_patch_spacings=None,
+        test_patch_spacings=None,
         return_binary=True,
         balance_bg=False,
     ):
@@ -181,8 +185,8 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
                 image_spacing=shot_image_spacing[shot_names[idx]],
                 image_direction=shot_image_directions[shot_names[idx]],
                 start_coordinates=shot_coordinates[idx],
-                patch_size=patch_size,
-                patch_spacing=patch_spacing,
+                patch_size=global_patch_size,
+                patch_spacing=global_patch_spacing,
             )
             label_patch_features.append(label_feats)
         label_patch_features = np.array(label_patch_features, dtype=object)
@@ -209,8 +213,12 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
         self.test_label_spacing = test_label_spacing
         self.test_label_origins = test_label_origins
         self.test_label_directions = test_label_directions
-        self.patch_size = patch_size
-        self.patch_spacing = patch_spacing
+        self.shot_patch_sizes = shot_patch_sizes
+        self.test_patch_sizes = test_patch_sizes
+        self.shot_patch_spacings = shot_patch_spacings
+        self.test_patch_spacings = test_patch_spacings
+        self.global_patch_size = global_patch_size
+        self.global_patch_spacing = global_patch_spacing
         self.decoder = None
         self.return_binary = return_binary
         self.balance_bg = balance_bg
@@ -221,14 +229,14 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
             coordinates=self.shot_coordinates,
             embeddings=self.shot_features,
             case_names=self.shot_names,
-            patch_size=self.patch_size,
-            patch_spacing=self.patch_spacing,
+            patch_size=self.global_patch_size,
+            patch_spacing=self.global_patch_spacing,
             labels=self.shot_labels,
         )
 
         train_loader = load_patch_data(train_data, batch_size=10, balance_bg=self.balance_bg)
         latent_dim = len(self.shot_features[0][0])
-        target_patch_size = tuple(int(j / 16) for j in self.patch_size)
+        target_patch_size = tuple(int(j / 16) for j in self.global_patch_size)
         target_shape = (
             latent_dim,
             target_patch_size[2],
@@ -261,8 +269,8 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
             coordinates=self.test_coordinates,
             embeddings=self.test_features,
             case_names=self.test_cases,
-            patch_size=self.patch_size,
-            patch_spacing=self.patch_spacing,
+            patch_size=self.global_patch_size,
+            patch_spacing=self.global_patch_spacing,
             image_sizes=self.test_image_sizes,
             image_origins=self.test_image_origins,
             image_spacings=self.test_image_spacings,

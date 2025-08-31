@@ -149,7 +149,7 @@ class LinearUpsampleConv3D_V2(SegmentationUpsampling3D):
             coordinates=self.shot_coordinates,
             embeddings=self.shot_features,
             case_names=self.shot_names,
-            patch_size=self.patch_size,
+            patch_size=self.global_patch_size,
             patch_spacing=[1.0, 1.0, 1.0],  # dummy, not used
             labels=self.shot_labels,
         )
@@ -171,7 +171,7 @@ class LinearUpsampleConv3D_V2(SegmentationUpsampling3D):
         # set up device and model
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         decoder = self.decoder_cls(
-            target_shape=self.patch_size[::-1],  # (D, H, W)
+            target_shape=self.global_patch_size[::-1],  # (D, H, W)
             num_classes=num_classes,
         )
 
@@ -185,7 +185,7 @@ class LinearUpsampleConv3D_V2(SegmentationUpsampling3D):
             coordinates=self.test_coordinates,
             embeddings=self.test_features,
             case_names=self.test_cases,
-            patch_size=self.patch_size,
+            patch_size=self.global_patch_size,
             patch_spacing=[1.0, 1.0, 1.0],  # dummy, not used
             image_sizes=self.test_image_sizes,
             image_origins=self.test_image_origins,

@@ -73,8 +73,12 @@ class LinearUpsampleConv3D_V1(PatchLevelTaskAdaptor):
         test_label_spacing,
         test_label_origins,
         test_label_directions,
-        patch_size,
-        patch_spacing,
+        global_patch_size,
+        global_patch_spacing,
+        shot_patch_sizes=None,
+        test_patch_sizes=None,
+        shot_patch_spacings=None,
+        test_patch_spacings=None,
         return_binary=True,
     ):
         label_patch_features = []
@@ -88,7 +92,7 @@ class LinearUpsampleConv3D_V1(PatchLevelTaskAdaptor):
                 image_origin=shot_image_origins[shot_names[idx]],
                 image_spacing=shot_image_spacing[shot_names[idx]],
                 image_direction=shot_image_directions[shot_names[idx]],
-                patch_size=patch_size,
+                patch_size=global_patch_size,
             )
             label_patch_features.append(label_feats)
         label_patch_features = np.array(label_patch_features, dtype=object)
@@ -115,8 +119,8 @@ class LinearUpsampleConv3D_V1(PatchLevelTaskAdaptor):
         self.test_label_spacing = test_label_spacing
         self.test_label_origins = test_label_origins
         self.test_label_directions = test_label_directions
-        self.patch_size = patch_size
-        self.patch_spacing = patch_spacing
+        self.patch_size = global_patch_size
+        self.patch_spacing = global_patch_spacing
         self.decoder = None
         self.return_binary = return_binary
 

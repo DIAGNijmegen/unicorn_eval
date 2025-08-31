@@ -65,15 +65,15 @@ class SegmentationUpsampling3D_V2(SegmentationUpsampling3D):
             coordinates=self.shot_coordinates,
             embeddings=self.shot_features,
             case_names=self.shot_names,
-            patch_size=self.patch_size,
-            patch_spacing=self.patch_spacing,
+            patch_size=self.global_patch_size,
+            patch_spacing=self.global_patch_spacing,
             labels=self.shot_labels,
         )
 
         train_loader = load_patch_data(train_data, batch_size=2, balance_bg=self.balance_bg)
         latent_dim = len(self.shot_features[0][0])
         blocks_up = (1, 1, 1, 1)  # number of upsampling blocks, each upsampling by factor 2
-        target_patch_size = tuple(int(j / 2 ** len(blocks_up)) for j in self.patch_size)
+        target_patch_size = tuple(int(j / 2 ** len(blocks_up)) for j in self.global_patch_size)
         latent_dim_reduce_factor = (np.prod(target_patch_size) * 16)
         target_shape = (
             latent_dim // latent_dim_reduce_factor,
@@ -113,8 +113,8 @@ class SegmentationUpsampling3D_V2(SegmentationUpsampling3D):
             coordinates=self.test_coordinates,
             embeddings=self.test_features,
             case_names=self.test_cases,
-            patch_size=self.patch_size,
-            patch_spacing=self.patch_spacing,
+            patch_size=self.global_patch_size,
+            patch_spacing=self.global_patch_spacing,
             image_sizes=self.test_image_sizes,
             image_origins=self.test_image_origins,
             image_spacings=self.test_image_spacings,
@@ -153,8 +153,8 @@ class UnicornLinearUpsampleConv3D_V1(LinearUpsampleConv3D_V2):
             coordinates=self.shot_coordinates,
             embeddings=self.shot_features,
             case_names=self.shot_names,
-            patch_size=self.patch_size,
-            patch_spacing=self.patch_spacing,
+            patch_size=self.global_patch_size,
+            patch_spacing=self.global_patch_spacing,
             labels=self.shot_labels,
         )
 
@@ -175,7 +175,7 @@ class UnicornLinearUpsampleConv3D_V1(LinearUpsampleConv3D_V2):
         # set up device and model
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         decoder = self.decoder_cls(
-            target_shape=self.patch_size[::-1],  # (D, H, W)
+            target_shape=self.global_patch_size[::-1],  # (D, H, W)
             num_classes=num_classes,
         )
 

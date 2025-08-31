@@ -380,12 +380,16 @@ def adapt_features(
             test_label_spacing=test_label_spacing,
             test_label_origins=test_label_origins,
             test_label_directions=test_label_directions,
-            patch_size=global_patch_size,
-            patch_spacing=global_patch_spacing,
+            global_patch_size=global_patch_size,
+            global_patch_spacing=global_patch_spacing,
             shot_image_sizes=shot_image_sizes,
             shot_image_spacing=shot_image_spacing,
             shot_image_origins=shot_image_origins,
             shot_image_directions=shot_image_directions,
+            shot_patch_sizes=shot_patch_sizes,
+            test_patch_sizes=test_patch_sizes,
+            shot_patch_spacings=shot_patch_spacings,
+            test_patch_spacings=test_patch_spacings,
         )
     elif adaptor_name == "linear-upsample-conv3d-v2":
         adaptor = LinearUpsampleConv3D_V2(
@@ -407,12 +411,16 @@ def adapt_features(
             test_label_spacing=test_label_spacing,
             test_label_origins=test_label_origins,
             test_label_directions=test_label_directions,
-            patch_size=global_patch_size,
-            patch_spacing=None,
+            global_patch_size=global_patch_size,
+            global_patch_spacing=None,
             shot_image_sizes=shot_image_sizes,
             shot_image_spacing=shot_image_spacing,
             shot_image_origins=shot_image_origins,
             shot_image_directions=shot_image_directions,
+            shot_patch_sizes=shot_patch_sizes,
+            test_patch_sizes=test_patch_sizes,
+            shot_patch_spacings=shot_patch_spacings,
+            test_patch_spacings=test_patch_spacings,
         )
     elif adaptor_name == "conv3d-linear-upsample":
         adaptor = LinearUpsampleConv3D_V2(
@@ -434,12 +442,16 @@ def adapt_features(
             test_label_spacing=test_label_spacing,
             test_label_origins=test_label_origins,
             test_label_directions=test_label_directions,
-            patch_size=global_patch_size,
-            patch_spacing=None,
+            global_patch_size=global_patch_size,
+            global_patch_spacing=None,
             shot_image_sizes=shot_image_sizes,
             shot_image_spacing=shot_image_spacing,
             shot_image_origins=shot_image_origins,
             shot_image_directions=shot_image_directions,
+            shot_patch_sizes=shot_patch_sizes,
+            test_patch_sizes=test_patch_sizes,
+            shot_patch_spacings=shot_patch_spacings,
+            test_patch_spacings=test_patch_spacings,
             decoder_cls=ConvUpsampleSegAdaptor,
         )
 
@@ -463,12 +475,16 @@ def adapt_features(
             test_label_spacing=test_label_spacing,
             test_label_origins=test_label_origins,
             test_label_directions=test_label_directions,
-            patch_size=global_patch_size,
-            patch_spacing=global_patch_spacing,
+            global_patch_size=global_patch_size,
+            global_patch_spacing=global_patch_spacing,
             shot_image_sizes=shot_image_sizes,
             shot_image_spacing=shot_image_spacing,
             shot_image_origins=shot_image_origins,
             shot_image_directions=shot_image_directions,
+            shot_patch_sizes=shot_patch_sizes,
+            test_patch_sizes=test_patch_sizes,
+            shot_patch_spacings=shot_patch_spacings,
+            test_patch_spacings=test_patch_spacings,
         )
 
     elif adaptor_name == "segmentation-upsampling-3d-v2":
@@ -491,12 +507,16 @@ def adapt_features(
             test_label_spacing=test_label_spacing,
             test_label_origins=test_label_origins,
             test_label_directions=test_label_directions,
-            patch_size=global_patch_size,
-            patch_spacing=global_patch_spacing,
+            global_patch_size=global_patch_size,
+            global_patch_spacing=global_patch_spacing,
             shot_image_sizes=shot_image_sizes,
             shot_image_spacing=shot_image_spacing,
             shot_image_origins=shot_image_origins,
             shot_image_directions=shot_image_directions,
+            shot_patch_sizes=shot_patch_sizes,
+            test_patch_sizes=test_patch_sizes,
+            shot_patch_spacings=shot_patch_spacings,
+            test_patch_spacings=test_patch_spacings,
         )
 
     elif adaptor_name == "conv-segmentation-3d":
@@ -519,13 +539,17 @@ def adapt_features(
             test_label_spacing=test_label_spacing,
             test_label_origins=test_label_origins,
             test_label_directions=test_label_directions,
-            patch_size=global_patch_size,
-            patch_spacing=global_patch_spacing,
+            global_patch_size=global_patch_size,
+            global_patch_spacing=global_patch_spacing,
             feature_grid_resolution=feature_grid_resolution,
             shot_image_sizes=shot_image_sizes,
             shot_image_spacing=shot_image_spacing,
             shot_image_origins=shot_image_origins,
             shot_image_directions=shot_image_directions,
+            shot_patch_sizes=shot_patch_sizes,
+            test_patch_sizes=test_patch_sizes,
+            shot_patch_spacings=shot_patch_spacings,
+            test_patch_spacings=test_patch_spacings,
         )
 
     elif adaptor_name == "detection-by-linear-upsample-conv3d":
@@ -552,8 +576,12 @@ def adapt_features(
             test_label_spacing=test_label_spacing,
             test_label_origins=test_label_origins,
             test_label_directions=test_label_directions,
-            patch_size=global_patch_size,
-            patch_spacing=None,
+            global_patch_size=global_patch_size,
+            global_patch_spacing=None,
+            shot_patch_sizes=shot_patch_sizes,
+            test_patch_sizes=test_patch_sizes,
+            shot_patch_spacings=shot_patch_spacings,
+            test_patch_spacings=test_patch_spacings,
             return_binary=False,
         )
 
@@ -581,8 +609,12 @@ def adapt_features(
             test_label_spacing=test_label_spacing,
             test_label_origins=test_label_origins,
             test_label_directions=test_label_directions,
-            patch_size=global_patch_size,
-            patch_spacing=None,
+            global_patch_size=global_patch_size,
+            global_patch_spacing=None,
+            shot_patch_sizes=shot_patch_sizes,
+            test_patch_sizes=test_patch_sizes,
+            shot_patch_spacings=shot_patch_spacings,
+            test_patch_spacings=test_patch_spacings,
             return_binary=False,
             decoder_cls=ConvUpsampleSegAdaptor,
         )
@@ -611,8 +643,12 @@ def adapt_features(
             test_label_spacing=test_label_spacing,
             test_label_origins=test_label_origins,
             test_label_directions=test_label_directions,
-            patch_size=global_patch_size,
-            patch_spacing=global_patch_spacing,
+            global_patch_size=global_patch_size,
+            global_patch_spacing=global_patch_spacing,
+            shot_patch_sizes=shot_patch_sizes,
+            test_patch_sizes=test_patch_sizes,
+            shot_patch_spacings=shot_patch_spacings,
+            test_patch_spacings=test_patch_spacings,
             return_binary=False,
         )
 
@@ -640,8 +676,12 @@ def adapt_features(
             test_label_spacing=test_label_spacing,
             test_label_origins=test_label_origins,
             test_label_directions=test_label_directions,
-            patch_size=global_patch_size,
-            patch_spacing=global_patch_spacing,
+            global_patch_size=global_patch_size,
+            global_patch_spacing=global_patch_spacing,
+            shot_patch_sizes=shot_patch_sizes,
+            test_patch_sizes=test_patch_sizes,
+            shot_patch_spacings=shot_patch_spacings,
+            test_patch_spacings=test_patch_spacings,
             return_binary=False,
         )
 
@@ -672,6 +712,10 @@ def adapt_features(
             patch_size=global_patch_size,
             patch_spacing=global_patch_spacing,
             feature_grid_resolution=feature_grid_resolution,
+            shot_patch_sizes=shot_patch_sizes,
+            test_patch_sizes=test_patch_sizes,
+            shot_patch_spacings=shot_patch_spacings,
+            test_patch_spacings=test_patch_spacings,
             return_binary=False,
         )
 
