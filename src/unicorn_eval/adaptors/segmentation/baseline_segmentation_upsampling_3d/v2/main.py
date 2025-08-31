@@ -105,10 +105,10 @@ class SegmentationUpsampling3D_V2(PatchLevelTaskAdaptor):
         test_label_directions,
         global_patch_size,
         global_patch_spacing,
-        shot_patch_sizes=None,
-        test_patch_sizes=None,
-        shot_patch_spacings=None,
-        test_patch_spacings=None,
+        shot_patch_sizes,
+        test_patch_sizes,
+        shot_patch_spacings,
+        test_patch_spacings,
         return_binary=True,
         balance_bg=True,
     ):
@@ -155,6 +155,10 @@ class SegmentationUpsampling3D_V2(PatchLevelTaskAdaptor):
         self.test_label_directions = test_label_directions
         self.patch_size = global_patch_size
         self.patch_spacing = global_patch_spacing
+        self.shot_patch_sizes = shot_patch_sizes
+        self.shot_patch_spacings = shot_patch_spacings
+        self.test_patch_sizes = test_patch_sizes
+        self.test_patch_spacings = test_patch_spacings
         self.decoder = None
         self.return_binary = return_binary
         self.balance_bg = balance_bg
