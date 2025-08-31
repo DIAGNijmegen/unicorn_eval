@@ -282,14 +282,14 @@ def process(job):
                     image_direction = curr_image_direction
                     first = False
                 else:
-                    assert np.all(coordinates == curr_coordinates), "Coordinates do not match between images"
-                    assert np.all(spacing == curr_spacing), "Spacing does not match between images"
-                    assert np.all(patch_size == curr_patch_size), "Patch size does not match between images"
-                    assert np.all(patch_spacing == curr_patch_spacing), "Patch spacing does not match between images"
-                    assert np.all(image_size == curr_image_size), "Image size does not match between images"
-                    assert np.all(image_spacing == curr_image_spacing), "Image spacing does not match between images"
-                    assert np.all(image_origin == curr_image_origin), "Image origin does not match between images"
-                    assert np.all(image_direction == curr_image_direction), "Image direction does not match between images"
+                    assert np.all(coordinates == curr_coordinates), "Coordinates do not match between images of the same case"
+                    assert np.all(spacing == curr_spacing), "Spacing does not match between images of the same case"
+                    assert np.all(patch_size == curr_patch_size), "Patch size does not match between images of the same case"
+                    assert np.all(patch_spacing == curr_patch_spacing), "Patch spacing does not match between images of the same case"
+                    assert np.all(image_size == curr_image_size), "Image size does not match between images of the same case"
+                    assert np.all(image_spacing == curr_image_spacing), "Image spacing does not match between images of the same case"
+                    assert np.all(image_origin == curr_image_origin), "Image origin does not match between images of the same case"
+                    assert np.all(image_direction == curr_image_direction), "Image direction does not match between images of the same case"
             embeddings = np.concatenate(features)
 
     elif modality == "vision-language":
@@ -700,6 +700,7 @@ def main():
             shot_image_spacings = task_results["shot_image_spacings"]
             shot_image_origins = task_results["shot_image_origins"]
             shot_image_directions = task_results["shot_image_directions"]
+            shot_patch_spacings = task_results["shot_patch_spacings"]
             shot_label_spacings = task_results["shot_label_spacings"]
             shot_label_origins = task_results["shot_label_origins"]
             shot_label_directions = task_results["shot_label_directions"]
@@ -710,6 +711,7 @@ def main():
             case_image_spacings = task_results["cases_image_spacings"]
             case_image_origins = task_results["cases_image_origins"]
             case_image_directions = task_results["cases_image_directions"]
+            case_patch_spacings = task_results["cases_patch_spacings"]
             case_label_sizes = task_results["cases_label_sizes"]
             case_label_spacings = task_results["cases_label_spacings"]
             case_label_origins = task_results["cases_label_origins"]
@@ -734,6 +736,8 @@ def main():
                 test_names=case_ids,
                 patch_size=patch_size,
                 patch_spacing=patch_spacing,
+                shot_patch_spacings=shot_patch_spacings,
+                test_patch_spacings=case_patch_spacings,
                 feature_grid_resolution=feature_grid_resolution,
                 test_image_sizes=case_image_sizes,
                 shot_extra_labels=shot_extra_labels,
@@ -758,9 +762,9 @@ def main():
             del (
                 shot_embeddings, case_embeddings, shot_labels, shot_extra_labels,
                 shot_ids, shot_image_sizes, shot_image_spacings, shot_image_origins,
-                shot_image_directions, shot_label_spacings, shot_label_origins,
+                shot_image_directions, shot_patch_spacings, shot_label_spacings, shot_label_origins,
                 shot_label_directions, case_image_sizes, case_image_spacings,
-                case_image_origins, case_image_directions, case_label_sizes,
+                case_image_origins, case_image_directions, case_patch_spacings, case_label_sizes,
                 case_label_spacings, case_label_origins, case_label_directions
             )
             gc.collect()

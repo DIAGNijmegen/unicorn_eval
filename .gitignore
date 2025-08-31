@@ -183,3 +183,4 @@ models/**/*.bin
 /tests/vision/input
 tests/test_data_handling/*.pkl
 tests/test_data_handling/*.nii.gz
+tests/output/*
