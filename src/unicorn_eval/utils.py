@@ -996,9 +996,8 @@ def extract_embeddings_and_labels(processed_results, task_name):
         "task_type": None,
         "modality": None,
         "domain": None,
-        "spacing": None,
-        "patch_size": None,
-        "patch_spacing": None,
+        "global_patch_size": None,
+        "global_patch_spacing": None,
         "feature_grid_resolution": None,
         "prediction": [],
         "shot_embeddings": [],
@@ -1051,10 +1050,16 @@ def extract_embeddings_and_labels(processed_results, task_name):
             task_data["task_type"] = result["task_type"]
             task_data["modality"] = result["modality"]
             task_data["domain"] = result["domain"]
-            task_data["spacing"] = result["spacing"]
-            task_data["patch_size"] = result["patch_size"]
-            task_data["patch_spacing"] = result["patch_spacing"]
             task_data["feature_grid_resolution"] = result["feature_grid_resolution"]
+
+            # Check if all cases have the same patch size and spacing
+            all_patch_sizes = [result["patch_size"] for result in processed_results]
+            all_patch_spacings = [result["patch_spacing"] for result in processed_results]
+
+            # Set global values if all are the same, otherwise None
+            task_data["global_patch_size"] = all_patch_sizes[0] if all_patch_sizes and all(ps == all_patch_sizes[0] for ps in all_patch_sizes) else None
+            task_data["global_patch_spacing"] = all_patch_spacings[0] if all_patch_spacings and all(ps == all_patch_spacings[0] for ps in all_patch_spacings) else None
+
 
         if result["split"] == "shot":
             task_data["shot_embeddings"].append(result["embeddings"])

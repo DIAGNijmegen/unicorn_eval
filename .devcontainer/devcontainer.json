@@ -6,7 +6,7 @@
 		// Sets the run context to one level up instead of the .devcontainer folder.
 		"context": "..",
 		// Update the 'dockerFile' property if you aren't using the standard 'Dockerfile' filename.
-		"dockerfile": "../Dockerfile.lightweight"
+		"dockerfile": "../Dockerfile.dev"
 	},
 
 	// Mount the same volumes as do_test_run.sh
@@ -15,6 +15,9 @@
 		"source=${localWorkspaceFolder}/tests/vision/ground_truth,target=/opt/ml/input/data/ground_truth,type=bind,consistency=cached,readonly",
 		"source=${localWorkspaceFolder}/tests/output,target=/output,type=bind,consistency=cached"
 	],
+
+  "postCreateCommand": "pip install --editable .",
+  "remoteUser": "user"
 
 	// Features to add to the dev container. More info: https://containers.dev/features.
 	// "features": {},

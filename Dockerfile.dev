@@ -1,0 +1,4 @@
+FROM waticlems/unicorn_eval:latest
+
+# keep the base image clean, don’t pre-install local code
+WORKDIR /workspace

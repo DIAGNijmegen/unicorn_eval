@@ -689,13 +689,9 @@ def main():
             print(f"Using adaptor: {adaptor_name}")
             return_probabilities = REQUIRES_PROBABILITIES_DICT[task_name]
 
-            # Check if all cases have the same patch size and spacing
-            all_patch_sizes = list(task_results["shot_patch_sizes"].values()) + list(task_results["cases_patch_sizes"].values())
-            all_patch_spacings = list(task_results["shot_patch_spacings"].values()) + list(task_results["cases_patch_spacings"].values())
-
             # Set global values if all are the same, otherwise None
-            global_patch_size = all_patch_sizes[0] if all_patch_sizes and all(ps == all_patch_sizes[0] for ps in all_patch_sizes) else None
-            global_patch_spacing = all_patch_spacings[0] if all_patch_spacings and all(ps == all_patch_spacings[0] for ps in all_patch_spacings) else None
+            global_patch_size = task_results["global_patch_size"]
+            global_patch_spacing = task_results["global_patch_spacing"]
 
             feature_grid_resolution = task_results["feature_grid_resolution"]
 
