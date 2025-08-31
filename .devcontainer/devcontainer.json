@@ -17,8 +17,21 @@
 	],
 
   "postCreateCommand": "pip install --editable .",
-  "remoteUser": "user"
+	"remoteUser": "user",
 
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.isort",
+        "KorbinianEckstein.niivue",
+		"ryu1kn.partial-diff"
+      ],
+      "settings": {
+        "editor.formatOnSave": true
+      }
+    }
+  }
 	// Features to add to the dev container. More info: https://containers.dev/features.
 	// "features": {},
 

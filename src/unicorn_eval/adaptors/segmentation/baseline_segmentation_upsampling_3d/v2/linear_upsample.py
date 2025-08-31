@@ -65,8 +65,8 @@ class SegmentationUpsampling3D_V2(SegmentationUpsampling3D):
             coordinates=self.shot_coordinates,
             embeddings=self.shot_features,
             case_names=self.shot_names,
-            patch_size=self.global_patch_size,  # TODO: check if this is valid with global value
-            patch_spacing=self.global_patch_spacing,  # TODO: check if this is valid with global value
+            patch_sizes=self.shot_patch_sizes,
+            patch_spacings=self.shot_patch_spacings,
             labels=self.shot_labels,
         )
 
@@ -113,8 +113,8 @@ class SegmentationUpsampling3D_V2(SegmentationUpsampling3D):
             coordinates=self.test_coordinates,
             embeddings=self.test_features,
             case_names=self.test_cases,
-            patch_size=self.global_patch_size,  # TODO: check if this is valid with global value
-            patch_spacing=self.global_patch_spacing,  # TODO: check if this is valid with global value
+            patch_sizes=self.test_patch_sizes,
+            patch_spacings=self.test_patch_spacings,
             image_sizes=self.test_image_sizes,
             image_origins=self.test_image_origins,
             image_spacings=self.test_image_spacings,

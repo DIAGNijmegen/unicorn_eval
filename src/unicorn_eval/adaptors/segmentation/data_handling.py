@@ -162,8 +162,8 @@ def construct_data_with_labels(
             data_dict = {
                 "patch": np.array(patch_img, dtype=np.float32),
                 "coordinates": patch_coordinates[i],
-                "patch_size": patch_size,
-                "patch_spacing": patch_spacing,
+                "patch_size": patch_sizes[case_name],
+                "patch_spacing": patch_spacings[case_name],
                 "case_number": case_idx,
             }
             if lbl_feat is not None:
