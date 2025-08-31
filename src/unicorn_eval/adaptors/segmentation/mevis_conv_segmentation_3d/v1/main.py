@@ -66,7 +66,6 @@ class ConvSegmentation3D(SegmentationUpsampling3D):
         # First three components are the original patchsize, next three are the resolution within the patch
         # If no feature grid resolution is given, use (1, 1, 1) to be compatible with sparse models
         self.pack_size = feature_grid_resolution if feature_grid_resolution is not None else (1, 1, 1)
-        self.patch_size = self.global_patch_size[:3]  # TODO: check if this is valid with global value
 
     @staticmethod
     def instances_from_mask(multiclass_mask: np.ndarray, divider_class: int, divided_class: int, sitk_mask):
@@ -160,7 +159,7 @@ class ConvSegmentation3D(SegmentationUpsampling3D):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         decoder = ConvDecoder3D(
             num_classes=self.num_classes,
-            patch_size=self.patch_size,
+            patch_size=self.global_patch_size,
             target_shape=target_shape,
         )
 

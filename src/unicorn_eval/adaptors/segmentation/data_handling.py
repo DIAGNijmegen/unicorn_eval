@@ -121,13 +121,13 @@ def construct_data_with_labels(
     coordinates: list[np.ndarray],
     embeddings: list[np.ndarray],
     case_names: list[str],
-    patch_size: list[int],
-    patch_spacing: list[float],
-    labels=None,
-    image_sizes=None,
-    image_origins=None,
-    image_spacings=None,
-    image_directions=None,
+    patch_sizes: dict[str, list[int]],
+    patch_spacings: dict[str, list[float]],
+    labels: np.ndarray | None = None,  # contains dict[str, any]
+    image_sizes: dict[str, list[int]] | None = None,
+    image_origins: dict[str, list[float]] | None = None,
+    image_spacings: dict[str, list[float]] | None = None,
+    image_directions: dict[str, list[float]] | None = None,
     label_mapper: Callable | None = None,
 ):
     data_array = []
@@ -184,15 +184,10 @@ def construct_data_with_labels(
                 and (image_spacings is not None)
                 and (image_directions is not None)
             ):
-                image_size = image_sizes[case_name]
-                image_origin = image_origins[case_name]
-                image_spacing = image_spacings[case_name]
-                image_direction = image_directions[case_name]
-
-                data_dict["image_size"] = image_size
-                data_dict["image_origin"] = (image_origin,)
-                data_dict["image_spacing"] = (image_spacing,)
-                data_dict["image_direction"] = image_direction
+                data_dict["image_size"] = image_sizes[case_name]
+                data_dict["image_origin"] = (image_origins[case_name],)  # TODO: why is this in a tuple??
+                data_dict["image_spacing"] = (image_spacings[case_name],)  # TODO: why is this in a tuple??
+                data_dict["image_direction"] = image_directions[case_name]
 
             data_array.append(data_dict)
 
