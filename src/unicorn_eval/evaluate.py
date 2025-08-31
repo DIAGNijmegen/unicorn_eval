@@ -387,9 +387,9 @@ def read_adaptors():
     return adaptors
 
 
-def read_predictions():
+def read_predictions(input_dir: Path = INPUT_DIRECTORY):
     # the prediction file tells us the location of the users' predictions
-    with open(INPUT_DIRECTORY / "predictions.json") as f:
+    with open(input_dir / "predictions.json") as f:
         return json.loads(f.read())
 
 
@@ -591,12 +591,12 @@ def evaluate_language_predictions():
         return {}
 
 
-def group_predictions_by_task(predictions):
+def group_predictions_by_task(predictions, gt_dir: Path = GROUNDTRUTH_DIRECTORY):
     """Group predictions by task to process them independently and save memory."""
     predictions_by_task = defaultdict(list)
 
     # we need to look at the mapping.csv to determine which task each prediction belongs to
-    mapping_path = GROUNDTRUTH_DIRECTORY / "mapping.csv"
+    mapping_path = gt_dir / "mapping.csv"
     try:
         mapping = pd.read_csv(mapping_path, dtype={"case_id": str})  # ensure case_id is string to enable leading zeros
     except FileNotFoundError:
@@ -638,7 +638,7 @@ def main():
     print("Input folder contents:")
     print_directory_contents(INPUT_DIRECTORY)
     print("=+=" * 10)
-    print("Grountruth folder contents:")
+    print("Groundtruth folder contents:")
     print_directory_contents(GROUNDTRUTH_DIRECTORY)
     print("=+=" * 10)
 
