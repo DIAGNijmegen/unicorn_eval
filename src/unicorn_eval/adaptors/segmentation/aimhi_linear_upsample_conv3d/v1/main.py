@@ -256,8 +256,8 @@ def seg_inference3d(decoder, data_loader, device, return_binary,  test_cases, te
             else:
                 pred_mask = probs[:, :1:2]
 
-            batch["image_origin"] = batch["image_origin"][0]
-            batch["image_spacing"] = batch["image_spacing"][0]
+            batch["image_origin"] = batch["image_origin"]
+            batch["image_spacing"] = batch["image_spacing"]
             for i in range(len(image_idxs)):
                 image_id = int(image_idxs[i])
                 coord = tuple(

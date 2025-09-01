@@ -185,8 +185,8 @@ def construct_data_with_labels(
                 and (image_directions is not None)
             ):
                 data_dict["image_size"] = image_sizes[case_name]
-                data_dict["image_origin"] = (image_origins[case_name],)  # TODO: why is this in a tuple??
-                data_dict["image_spacing"] = (image_spacings[case_name],)  # TODO: why is this in a tuple??
+                data_dict["image_origin"] = image_origins[case_name]
+                data_dict["image_spacing"] = image_spacings[case_name]
                 data_dict["image_direction"] = image_directions[case_name]
 
             data_array.append(data_dict)

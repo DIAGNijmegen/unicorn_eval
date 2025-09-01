@@ -283,8 +283,8 @@ def inference3d_softmax(*, decoder, data_loader, device, return_binary, test_cas
             else:
                 pred_mask = probs[:, 1:]
 
-            batch["image_origin"] = batch["image_origin"][0]
-            batch["image_spacing"] = batch["image_spacing"][0]
+            batch["image_origin"] = batch["image_origin"]
+            batch["image_spacing"] = batch["image_spacing"]
             for i in range(len(image_idxs)):
                 image_id = int(image_idxs[i])
                 coord = tuple(
