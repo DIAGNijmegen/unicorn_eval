@@ -728,7 +728,7 @@ def evaluate_predictions(
     ):
         events = test_extra_labels["event"].astype(bool)
         cohorts = test_extra_labels["cohort"]
-        if len(np.unique(cohorts)) > 1:
+        if len(np.unique(list(set(cohorts)))) > 1:
             cohort_metrics = []
             for c in np.unique(cohorts):
                 cohort_mask = cohorts == c
