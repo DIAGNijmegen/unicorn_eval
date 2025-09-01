@@ -223,6 +223,9 @@ def process(job):
             case_name = case_name[: -len(suffix)]
 
     case_info = mapping[mapping.case_id == case_name]
+    if case_info.empty:
+        raise ValueError(f"Case {case_name} not found in mapping.")
+
     task_name = case_info.task_name.values[0]
     modality = case_info.modality.values[0]
 
@@ -628,6 +631,8 @@ def group_predictions_by_task(predictions, gt_dir: Path = GROUNDTRUTH_DIRECTORY)
 
         # retrieve case information from mapping
         case_info = mapping[mapping.case_id == case_name]
+        if case_info.empty:
+            raise ValueError(f"Case {case_name} not found in mapping.")
         task_name = case_info.task_name.values[0]
         predictions_by_task[task_name].append(prediction)
 
