@@ -35,17 +35,17 @@ cleanup() {
       -c "chmod -R -f o+rwX /output/* || true"
 }
 
-if [ -d "$OUTPUT_DIR" ]; then
-  echo "=+= Cleaning up any earlier output"
-  docker run --rm \
-      --platform=linux/amd64 \
-      --volume "$OUTPUT_DIR":/output \
-      --entrypoint /bin/sh \
-      "$DOCKER_IMAGE_TAG" \
-      -c "rm -rf /output/* || true"
-else
-  mkdir -p -m o+rwx "$OUTPUT_DIR"
-fi
+# if [ -d "$OUTPUT_DIR" ]; then
+#   echo "=+= Cleaning up any earlier output"
+#   docker run --rm \
+#       --platform=linux/amd64 \
+#       --volume "$OUTPUT_DIR":/output \
+#       --entrypoint /bin/sh \
+#       "$DOCKER_IMAGE_TAG" \
+#       -c "rm -rf /output/* || true"
+# else
+#   mkdir -p -m o+rwx "$OUTPUT_DIR"
+# fi
 
 trap cleanup EXIT
 
@@ -54,7 +54,6 @@ docker run --rm \
   --volume "$INPUT_DIR":/input:ro \
   --volume "$GROUND_TRUTH_DIR":/opt/ml/input/data/ground_truth:ro \
   --volume "$OUTPUT_DIR":/output \
-  --gpus all \
   "$DOCKER_IMAGE_TAG"
 
 echo "=+= Wrote results to ${OUTPUT_DIR}"
