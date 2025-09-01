@@ -152,7 +152,7 @@ def test_end_to_end_data_handling(
             patch_size=patch_size,
             spacing=patch_spacing,
         )
-        patch_coordinates = [c[0] for c in coordinates]
+        # patch_coordinates = [c[0] for c in coordinates]
 
         # Step 2: Extract patch labels using extract_patch_labels
         patch_labels_dict = extract_patch_labels(
@@ -281,7 +281,7 @@ def test_end_to_end_data_handling(
                 print(f"  Dice coefficient: {dice:.4f}")
 
                 # For debugging: check if there's an orientation issue
-                if dice < 0.5:
+                if dice < 0.8:
                     print("  WARNING: Low Dice coefficient - possible orientation issue")
 
                     # Try different axis flips to check for orientation issues
@@ -302,10 +302,10 @@ def test_end_to_end_data_handling(
 if __name__ == "__main__":
     test_end_to_end_data_handling(
         task_results_path=Path(__file__).parent / "task_results_Task10_segmenting_lesions_within_vois_in_ct.pkl",
-        label_path_pattern=Path(__file__).parent.parent / "vision" / "ground_truth-task10-check" / "Task10_segmenting_lesions_within_vois_in_ct" / r"{case_id}" / "images" / "ct-binary-uls" / f"{{case_id}}.mha"
+        label_path_pattern=Path(__file__).parent.parent / "vision" / "ground_truth-task10-val" / "Task10_segmenting_lesions_within_vois_in_ct" / r"{case_id}" / "images" / "ct-binary-uls" / f"{{case_id}}.mha"
     )
 
-    # test_end_to_end_data_handling(
-    #     task_results_path=Path(__file__).parent / "task_results_Task11_segmenting_three_anatomical_structures_in_lumbar_spine_mri.pkl",
-    #     label_path_pattern=Path(__file__).parent.parent / "vision" / "ground_truth-task11-val" / "Task11_segmenting_three_anatomical_structures_in_lumbar_spine_mri" / r"{case_id}" / "images" / "sagittal-spine-mr-segmentation" / f"{{case_id}}.mha"
-    # )
+    test_end_to_end_data_handling(
+        task_results_path=Path(__file__).parent / "task_results_Task11_segmenting_three_anatomical_structures_in_lumbar_spine_mri.pkl",
+        label_path_pattern=Path(__file__).parent.parent / "vision" / "ground_truth-task11-val" / "Task11_segmenting_three_anatomical_structures_in_lumbar_spine_mri" / r"{case_id}" / "images" / "sagittal-spine-mr-segmentation" / f"{{case_id}}.mha"
+    )
