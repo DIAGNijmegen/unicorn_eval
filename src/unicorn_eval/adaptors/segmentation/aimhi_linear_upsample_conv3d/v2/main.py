@@ -193,7 +193,7 @@ class LinearUpsampleConv3D_V2(SegmentationUpsampling3D):
 
         # wrong patch spacing
         for data in test_data:
-            data['patch_spacing'] = data['image_spacing'][0]  # TODO: remove the weird tuple and prevent unpacking?
+            data['patch_spacing'] = data['image_spacing']
 
         test_loader = load_patch_data(test_data, batch_size=1)
 
