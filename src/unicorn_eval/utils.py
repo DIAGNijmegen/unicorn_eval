@@ -178,14 +178,6 @@ def adapt_features(
     return_probabilities: bool = False,
 ) -> np.ndarray:
     num_shots = len(shot_features)
-    
-    # Handle backward compatibility for global_patch_spacing
-    # If individual patch spacings are provided, use them; otherwise use the single value
-    if global_patch_spacing is None and shot_patch_spacings is not None and test_patch_spacings is not None:
-        # Use individual patch spacings - for now, use the first shot's patch spacing as fallback
-        # This maintains the same behavior as before for adaptors that need a single value
-        first_shot_id = shot_names[0] if shot_names else list(shot_patch_spacings.keys())[0]
-        global_patch_spacing = shot_patch_spacings[first_shot_id]
 
     if "-nn" in adaptor_name:
         k = int(adaptor_name.split("-")[0])
@@ -329,7 +321,7 @@ def adapt_features(
             test_features=test_features,
             test_coordinates=test_coordinates,
             test_names=test_names,
-            patch_size=global_patch_size[0],
+            global_patch_size=global_patch_size[0],
             heatmap_size=16,
         )
 
@@ -357,8 +349,8 @@ def adapt_features(
             test_coordinates=test_coordinates,
             test_names=test_names,
             test_image_sizes=test_image_sizes,
-            patch_size=global_patch_size[0],
-            patch_spacing=global_patch_spacing[0],
+            global_patch_size=global_patch_size[0],
+            global_patch_spacing=global_patch_spacing[0],
         )
     elif adaptor_name == "linear-upsample-conv3d":
         adaptor = LinearUpsampleConv3D_V1(

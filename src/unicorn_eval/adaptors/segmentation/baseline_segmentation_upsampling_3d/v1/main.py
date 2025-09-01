@@ -42,8 +42,8 @@ class SegmentationUpsampling(PatchLevelTaskAdaptor):
         test_coordinates,
         test_names,
         test_image_sizes,
-        patch_size,
-        patch_spacing,
+        global_patch_size,
+        global_patch_spacing,
         num_epochs=20,
         learning_rate=1e-5,
     ):
@@ -57,8 +57,8 @@ class SegmentationUpsampling(PatchLevelTaskAdaptor):
         self.shot_names = shot_names
         self.test_names = test_names
         self.test_image_sizes = test_image_sizes
-        self.patch_size = patch_size
-        self.patch_spacing = patch_spacing
+        self.patch_size = global_patch_size
+        self.patch_spacing = global_patch_spacing
         self.num_epochs = num_epochs
         self.learning_rate = learning_rate
         self.decoder = None
