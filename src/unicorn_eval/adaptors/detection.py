@@ -12,6 +12,8 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+from typing import Sequence
+
 import numpy as np
 import scipy.ndimage as ndimage
 import torch
@@ -20,7 +22,7 @@ import torch.optim as optim
 from scipy.ndimage import filters, gaussian_filter
 from torch.utils.data import DataLoader, Dataset
 from torch.utils.data._utils.collate import default_collate
-from typing import Sequence
+
 from unicorn_eval.adaptors.base import PatchLevelTaskAdaptor
 
 
@@ -297,7 +299,7 @@ class DensityMap(PatchLevelTaskAdaptor):
         test_features,
         test_coordinates,
         test_names,
-        patch_size=224,
+        global_patch_size=224,
         heatmap_size=16,
         num_epochs=200,
         learning_rate=1e-5,
@@ -311,7 +313,7 @@ class DensityMap(PatchLevelTaskAdaptor):
         )
         self.shot_names = shot_names
         self.test_names = test_names
-        self.patch_size = patch_size
+        self.patch_size = global_patch_size
         self.heatmap_size = heatmap_size
         self.num_epochs = num_epochs
         self.learning_rate = learning_rate

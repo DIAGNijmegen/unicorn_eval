@@ -223,6 +223,9 @@ def process(job):
             case_name = case_name[: -len(suffix)]
 
     case_info = mapping[mapping.case_id == case_name]
+    if case_info.empty:
+        raise ValueError(f"Case {case_name} not found in mapping.")
+
     task_name = case_info.task_name.values[0]
     modality = case_info.modality.values[0]
 
@@ -282,14 +285,14 @@ def process(job):
                     image_direction = curr_image_direction
                     first = False
                 else:
-                    assert np.all(coordinates == curr_coordinates), "Coordinates do not match between images"
-                    assert np.all(spacing == curr_spacing), "Spacing does not match between images"
-                    assert np.all(patch_size == curr_patch_size), "Patch size does not match between images"
-                    assert np.all(patch_spacing == curr_patch_spacing), "Patch spacing does not match between images"
-                    assert np.all(image_size == curr_image_size), "Image size does not match between images"
-                    assert np.all(image_spacing == curr_image_spacing), "Image spacing does not match between images"
-                    assert np.all(image_origin == curr_image_origin), "Image origin does not match between images"
-                    assert np.all(image_direction == curr_image_direction), "Image direction does not match between images"
+                    assert np.all(coordinates == curr_coordinates), "Coordinates do not match between images of the same case"
+                    assert np.all(spacing == curr_spacing), "Spacing does not match between images of the same case"
+                    assert np.all(patch_size == curr_patch_size), "Patch size does not match between images of the same case"
+                    assert np.all(patch_spacing == curr_patch_spacing), "Patch spacing does not match between images of the same case"
+                    assert np.all(image_size == curr_image_size), "Image size does not match between images of the same case"
+                    assert np.all(image_spacing == curr_image_spacing), "Image spacing does not match between images of the same case"
+                    assert np.all(image_origin == curr_image_origin), "Image origin does not match between images of the same case"
+                    assert np.all(image_direction == curr_image_direction), "Image direction does not match between images of the same case"
             embeddings = np.concatenate(features)
 
     elif modality == "vision-language":
@@ -387,9 +390,9 @@ def read_adaptors():
     return adaptors
 
 
-def read_predictions():
+def read_predictions(input_dir: Path = INPUT_DIRECTORY):
     # the prediction file tells us the location of the users' predictions
-    with open(INPUT_DIRECTORY / "predictions.json") as f:
+    with open(input_dir / "predictions.json") as f:
         return json.loads(f.read())
 
 
@@ -480,6 +483,7 @@ def write_combined_metrics(
         [metric_value for _, metric_value in metrics["normalized_metrics"].items()]
     )
 
+    print(f"{metrics=}")
     write_json_file(
         location=OUTPUT_DIRECTORY / "metrics.json",
         content=metrics,
@@ -590,12 +594,12 @@ def evaluate_language_predictions():
         return {}
 
 
-def group_predictions_by_task(predictions):
+def group_predictions_by_task(predictions, gt_dir: Path = GROUNDTRUTH_DIRECTORY):
     """Group predictions by task to process them independently and save memory."""
     predictions_by_task = defaultdict(list)
 
     # we need to look at the mapping.csv to determine which task each prediction belongs to
-    mapping_path = GROUNDTRUTH_DIRECTORY / "mapping.csv"
+    mapping_path = gt_dir / "mapping.csv"
     try:
         mapping = pd.read_csv(mapping_path, dtype={"case_id": str})  # ensure case_id is string to enable leading zeros
     except FileNotFoundError:
@@ -627,6 +631,8 @@ def group_predictions_by_task(predictions):
 
         # retrieve case information from mapping
         case_info = mapping[mapping.case_id == case_name]
+        if case_info.empty:
+            raise ValueError(f"Case {case_name} not found in mapping.")
         task_name = case_info.task_name.values[0]
         predictions_by_task[task_name].append(prediction)
 
@@ -637,7 +643,7 @@ def main():
     print("Input folder contents:")
     print_directory_contents(INPUT_DIRECTORY)
     print("=+=" * 10)
-    print("Grountruth folder contents:")
+    print("Groundtruth folder contents:")
     print_directory_contents(GROUNDTRUTH_DIRECTORY)
     print("=+=" * 10)
 
@@ -688,8 +694,10 @@ def main():
             print(f"Using adaptor: {adaptor_name}")
             return_probabilities = REQUIRES_PROBABILITIES_DICT[task_name]
 
-            patch_size = task_results["patch_size"]
-            patch_spacing = task_results["patch_spacing"]
+            # Set global values if all are the same, otherwise None
+            global_patch_size = task_results["global_patch_size"]
+            global_patch_spacing = task_results["global_patch_spacing"]
+
             feature_grid_resolution = task_results["feature_grid_resolution"]
 
             shot_embeddings = task_results["shot_embeddings"]
@@ -700,6 +708,8 @@ def main():
             shot_image_spacings = task_results["shot_image_spacings"]
             shot_image_origins = task_results["shot_image_origins"]
             shot_image_directions = task_results["shot_image_directions"]
+            shot_patch_sizes = task_results["shot_patch_sizes"]
+            shot_patch_spacings = task_results["shot_patch_spacings"]
             shot_label_spacings = task_results["shot_label_spacings"]
             shot_label_origins = task_results["shot_label_origins"]
             shot_label_directions = task_results["shot_label_directions"]
@@ -710,6 +720,8 @@ def main():
             case_image_spacings = task_results["cases_image_spacings"]
             case_image_origins = task_results["cases_image_origins"]
             case_image_directions = task_results["cases_image_directions"]
+            case_patch_sizes = task_results["cases_patch_sizes"]
+            case_patch_spacings = task_results["cases_patch_spacings"]
             case_label_sizes = task_results["cases_label_sizes"]
             case_label_spacings = task_results["cases_label_spacings"]
             case_label_origins = task_results["cases_label_origins"]
@@ -732,8 +744,12 @@ def main():
                 shot_coordinates=task_results["shot_coordinates"],
                 test_coordinates=task_results["cases_coordinates"],
                 test_names=case_ids,
-                patch_size=patch_size,
-                patch_spacing=patch_spacing,
+                global_patch_size=global_patch_size,
+                global_patch_spacing=global_patch_spacing,
+                shot_patch_sizes=shot_patch_sizes,
+                test_patch_sizes=case_patch_sizes,
+                shot_patch_spacings=shot_patch_spacings,
+                test_patch_spacings=case_patch_spacings,
                 feature_grid_resolution=feature_grid_resolution,
                 test_image_sizes=case_image_sizes,
                 shot_extra_labels=shot_extra_labels,
@@ -758,9 +774,9 @@ def main():
             del (
                 shot_embeddings, case_embeddings, shot_labels, shot_extra_labels,
                 shot_ids, shot_image_sizes, shot_image_spacings, shot_image_origins,
-                shot_image_directions, shot_label_spacings, shot_label_origins,
+                shot_image_directions, shot_patch_sizes, shot_patch_spacings, shot_label_spacings, shot_label_origins,
                 shot_label_directions, case_image_sizes, case_image_spacings,
-                case_image_origins, case_image_directions, case_label_sizes,
+                case_image_origins, case_image_directions, case_patch_sizes, case_patch_spacings, case_label_sizes,
                 case_label_spacings, case_label_origins, case_label_directions
             )
             gc.collect()

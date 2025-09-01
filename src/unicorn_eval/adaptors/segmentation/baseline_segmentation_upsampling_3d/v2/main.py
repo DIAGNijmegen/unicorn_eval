@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import numpy as np
 import torch
-import torch.nn as nn
 from tqdm import tqdm
 
 from unicorn_eval.adaptors.base import PatchLevelTaskAdaptor
@@ -103,8 +102,12 @@ class SegmentationUpsampling3D_V2(PatchLevelTaskAdaptor):
         test_label_spacing,
         test_label_origins,
         test_label_directions,
-        patch_size,
-        patch_spacing,
+        global_patch_size,
+        global_patch_spacing,
+        shot_patch_sizes,
+        test_patch_sizes,
+        shot_patch_spacings,
+        test_patch_spacings,
         return_binary=True,
         balance_bg=True,
     ):
@@ -120,8 +123,8 @@ class SegmentationUpsampling3D_V2(PatchLevelTaskAdaptor):
                 image_spacing=shot_image_spacing[shot_names[idx]],
                 image_direction=shot_image_directions[shot_names[idx]],
                 start_coordinates=shot_coordinates[idx],
-                patch_size=patch_size,
-                patch_spacing=patch_spacing,
+                patch_size=global_patch_size,
+                patch_spacing=global_patch_spacing,
             )
             label_patch_features.append(label_feats)
         label_patch_features = np.array(label_patch_features, dtype=object)
@@ -149,8 +152,12 @@ class SegmentationUpsampling3D_V2(PatchLevelTaskAdaptor):
         self.test_label_spacing = test_label_spacing
         self.test_label_origins = test_label_origins
         self.test_label_directions = test_label_directions
-        self.patch_size = patch_size
-        self.patch_spacing = patch_spacing
+        self.patch_size = global_patch_size
+        self.patch_spacing = global_patch_spacing
+        self.shot_patch_sizes = shot_patch_sizes
+        self.shot_patch_spacings = shot_patch_spacings
+        self.test_patch_sizes = test_patch_sizes
+        self.test_patch_spacings = test_patch_spacings
         self.decoder = None
         self.return_binary = return_binary
         self.balance_bg = balance_bg
@@ -163,8 +170,8 @@ class SegmentationUpsampling3D_V2(PatchLevelTaskAdaptor):
             coordinates=self.shot_coordinates,
             embeddings=self.shot_features,
             case_names=self.shot_names,
-            patch_size=self.patch_size,
-            patch_spacing=self.patch_spacing,
+            patch_sizes=self.shot_patch_sizes,
+            patch_spacings=self.shot_patch_spacings,
             labels=self.shot_labels,
             image_sizes=self.shot_image_sizes,
             image_origins=self.shot_image_origins,
@@ -197,6 +204,7 @@ class SegmentationUpsampling3D_V2(PatchLevelTaskAdaptor):
             "blocks_up": blocks_up,
             "dsdepth": 1,
             "upsample_mode": "deconv",
+            "act": "leakyrelu",
         }
         print(f"Setting up decoder with: {latent_dim=}, {target_shape=}, {decoder_kwargs=}")
         decoder = Decoder3D(
@@ -218,8 +226,8 @@ class SegmentationUpsampling3D_V2(PatchLevelTaskAdaptor):
             coordinates=self.test_coordinates,
             embeddings=self.test_features,
             case_names=self.test_cases,
-            patch_size=self.patch_size,
-            patch_spacing=self.patch_spacing,
+            patch_sizes=self.test_patch_sizes,
+            patch_spacings=self.test_patch_spacings,
             image_sizes=self.test_image_sizes,
             image_origins=self.test_image_origins,
             image_spacings=self.test_image_spacings,

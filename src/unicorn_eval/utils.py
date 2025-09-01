@@ -148,31 +148,35 @@ def adapt_features(
     shot_features: np.ndarray,
     shot_labels: np.ndarray,
     test_features: np.ndarray,
-    shot_coordinates=None,
-    test_coordinates=None,
-    shot_names=None,
-    test_names=None,
-    patch_size=224,
-    patch_spacing=None,
-    feature_grid_resolution=None,
-    test_image_sizes=None,
-    test_image_spacing=None,
-    test_image_origins=None,
-    test_image_directions=None,
-    test_label_sizes=None,
-    test_label_spacing=None,
-    test_label_origins=None,
-    test_label_directions=None,
-    shot_image_sizes=None,
-    shot_image_spacing=None,
-    shot_image_origins=None,
-    shot_image_directions=None,
-    shot_label_spacing=None,
-    shot_label_origins=None,
-    shot_label_directions=None,
-    shot_extra_labels=None,
-    return_probabilities=False,
-):
+    shot_coordinates: list[np.ndarray] | None = None,
+    test_coordinates: list[np.ndarray] | None = None,
+    shot_names: list[str] | None = None,
+    test_names: list[str] | None = None,
+    global_patch_size: list[int] | int | None = 224,
+    global_patch_spacing: list[float] | float | None = None,
+    shot_patch_sizes: dict[str, list[int] | int] | None = None,
+    test_patch_sizes: dict[str, list[int] | int] | None = None,
+    shot_patch_spacings: dict[str, list[float] | float] | None = None,
+    test_patch_spacings: dict[str, list[float] | float] | None = None,
+    feature_grid_resolution: list[int] | None = None,
+    test_image_sizes: dict[str, list[int]] | None = None,
+    test_image_spacing: dict[str, list[float]] | None = None,
+    test_image_origins: dict[str, list[float]] | None = None,
+    test_image_directions: dict[str, list[float]] | None = None,
+    test_label_sizes: dict[str, list[int]] | None = None,
+    test_label_spacing: dict[str, list[float]] | None = None,
+    test_label_origins: dict[str, list[float]] | None = None,
+    test_label_directions: dict[str, list[float]] | None = None,
+    shot_image_sizes: dict[str, list[int]] | None = None,
+    shot_image_spacing: dict[str, list[float]] | None = None,
+    shot_image_origins: dict[str, list[float]] | None = None,
+    shot_image_directions: dict[str, list[float]] | None = None,
+    shot_label_spacing: dict[str, list[float]] | None = None,
+    shot_label_origins: dict[str, list[float]] | None = None,
+    shot_label_directions: dict[str, list[float]] | None = None,
+    shot_extra_labels: np.ndarray | None = None,
+    return_probabilities: bool = False,
+) -> np.ndarray:
     num_shots = len(shot_features)
 
     if "-nn" in adaptor_name:
@@ -308,6 +312,7 @@ def adapt_features(
         )
 
     elif adaptor_name == "density-map":
+        assert global_patch_size is not None, f"Global patch size must be specified for {adaptor_name} adaptor."
         adaptor = DensityMap(
             shot_features=shot_features,
             shot_labels=shot_labels,
@@ -316,11 +321,12 @@ def adapt_features(
             test_features=test_features,
             test_coordinates=test_coordinates,
             test_names=test_names,
-            patch_size=patch_size[0],
+            global_patch_size=global_patch_size[0],
             heatmap_size=16,
         )
 
     elif adaptor_name == "conv-detector":
+        assert global_patch_size is not None, f"Global patch size must be specified for {adaptor_name} adaptor."
         adaptor = ConvDetector(
             shot_features=shot_features,
             shot_labels=shot_labels,
@@ -329,10 +335,11 @@ def adapt_features(
             test_features=test_features,
             test_coordinates=test_coordinates,
             test_names=test_names,
-            patch_sizes=patch_size,
+            patch_sizes=global_patch_size,
         )
 
     elif adaptor_name == "segmentation-upsampling":
+        assert global_patch_size is not None, f"Global patch size must be specified for {adaptor_name} adaptor."
         adaptor = SegmentationUpsampling(
             shot_features=shot_features,
             shot_labels=shot_labels,
@@ -342,8 +349,8 @@ def adapt_features(
             test_coordinates=test_coordinates,
             test_names=test_names,
             test_image_sizes=test_image_sizes,
-            patch_size=patch_size[0],
-            patch_spacing=patch_spacing[0],
+            global_patch_size=global_patch_size[0],
+            global_patch_spacing=global_patch_spacing[0],
         )
     elif adaptor_name == "linear-upsample-conv3d":
         adaptor = LinearUpsampleConv3D_V1(
@@ -365,12 +372,16 @@ def adapt_features(
             test_label_spacing=test_label_spacing,
             test_label_origins=test_label_origins,
             test_label_directions=test_label_directions,
-            patch_size=patch_size,
-            patch_spacing=patch_spacing,
+            global_patch_size=global_patch_size,
+            global_patch_spacing=global_patch_spacing,
             shot_image_sizes=shot_image_sizes,
             shot_image_spacing=shot_image_spacing,
             shot_image_origins=shot_image_origins,
             shot_image_directions=shot_image_directions,
+            shot_patch_sizes=shot_patch_sizes,
+            test_patch_sizes=test_patch_sizes,
+            shot_patch_spacings=shot_patch_spacings,
+            test_patch_spacings=test_patch_spacings,
         )
     elif adaptor_name == "linear-upsample-conv3d-v2":
         adaptor = LinearUpsampleConv3D_V2(
@@ -392,12 +403,16 @@ def adapt_features(
             test_label_spacing=test_label_spacing,
             test_label_origins=test_label_origins,
             test_label_directions=test_label_directions,
-            patch_size=patch_size,
-            patch_spacing=None,
+            global_patch_size=global_patch_size,
+            global_patch_spacing=None,
             shot_image_sizes=shot_image_sizes,
             shot_image_spacing=shot_image_spacing,
             shot_image_origins=shot_image_origins,
             shot_image_directions=shot_image_directions,
+            shot_patch_sizes=shot_patch_sizes,
+            test_patch_sizes=test_patch_sizes,
+            shot_patch_spacings=shot_patch_spacings,
+            test_patch_spacings=test_patch_spacings,
         )
     elif adaptor_name == "conv3d-linear-upsample":
         adaptor = LinearUpsampleConv3D_V2(
@@ -419,12 +434,16 @@ def adapt_features(
             test_label_spacing=test_label_spacing,
             test_label_origins=test_label_origins,
             test_label_directions=test_label_directions,
-            patch_size=patch_size,
-            patch_spacing=None,
+            global_patch_size=global_patch_size,
+            global_patch_spacing=None,
             shot_image_sizes=shot_image_sizes,
             shot_image_spacing=shot_image_spacing,
             shot_image_origins=shot_image_origins,
             shot_image_directions=shot_image_directions,
+            shot_patch_sizes=shot_patch_sizes,
+            test_patch_sizes=test_patch_sizes,
+            shot_patch_spacings=shot_patch_spacings,
+            test_patch_spacings=test_patch_spacings,
             decoder_cls=ConvUpsampleSegAdaptor,
         )
 
@@ -448,12 +467,16 @@ def adapt_features(
             test_label_spacing=test_label_spacing,
             test_label_origins=test_label_origins,
             test_label_directions=test_label_directions,
-            patch_size=patch_size,
-            patch_spacing=patch_spacing,
+            global_patch_size=global_patch_size,
+            global_patch_spacing=global_patch_spacing,
             shot_image_sizes=shot_image_sizes,
             shot_image_spacing=shot_image_spacing,
             shot_image_origins=shot_image_origins,
             shot_image_directions=shot_image_directions,
+            shot_patch_sizes=shot_patch_sizes,
+            test_patch_sizes=test_patch_sizes,
+            shot_patch_spacings=shot_patch_spacings,
+            test_patch_spacings=test_patch_spacings,
         )
 
     elif adaptor_name == "segmentation-upsampling-3d-v2":
@@ -476,12 +499,16 @@ def adapt_features(
             test_label_spacing=test_label_spacing,
             test_label_origins=test_label_origins,
             test_label_directions=test_label_directions,
-            patch_size=patch_size,
-            patch_spacing=patch_spacing,
+            global_patch_size=global_patch_size,
+            global_patch_spacing=global_patch_spacing,
             shot_image_sizes=shot_image_sizes,
             shot_image_spacing=shot_image_spacing,
             shot_image_origins=shot_image_origins,
             shot_image_directions=shot_image_directions,
+            shot_patch_sizes=shot_patch_sizes,
+            test_patch_sizes=test_patch_sizes,
+            shot_patch_spacings=shot_patch_spacings,
+            test_patch_spacings=test_patch_spacings,
         )
 
     elif adaptor_name == "conv-segmentation-3d":
@@ -504,13 +531,17 @@ def adapt_features(
             test_label_spacing=test_label_spacing,
             test_label_origins=test_label_origins,
             test_label_directions=test_label_directions,
-            patch_size=patch_size,
-            patch_spacing=patch_spacing,
+            global_patch_size=global_patch_size,
+            global_patch_spacing=global_patch_spacing,
             feature_grid_resolution=feature_grid_resolution,
             shot_image_sizes=shot_image_sizes,
             shot_image_spacing=shot_image_spacing,
             shot_image_origins=shot_image_origins,
             shot_image_directions=shot_image_directions,
+            shot_patch_sizes=shot_patch_sizes,
+            test_patch_sizes=test_patch_sizes,
+            shot_patch_spacings=shot_patch_spacings,
+            test_patch_spacings=test_patch_spacings,
         )
 
     elif adaptor_name == "detection-by-linear-upsample-conv3d":
@@ -537,8 +568,12 @@ def adapt_features(
             test_label_spacing=test_label_spacing,
             test_label_origins=test_label_origins,
             test_label_directions=test_label_directions,
-            patch_size=patch_size,
-            patch_spacing=None,
+            global_patch_size=global_patch_size,
+            global_patch_spacing=None,
+            shot_patch_sizes=shot_patch_sizes,
+            test_patch_sizes=test_patch_sizes,
+            shot_patch_spacings=shot_patch_spacings,
+            test_patch_spacings=test_patch_spacings,
             return_binary=False,
         )
 
@@ -566,8 +601,12 @@ def adapt_features(
             test_label_spacing=test_label_spacing,
             test_label_origins=test_label_origins,
             test_label_directions=test_label_directions,
-            patch_size=patch_size,
-            patch_spacing=None,
+            global_patch_size=global_patch_size,
+            global_patch_spacing=None,
+            shot_patch_sizes=shot_patch_sizes,
+            test_patch_sizes=test_patch_sizes,
+            shot_patch_spacings=shot_patch_spacings,
+            test_patch_spacings=test_patch_spacings,
             return_binary=False,
             decoder_cls=ConvUpsampleSegAdaptor,
         )
@@ -596,8 +635,12 @@ def adapt_features(
             test_label_spacing=test_label_spacing,
             test_label_origins=test_label_origins,
             test_label_directions=test_label_directions,
-            patch_size=patch_size,
-            patch_spacing=patch_spacing,
+            global_patch_size=global_patch_size,
+            global_patch_spacing=global_patch_spacing,
+            shot_patch_sizes=shot_patch_sizes,
+            test_patch_sizes=test_patch_sizes,
+            shot_patch_spacings=shot_patch_spacings,
+            test_patch_spacings=test_patch_spacings,
             return_binary=False,
         )
 
@@ -625,8 +668,12 @@ def adapt_features(
             test_label_spacing=test_label_spacing,
             test_label_origins=test_label_origins,
             test_label_directions=test_label_directions,
-            patch_size=patch_size,
-            patch_spacing=patch_spacing,
+            global_patch_size=global_patch_size,
+            global_patch_spacing=global_patch_spacing,
+            shot_patch_sizes=shot_patch_sizes,
+            test_patch_sizes=test_patch_sizes,
+            shot_patch_spacings=shot_patch_spacings,
+            test_patch_spacings=test_patch_spacings,
             return_binary=False,
         )
 
@@ -654,9 +701,13 @@ def adapt_features(
             test_label_spacing=test_label_spacing,
             test_label_origins=test_label_origins,
             test_label_directions=test_label_directions,
-            patch_size=patch_size,
-            patch_spacing=patch_spacing,
+            patch_size=global_patch_size,
+            patch_spacing=global_patch_spacing,
             feature_grid_resolution=feature_grid_resolution,
+            shot_patch_sizes=shot_patch_sizes,
+            test_patch_sizes=test_patch_sizes,
+            shot_patch_spacings=shot_patch_spacings,
+            test_patch_spacings=test_patch_spacings,
             return_binary=False,
         )
 
@@ -937,9 +988,8 @@ def extract_embeddings_and_labels(processed_results, task_name):
         "task_type": None,
         "modality": None,
         "domain": None,
-        "spacing": None,
-        "patch_size": None,
-        "patch_spacing": None,
+        "global_patch_size": None,
+        "global_patch_spacing": None,
         "feature_grid_resolution": None,
         "prediction": [],
         "shot_embeddings": [],
@@ -948,6 +998,8 @@ def extract_embeddings_and_labels(processed_results, task_name):
         "shot_image_origins": {},
         "shot_image_directions": {},
         "shot_image_sizes": {},
+        "shot_patch_sizes": {},
+        "shot_patch_spacings": {},
         "shot_label_sizes": {},
         "shot_label_spacings": {},
         "shot_label_origins": {},
@@ -964,6 +1016,8 @@ def extract_embeddings_and_labels(processed_results, task_name):
         "cases_image_spacings": {},
         "cases_image_origins": {},
         "cases_image_directions": {},
+        "cases_patch_sizes": {},
+        "cases_patch_spacings": {},
         "cases_label_sizes": {},
         "cases_label_spacings": {},
         "cases_label_origins": {},
@@ -988,10 +1042,16 @@ def extract_embeddings_and_labels(processed_results, task_name):
             task_data["task_type"] = result["task_type"]
             task_data["modality"] = result["modality"]
             task_data["domain"] = result["domain"]
-            task_data["spacing"] = result["spacing"]
-            task_data["patch_size"] = result["patch_size"]
-            task_data["patch_spacing"] = result["patch_spacing"]
             task_data["feature_grid_resolution"] = result["feature_grid_resolution"]
+
+            # Check if all cases have the same patch size and spacing
+            all_patch_sizes = [result["patch_size"] for result in processed_results]
+            all_patch_spacings = [result["patch_spacing"] for result in processed_results]
+
+            # Set global values if all are the same, otherwise None
+            task_data["global_patch_size"] = all_patch_sizes[0] if all_patch_sizes and all(ps == all_patch_sizes[0] for ps in all_patch_sizes) else None
+            task_data["global_patch_spacing"] = all_patch_spacings[0] if all_patch_spacings and all(ps == all_patch_spacings[0] for ps in all_patch_spacings) else None
+
 
         if result["split"] == "shot":
             task_data["shot_embeddings"].append(result["embeddings"])
@@ -1004,6 +1064,8 @@ def extract_embeddings_and_labels(processed_results, task_name):
             task_data["shot_image_spacings"][shot_id] = result["image_spacing"]
             task_data["shot_image_origins"][shot_id] = result["image_origin"]
             task_data["shot_image_directions"][shot_id] = result["image_direction"]
+            task_data["shot_patch_spacings"][shot_id] = result["patch_spacing"]
+            task_data["shot_patch_sizes"][shot_id] = result["patch_size"]
             task_data["shot_label_spacings"][shot_id] = result["label_spacing"]
             task_data["shot_label_sizes"][shot_id] = result["label_size"]
             task_data["shot_label_origins"][shot_id] = result["label_origin"]
@@ -1020,6 +1082,8 @@ def extract_embeddings_and_labels(processed_results, task_name):
             task_data["cases_image_sizes"][case_id] = result["image_size"]
             task_data["cases_image_origins"][case_id] = result["image_origin"]
             task_data["cases_image_directions"][case_id] = result["image_direction"]
+            task_data["cases_patch_sizes"][case_id] = result["patch_size"]
+            task_data["cases_patch_spacings"][case_id] = result["patch_spacing"]
             task_data["cases_label_spacings"][case_id] = result["label_spacing"]
             task_data["cases_label_sizes"][case_id] = result["label_size"]
             task_data["cases_label_origins"][case_id] = result["label_origin"]

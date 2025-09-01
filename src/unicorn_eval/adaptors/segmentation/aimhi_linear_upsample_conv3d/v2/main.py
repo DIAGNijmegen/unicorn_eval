@@ -149,8 +149,8 @@ class LinearUpsampleConv3D_V2(SegmentationUpsampling3D):
             coordinates=self.shot_coordinates,
             embeddings=self.shot_features,
             case_names=self.shot_names,
-            patch_size=self.patch_size,
-            patch_spacing=[1.0, 1.0, 1.0],  # dummy, not used
+            patch_sizes=self.shot_patch_sizes,
+            patch_spacings=self.shot_patch_spacings,
             labels=self.shot_labels,
         )
 
@@ -163,15 +163,13 @@ class LinearUpsampleConv3D_V2(SegmentationUpsampling3D):
         elif max_class > 1:
             self.is_task06 = True
             num_classes = 2
-            self.return_binary = False  # Do not threshold predictions for task 06
-            # TODO: implement this choice more elegantly
         else:
             num_classes = max_class + 1
 
         # set up device and model
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         decoder = self.decoder_cls(
-            target_shape=self.patch_size[::-1],  # (D, H, W)
+            target_shape=self.global_patch_size[::-1],  # (D, H, W)
             num_classes=num_classes,
         )
 
@@ -185,8 +183,8 @@ class LinearUpsampleConv3D_V2(SegmentationUpsampling3D):
             coordinates=self.test_coordinates,
             embeddings=self.test_features,
             case_names=self.test_cases,
-            patch_size=self.patch_size,
-            patch_spacing=[1.0, 1.0, 1.0],  # dummy, not used
+            patch_sizes=self.test_patch_sizes,
+            patch_spacings=self.test_patch_spacings,
             image_sizes=self.test_image_sizes,
             image_origins=self.test_image_origins,
             image_spacings=self.test_image_spacings,
@@ -195,7 +193,7 @@ class LinearUpsampleConv3D_V2(SegmentationUpsampling3D):
 
         # wrong patch spacing
         for data in test_data:
-            data['patch_spacing'] = data['image_spacing'][0]
+            data['patch_spacing'] = data['image_spacing']
 
         test_loader = load_patch_data(test_data, batch_size=1)
 
@@ -285,8 +283,8 @@ def inference3d_softmax(*, decoder, data_loader, device, return_binary, test_cas
             else:
                 pred_mask = probs[:, 1:]
 
-            batch["image_origin"] = batch["image_origin"][0]
-            batch["image_spacing"] = batch["image_spacing"][0]
+            batch["image_origin"] = batch["image_origin"]
+            batch["image_spacing"] = batch["image_spacing"]
             for i in range(len(image_idxs)):
                 image_id = int(image_idxs[i])
                 coord = tuple(

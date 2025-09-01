@@ -36,12 +36,12 @@ def download_predictions(
                 continue
 
             dest_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(dest_path, 'w') as fp:
+            with open(dest_path, 'w') as f:
                 predictions = client(url=output["file"], follow_redirects=True)
-                json.dump(predictions, fp)
+                f.write(json.dumps(predictions))
 
 
 if __name__ == "__main__":
     download_predictions(
-        output_dir=Path("/Users/joeranbosma/repos/unicorn_eval/tests/vision/input-task10-val"),
+        output_dir=Path("/Users/joeranbosma/repos/unicorn_eval/tests/vision/input-task10-check"),
     )

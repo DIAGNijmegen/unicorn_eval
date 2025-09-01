@@ -186,8 +186,8 @@ def inference3d(
                 else:
                     pred_mask = probs
 
-            batch["image_origin"] = batch["image_origin"][0]
-            batch["image_spacing"] = batch["image_spacing"][0]
+            batch["image_origin"] = batch["image_origin"]
+            batch["image_spacing"] = batch["image_spacing"]
             for i in range(len(image_idxs)):
                 image_id = int(image_idxs[i])
                 coord = tuple(

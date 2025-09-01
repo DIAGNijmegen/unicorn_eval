@@ -66,7 +66,6 @@ class ConvSegmentation3D(SegmentationUpsampling3D):
         # First three components are the original patchsize, next three are the resolution within the patch
         # If no feature grid resolution is given, use (1, 1, 1) to be compatible with sparse models
         self.pack_size = feature_grid_resolution if feature_grid_resolution is not None else (1, 1, 1)
-        self.patch_size = self.patch_size[:3]
 
     @staticmethod
     def instances_from_mask(multiclass_mask: np.ndarray, divider_class: int, divided_class: int, sitk_mask):
@@ -133,8 +132,8 @@ class ConvSegmentation3D(SegmentationUpsampling3D):
             coordinates=self.shot_coordinates,
             embeddings=self.shot_features,
             case_names=self.shot_names,
-            patch_size=self.patch_size,
-            patch_spacing=self.patch_spacing,
+            patch_sizes=self.shot_patch_sizes,
+            patch_spacings=self.shot_patch_spacings,
             labels=self.shot_labels,
         )
         train_loader = load_patch_data(train_data, batch_size=32, balance_bg=self.balance_bg)
@@ -160,7 +159,7 @@ class ConvSegmentation3D(SegmentationUpsampling3D):
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         decoder = ConvDecoder3D(
             num_classes=self.num_classes,
-            patch_size=self.patch_size,
+            patch_size=self.global_patch_size,
             target_shape=target_shape,
         )
 
@@ -182,8 +181,8 @@ class ConvSegmentation3D(SegmentationUpsampling3D):
             coordinates=self.test_coordinates,
             embeddings=self.test_features,
             case_names=self.test_cases,
-            patch_size=self.patch_size,
-            patch_spacing=self.patch_spacing,
+            patch_sizes=self.test_patch_sizes,
+            patch_spacings=self.test_patch_spacings,
             image_sizes=self.test_image_sizes,
             image_origins=self.test_image_origins,
             image_spacings=self.test_image_spacings,

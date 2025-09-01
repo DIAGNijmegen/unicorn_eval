@@ -73,8 +73,12 @@ class LinearUpsampleConv3D_V1(PatchLevelTaskAdaptor):
         test_label_spacing,
         test_label_origins,
         test_label_directions,
-        patch_size,
-        patch_spacing,
+        global_patch_size,
+        global_patch_spacing,
+        shot_patch_sizes=None,
+        test_patch_sizes=None,
+        shot_patch_spacings=None,
+        test_patch_spacings=None,
         return_binary=True,
     ):
         label_patch_features = []
@@ -88,7 +92,7 @@ class LinearUpsampleConv3D_V1(PatchLevelTaskAdaptor):
                 image_origin=shot_image_origins[shot_names[idx]],
                 image_spacing=shot_image_spacing[shot_names[idx]],
                 image_direction=shot_image_directions[shot_names[idx]],
-                patch_size=patch_size,
+                patch_size=global_patch_size,
             )
             label_patch_features.append(label_feats)
         label_patch_features = np.array(label_patch_features, dtype=object)
@@ -115,8 +119,12 @@ class LinearUpsampleConv3D_V1(PatchLevelTaskAdaptor):
         self.test_label_spacing = test_label_spacing
         self.test_label_origins = test_label_origins
         self.test_label_directions = test_label_directions
-        self.patch_size = patch_size
-        self.patch_spacing = patch_spacing
+        self.patch_size = global_patch_size
+        self.patch_spacing = global_patch_spacing
+        self.shot_patch_sizes = shot_patch_sizes
+        self.test_patch_sizes = test_patch_sizes
+        self.shot_patch_spacings = shot_patch_spacings
+        self.test_patch_spacings = test_patch_spacings
         self.decoder = None
         self.return_binary = return_binary
 
@@ -126,8 +134,8 @@ class LinearUpsampleConv3D_V1(PatchLevelTaskAdaptor):
             coordinates=self.shot_coordinates,
             embeddings=self.shot_features,
             case_names=self.shot_names,
-            patch_size=self.patch_size,
-            patch_spacing=self.patch_spacing,
+            patch_sizes=self.shot_patch_sizes,
+            patch_spacings=self.shot_patch_spacings,
             labels=self.shot_labels,
         )
         train_loader = load_patch_data(train_data, batch_size=1)
@@ -147,8 +155,8 @@ class LinearUpsampleConv3D_V1(PatchLevelTaskAdaptor):
             coordinates=self.test_coordinates,
             embeddings=self.test_features,
             case_names=self.test_cases,
-            patch_size=self.patch_size,
-            patch_spacing=self.patch_spacing,
+            patch_sizes=self.test_patch_sizes,
+            patch_spacings=self.test_patch_spacings,
             image_sizes=self.test_image_sizes,
             image_origins=self.test_image_origins,
             image_spacings=self.test_image_spacings,
@@ -248,8 +256,8 @@ def seg_inference3d(decoder, data_loader, device, return_binary,  test_cases, te
             else:
                 pred_mask = probs[:, :1:2]
 
-            batch["image_origin"] = batch["image_origin"][0]
-            batch["image_spacing"] = batch["image_spacing"][0]
+            batch["image_origin"] = batch["image_origin"]
+            batch["image_spacing"] = batch["image_spacing"]
             for i in range(len(image_idxs)):
                 image_id = int(image_idxs[i])
                 coord = tuple(
