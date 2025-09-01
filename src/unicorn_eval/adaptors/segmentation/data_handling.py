@@ -31,13 +31,16 @@ def assign_mask_to_patch(mask_data, x_patch, y_patch, patch_size, padding_value=
     """Assign ROI mask to the patch."""
     # patch = mask_data[y_patch:y_patch+patch_size, x_patch:x_patch+patch_size]
 
-    x_end = x_patch + patch_size
-    y_end = y_patch + patch_size
+    x_end = x_patch + patch_size    # Calcluate the end x coordinate of the patch
+    y_end = y_patch + patch_size    # Calcluate the end y coordinate of the patch
 
+    # if x_patch or y_patch is negative, we pad to the left or top side
     pad_x = max(0, -x_patch)
     pad_y = max(0, -y_patch)
-    pad_x_end = max(0, x_end - patch_size)
-    pad_y_end = max(0, y_end - patch_size)
+
+     # if x_end exceeds the image width, pad to the right side, if y_end exceeds the image height, pad to the bottom side 
+    pad_x_end = max(0, x_end - mask_data.shape[1])
+    pad_y_end = max(0, y_end - mask_data.shape[0])
 
     padded_mask = np.pad(
         mask_data,
@@ -45,7 +48,13 @@ def assign_mask_to_patch(mask_data, x_patch, y_patch, patch_size, padding_value=
         mode="constant",
         constant_values=padding_value,
     )
+
+    # Adjust coordinates for the padded mask in case of padding to the left or top
+    x_patch += pad_x 
+    y_patch += pad_y
+
     patch = padded_mask[y_patch : y_patch + patch_size, x_patch : x_patch + patch_size]
+    assert patch.shape == (patch_size, patch_size), f"Patch shape {patch.shape} does not match expected size {(patch_size, patch_size)}"
 
     return patch
 
