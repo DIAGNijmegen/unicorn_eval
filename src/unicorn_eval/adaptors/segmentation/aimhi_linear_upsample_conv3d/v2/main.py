@@ -163,8 +163,6 @@ class LinearUpsampleConv3D_V2(SegmentationUpsampling3D):
         elif max_class > 1:
             self.is_task06 = True
             num_classes = 2
-            self.return_binary = False  # Do not threshold predictions for task 06
-            # TODO: implement this choice more elegantly
         else:
             num_classes = max_class + 1
 

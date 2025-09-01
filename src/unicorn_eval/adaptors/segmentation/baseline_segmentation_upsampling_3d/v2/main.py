@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import numpy as np
 import torch
-import torch.nn as nn
 from tqdm import tqdm
 
 from unicorn_eval.adaptors.base import PatchLevelTaskAdaptor
@@ -205,6 +204,7 @@ class SegmentationUpsampling3D_V2(PatchLevelTaskAdaptor):
             "blocks_up": blocks_up,
             "dsdepth": 1,
             "upsample_mode": "deconv",
+            "act": "leakyrelu",
         }
         print(f"Setting up decoder with: {latent_dim=}, {target_shape=}, {decoder_kwargs=}")
         decoder = Decoder3D(

@@ -166,10 +166,10 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
         test_label_directions,
         global_patch_size,
         global_patch_spacing,
-        shot_patch_sizes=None,
-        test_patch_sizes=None,
-        shot_patch_spacings=None,
-        test_patch_spacings=None,
+        shot_patch_sizes,
+        test_patch_sizes,
+        shot_patch_spacings,
+        test_patch_spacings,
         return_binary=True,
         balance_bg=False,
     ):
@@ -185,8 +185,8 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
                 image_spacing=shot_image_spacing[shot_names[idx]],
                 image_direction=shot_image_directions[shot_names[idx]],
                 start_coordinates=shot_coordinates[idx],
-                patch_size=global_patch_size,  # TODO: check if this is valid with global value
-                patch_spacing=global_patch_spacing,  # TODO: check if this is valid with global value
+                patch_size=shot_patch_sizes[shot_names[idx]],
+                patch_spacing=shot_patch_spacings[shot_names[idx]],
             )
             label_patch_features.append(label_feats)
         label_patch_features = np.array(label_patch_features, dtype=object)
