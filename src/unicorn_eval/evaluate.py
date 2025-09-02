@@ -35,7 +35,6 @@ INPUT_DIRECTORY = Path("/input")
 OUTPUT_DIRECTORY = Path("/output")
 GROUNDTRUTH_DIRECTORY = Path("/opt/ml/input/data/ground_truth")
 
-
 ADAPTOR_SLUGS_DICT = {
     "Task01_classifying_he_prostate_biopsies_into_isup_scores": "adaptor-pathology-classification",
     "Task02_classifying_lung_nodule_malignancy_in_ct": "adaptor-radiology-classification",
@@ -49,6 +48,15 @@ ADAPTOR_SLUGS_DICT = {
     "Task10_segmenting_lesions_within_vois_in_ct": "adaptor-radiology-segmentation",
     "Task11_segmenting_three_anatomical_structures_in_lumbar_spine_mri": "adaptor-radiology-segmentation",
 }
+
+DETERMINISTIC_ADAPTORS = [
+    "1-nn",
+    "5-nn",
+    "20-nn",
+    "1-nn-weighted",
+    "5-nn-weighted",
+    "20-nn-weighted",
+]
 
 REQUIRES_PROBABILITIES_DICT = {
     "Task01_classifying_he_prostate_biopsies_into_isup_scores": False,
@@ -735,10 +743,12 @@ def main():
                     case_embeddings = case_embeddings.squeeze(1)
 
             num_run = 5
+            if adaptor_name in DETERMINISTIC_ADAPTORS:
+                num_run = 1
             metric_list = []
-            for i in range(num_run):
+            for seed in range(num_run):
 
-                set_all_seeds(i)
+                set_all_seeds(seed)
                 predictions = adapt_features(
                     adaptor_name=adaptor_name,
                     task_type=task_type,
@@ -773,6 +783,7 @@ def main():
                     shot_label_origins=shot_label_origins,
                     shot_label_directions=shot_label_directions,
                     return_probabilities=return_probabilities,
+                    seed=seed,
                 )
 
                 # delete arrays and run garbage collection

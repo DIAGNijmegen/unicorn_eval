@@ -188,6 +188,7 @@ def adapt_features(
     shot_label_directions: dict[str, list[float]] | None = None,
     shot_extra_labels: np.ndarray | None = None,
     return_probabilities: bool = False,
+    seed: int = 0,
 ) -> np.ndarray:
     num_shots = len(shot_features)
 
@@ -237,6 +238,7 @@ def adapt_features(
             C=1.0,
             solver="lbfgs",
             return_probabilities=return_probabilities,
+            seed=seed,
         )
 
     elif "linear-probing" in adaptor_name:
