@@ -17,6 +17,9 @@ from functools import partial
 from typing import Any
 
 import numpy as np
+import os
+import random
+import torch
 from sklearn.metrics import cohen_kappa_score, roc_auc_score
 from sksurv.metrics import concordance_index_censored
 
@@ -139,6 +142,15 @@ METRIC_DICT = {
         "range": (0, 1),
     },
 }
+
+
+def set_all_seeds(seed: int):
+    os.environ["PYTHONHASHSEED"] = str(seed)
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.benchmark = False
 
 
 def adapt_features(

@@ -27,7 +27,7 @@ from dragon_eval import DragonEval
 from dragon_eval.evaluation import REGRESSION_EPSILON, TASK_TYPE, EvalType
 
 from unicorn_eval.helpers import get_max_workers
-from unicorn_eval.utils import (adapt_features, evaluate_predictions,
+from unicorn_eval.utils import (set_all_seeds, adapt_features, evaluate_predictions,
                                 extract_data, extract_embeddings_and_labels,
                                 normalize_metric, write_json_file)
 
@@ -734,70 +734,90 @@ def main():
                 if len(case_embeddings.shape) > 2:
                     case_embeddings = case_embeddings.squeeze(1)
 
-            predictions = adapt_features(
-                adaptor_name=adaptor_name,
-                task_type=task_type,
-                shot_features=shot_embeddings,
-                shot_names=shot_ids,
-                shot_labels=shot_labels,
-                test_features=case_embeddings,
-                shot_coordinates=task_results["shot_coordinates"],
-                test_coordinates=task_results["cases_coordinates"],
-                test_names=case_ids,
-                global_patch_size=global_patch_size,
-                global_patch_spacing=global_patch_spacing,
-                shot_patch_sizes=shot_patch_sizes,
-                test_patch_sizes=case_patch_sizes,
-                shot_patch_spacings=shot_patch_spacings,
-                test_patch_spacings=case_patch_spacings,
-                feature_grid_resolution=feature_grid_resolution,
-                test_image_sizes=case_image_sizes,
-                shot_extra_labels=shot_extra_labels,
-                test_image_spacing=case_image_spacings,
-                test_image_origins=case_image_origins,
-                test_image_directions=case_image_directions,
-                test_label_spacing=case_label_spacings,
-                test_label_origins=case_label_origins,
-                test_label_directions=case_label_directions,
-                test_label_sizes=case_label_sizes,
-                shot_image_sizes=shot_image_sizes,
-                shot_image_spacing=shot_image_spacings,
-                shot_image_origins=shot_image_origins,
-                shot_image_directions=shot_image_directions,
-                shot_label_spacing=shot_label_spacings,
-                shot_label_origins=shot_label_origins,
-                shot_label_directions=shot_label_directions,
-                return_probabilities=return_probabilities,
-            )
+            num_run = 5
+            metric_list = []
+            for i in range(num_run):
 
-            # delete arrays and run garbage collection
-            del (
-                shot_embeddings, case_embeddings, shot_labels, shot_extra_labels,
-                shot_ids, shot_image_sizes, shot_image_spacings, shot_image_origins,
-                shot_image_directions, shot_patch_sizes, shot_patch_spacings, shot_label_spacings, shot_label_origins,
-                shot_label_directions, case_image_sizes, case_image_spacings,
-                case_image_origins, case_image_directions, case_patch_sizes, case_patch_spacings, case_label_sizes,
-                case_label_spacings, case_label_origins, case_label_directions
-            )
-            gc.collect()
+                set_all_seeds(i)
+                predictions = adapt_features(
+                    adaptor_name=adaptor_name,
+                    task_type=task_type,
+                    shot_features=shot_embeddings,
+                    shot_names=shot_ids,
+                    shot_labels=shot_labels,
+                    test_features=case_embeddings,
+                    shot_coordinates=task_results["shot_coordinates"],
+                    test_coordinates=task_results["cases_coordinates"],
+                    test_names=case_ids,
+                    global_patch_size=global_patch_size,
+                    global_patch_spacing=global_patch_spacing,
+                    shot_patch_sizes=shot_patch_sizes,
+                    test_patch_sizes=case_patch_sizes,
+                    shot_patch_spacings=shot_patch_spacings,
+                    test_patch_spacings=case_patch_spacings,
+                    feature_grid_resolution=feature_grid_resolution,
+                    test_image_sizes=case_image_sizes,
+                    shot_extra_labels=shot_extra_labels,
+                    test_image_spacing=case_image_spacings,
+                    test_image_origins=case_image_origins,
+                    test_image_directions=case_image_directions,
+                    test_label_spacing=case_label_spacings,
+                    test_label_origins=case_label_origins,
+                    test_label_directions=case_label_directions,
+                    test_label_sizes=case_label_sizes,
+                    shot_image_sizes=shot_image_sizes,
+                    shot_image_spacing=shot_image_spacings,
+                    shot_image_origins=shot_image_origins,
+                    shot_image_directions=shot_image_directions,
+                    shot_label_spacing=shot_label_spacings,
+                    shot_label_origins=shot_label_origins,
+                    shot_label_directions=shot_label_directions,
+                    return_probabilities=return_probabilities,
+                )
+
+                # delete arrays and run garbage collection
+                del (
+                    shot_embeddings, case_embeddings, shot_labels, shot_extra_labels,
+                    shot_ids, shot_image_sizes, shot_image_spacings, shot_image_origins,
+                    shot_image_directions, shot_patch_sizes, shot_patch_spacings, shot_label_spacings, shot_label_origins,
+                    shot_label_directions, case_image_sizes, case_image_spacings,
+                    case_image_origins, case_image_directions, case_patch_sizes, case_patch_spacings, case_label_sizes,
+                    case_label_spacings, case_label_origins, case_label_directions
+                )
+                gc.collect()
+
+                metrics = evaluate_predictions(
+                    task_name=task_name,
+                    case_ids=case_ids,
+                    test_predictions=predictions,
+                    test_labels=case_labels,
+                    test_extra_labels=case_extra_labels,
+                    save_predictions=save_predictions
+                )
+                metric_list.append(metrics)
+
+            avg_metric = np.mean(metric_list)
+            task_metrics[task_name] = avg_metric
+
         elif modality == "vision-language":
             predictions = [pred["text"] for pred in task_results["prediction"]]
             case_labels = [
                 label["text"] for case in task_results["case_labels"] for label in case
             ]
             case_extra_labels = None
+
+            metrics = evaluate_predictions(
+                task_name=task_name,
+                case_ids=case_ids,
+                test_predictions=predictions,
+                test_labels=case_labels,
+                test_extra_labels=case_extra_labels,
+                save_predictions=save_predictions
+            )
+            task_metrics[task_name] = metrics
+
         else:
             raise ValueError(f"Unsupported modality: {modality}")
-
-        metrics = evaluate_predictions(
-            task_name=task_name,
-            case_ids=case_ids,
-            test_predictions=predictions,
-            test_labels=case_labels,
-            test_extra_labels=case_extra_labels,
-            save_predictions=save_predictions
-        )
-        task_metrics[task_name] = metrics
 
         # free up memory
         del task_results, predictions, case_labels, case_ids
