@@ -649,12 +649,9 @@ def main():
         max_workers = get_max_workers()
         task_metrics = {}
 
-    # process task sequentially and manage memory
-    for task_name, task_predictions in list(predictions_by_task.items()):
-        logging.info(f"Processing task: {task_name}")
         # process task sequentially and manage memory
         for task_name in all_tasks:
-            print(f"Processing task: {task_name}")
+            logging.info(f"Processing task: {task_name}")
 
             # only keep predictions for the current task
             task_case_names = mapping[mapping["task_name"] == task_name]["case_id"].tolist()
