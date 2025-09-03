@@ -261,7 +261,17 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
         )
 
         decoder.to(self.device)
-        self.decoder = train_decoder3d(decoder, train_loader, self.device)
+        try:
+            self.decoder = train_decoder3d(decoder, train_loader, self.device)
+        except torch.cuda.OutOfMemoryError as e:
+            logging.warning(f"Out of memory error occurred while training decoder: {e}")
+            if self.device.type == 'cuda':
+                logging.info("Retrying using CPU")
+                self.device = torch.device("cpu")
+                decoder.to(self.device)
+                self.decoder = train_decoder3d(decoder, train_loader, self.device)
+            else:
+                raise
 
     def predict(self) -> list:
         # build test data and loader

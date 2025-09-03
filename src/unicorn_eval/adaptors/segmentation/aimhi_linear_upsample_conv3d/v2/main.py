@@ -176,7 +176,17 @@ class LinearUpsampleConv3D_V2(SegmentationUpsampling3D):
 
         logging.info(f"Training decoder with {num_classes} classes")
         decoder.to(self.device)
-        self.decoder = train_seg_adaptor3d(decoder, train_loader, self.device, is_task11=self.is_task11, is_task06=self.is_task06)
+        try:
+            self.decoder = train_seg_adaptor3d(decoder, train_loader, self.device, is_task11=self.is_task11, is_task06=self.is_task06)
+        except torch.cuda.OutOfMemoryError as e:
+            logging.warning(f"Out of memory error occurred while training decoder: {e}")
+            if self.device.type == 'cuda':
+                logging.info("Retrying using CPU")
+                self.device = torch.device("cpu")
+                decoder.to(self.device)
+                self.decoder = train_seg_adaptor3d(decoder, train_loader, self.device, is_task11=self.is_task11, is_task06=self.is_task06)
+            else:
+                raise
 
     def predict(self) -> list:
         # build test data and loader

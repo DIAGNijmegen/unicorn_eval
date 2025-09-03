@@ -167,15 +167,33 @@ class ConvSegmentation3D(SegmentationUpsampling3D):
         loss = DiceFocalLoss(to_onehot_y=True, softmax=True, alpha=0.25)
         optimizer = optim.AdamW(decoder.parameters(), lr=3e-3)
         decoder.to(self.device)
-        self.decoder = train_decoder3d(
-            decoder,
-            train_loader,
-            self.device,
-            num_epochs=8,
-            loss_fn=loss,
-            optimizer=optimizer,
-            label_mapper=self.gt_to_multiclass,
-        )
+        try:
+            self.decoder = train_decoder3d(
+                decoder,
+                train_loader,
+                self.device,
+                num_epochs=8,
+                loss_fn=loss,
+                optimizer=optimizer,
+                label_mapper=self.gt_to_multiclass,
+            )
+        except torch.cuda.OutOfMemoryError as e:
+            logging.warning(f"Out of memory error occurred while training decoder: {e}")
+            if self.device.type == 'cuda':
+                logging.info("Retrying using CPU")
+                self.device = torch.device("cpu")
+                decoder.to(self.device)
+                self.decoder = train_decoder3d(
+                    decoder,
+                    train_loader,
+                    self.device,
+                    num_epochs=8,
+                    loss_fn=loss,
+                    optimizer=optimizer,
+                    label_mapper=self.gt_to_multiclass,
+                )
+            else:
+                raise
 
     def predict(self):  # Copied from SegmentationUpsampling3D to change activation
         test_data = construct_data_with_labels(

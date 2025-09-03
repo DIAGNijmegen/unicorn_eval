@@ -233,6 +233,8 @@ class SegmentationUpsampling3D_V2(PatchLevelTaskAdaptor):
                     data_loader=train_loader,
                     device=self.device,
                 )
+            else:
+                raise
 
     def predict(self) -> list:
         # build test data and loader
