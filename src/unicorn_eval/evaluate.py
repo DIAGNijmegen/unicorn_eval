@@ -27,14 +27,13 @@ from dragon_eval import DragonEval
 from dragon_eval.evaluation import REGRESSION_EPSILON, TASK_TYPE, EvalType
 
 from unicorn_eval.helpers import get_max_workers
-from unicorn_eval.utils import (adapt_features, evaluate_predictions,
+from unicorn_eval.utils import (set_all_seeds, adapt_features, evaluate_predictions,
                                 extract_data, extract_embeddings_and_labels,
                                 normalize_metric, write_json_file)
 
 INPUT_DIRECTORY = Path("/input")
 OUTPUT_DIRECTORY = Path("/output")
 GROUNDTRUTH_DIRECTORY = Path("/opt/ml/input/data/ground_truth")
-
 
 ADAPTOR_SLUGS_DICT = {
     "Task01_classifying_he_prostate_biopsies_into_isup_scores": "adaptor-pathology-classification",
@@ -49,6 +48,15 @@ ADAPTOR_SLUGS_DICT = {
     "Task10_segmenting_lesions_within_vois_in_ct": "adaptor-radiology-segmentation",
     "Task11_segmenting_three_anatomical_structures_in_lumbar_spine_mri": "adaptor-radiology-segmentation",
 }
+
+DETERMINISTIC_ADAPTORS = [
+    "1-nn",
+    "5-nn",
+    "20-nn",
+    "1-nn-weighted",
+    "5-nn-weighted",
+    "20-nn-weighted",
+]
 
 REQUIRES_PROBABILITIES_DICT = {
     "Task01_classifying_he_prostate_biopsies_into_isup_scores": False,
@@ -734,41 +742,82 @@ def main():
                 if len(case_embeddings.shape) > 2:
                     case_embeddings = case_embeddings.squeeze(1)
 
-            predictions = adapt_features(
-                adaptor_name=adaptor_name,
-                task_type=task_type,
-                shot_features=shot_embeddings,
-                shot_names=shot_ids,
-                shot_labels=shot_labels,
-                test_features=case_embeddings,
-                shot_coordinates=task_results["shot_coordinates"],
-                test_coordinates=task_results["cases_coordinates"],
-                test_names=case_ids,
-                global_patch_size=global_patch_size,
-                global_patch_spacing=global_patch_spacing,
-                shot_patch_sizes=shot_patch_sizes,
-                test_patch_sizes=case_patch_sizes,
-                shot_patch_spacings=shot_patch_spacings,
-                test_patch_spacings=case_patch_spacings,
-                feature_grid_resolution=feature_grid_resolution,
-                test_image_sizes=case_image_sizes,
-                shot_extra_labels=shot_extra_labels,
-                test_image_spacing=case_image_spacings,
-                test_image_origins=case_image_origins,
-                test_image_directions=case_image_directions,
-                test_label_spacing=case_label_spacings,
-                test_label_origins=case_label_origins,
-                test_label_directions=case_label_directions,
-                test_label_sizes=case_label_sizes,
-                shot_image_sizes=shot_image_sizes,
-                shot_image_spacing=shot_image_spacings,
-                shot_image_origins=shot_image_origins,
-                shot_image_directions=shot_image_directions,
-                shot_label_spacing=shot_label_spacings,
-                shot_label_origins=shot_label_origins,
-                shot_label_directions=shot_label_directions,
-                return_probabilities=return_probabilities,
-            )
+            num_run = 5
+            if adaptor_name in DETERMINISTIC_ADAPTORS:
+                num_run = 1
+
+            first_metric, first_additional_metric = True, True
+            running_metrics = {"metrics": {}, "additional_metrics": {}}
+            for seed in range(num_run):
+
+                set_all_seeds(seed)
+                predictions = adapt_features(
+                    adaptor_name=adaptor_name,
+                    task_type=task_type,
+                    shot_features=shot_embeddings,
+                    shot_names=shot_ids,
+                    shot_labels=shot_labels,
+                    test_features=case_embeddings,
+                    shot_coordinates=task_results["shot_coordinates"],
+                    test_coordinates=task_results["cases_coordinates"],
+                    test_names=case_ids,
+                    global_patch_size=global_patch_size,
+                    global_patch_spacing=global_patch_spacing,
+                    shot_patch_sizes=shot_patch_sizes,
+                    test_patch_sizes=case_patch_sizes,
+                    shot_patch_spacings=shot_patch_spacings,
+                    test_patch_spacings=case_patch_spacings,
+                    feature_grid_resolution=feature_grid_resolution,
+                    test_image_sizes=case_image_sizes,
+                    shot_extra_labels=shot_extra_labels,
+                    test_image_spacing=case_image_spacings,
+                    test_image_origins=case_image_origins,
+                    test_image_directions=case_image_directions,
+                    test_label_spacing=case_label_spacings,
+                    test_label_origins=case_label_origins,
+                    test_label_directions=case_label_directions,
+                    test_label_sizes=case_label_sizes,
+                    shot_image_sizes=shot_image_sizes,
+                    shot_image_spacing=shot_image_spacings,
+                    shot_image_origins=shot_image_origins,
+                    shot_image_directions=shot_image_directions,
+                    shot_label_spacing=shot_label_spacings,
+                    shot_label_origins=shot_label_origins,
+                    shot_label_directions=shot_label_directions,
+                    return_probabilities=return_probabilities,
+                    seed=seed,
+                )
+
+                metrics = evaluate_predictions(
+                    task_name=task_name,
+                    case_ids=case_ids,
+                    test_predictions=predictions,
+                    test_labels=case_labels,
+                    test_extra_labels=case_extra_labels,
+                    save_predictions=save_predictions
+                )
+
+                # store metrics
+                for metric_name, metric_value in metrics["metrics"].items():
+                    if first_metric:
+                        first_metric = False
+                        running_metrics["metrics"][metric_name] = metric_value
+                    else:
+                        running_metrics["metrics"][metric_name] += metric_value
+                for metric_name, metric_value in metrics["additional_metrics"].items():
+                    if first_additional_metric:
+                        first_additional_metric = False
+                        running_metrics["additional_metrics"][metric_name] = metric_value
+                    else:
+                        running_metrics["additional_metrics"][metric_name] += metric_value
+
+            # average metrics
+            avg_metrics = {
+                "metrics": {k: v / num_run for k, v in running_metrics["metrics"].items()},
+                "additional_metrics": {k: v / num_run for k, v in running_metrics["additional_metrics"].items()}
+            }
+
+            task_metrics[task_name] = avg_metrics
 
             # delete arrays and run garbage collection
             del (
@@ -780,24 +829,26 @@ def main():
                 case_label_spacings, case_label_origins, case_label_directions
             )
             gc.collect()
+
         elif modality == "vision-language":
             predictions = [pred["text"] for pred in task_results["prediction"]]
             case_labels = [
                 label["text"] for case in task_results["case_labels"] for label in case
             ]
             case_extra_labels = None
+
+            metrics = evaluate_predictions(
+                task_name=task_name,
+                case_ids=case_ids,
+                test_predictions=predictions,
+                test_labels=case_labels,
+                test_extra_labels=case_extra_labels,
+                save_predictions=save_predictions
+            )
+            task_metrics[task_name] = metrics
+
         else:
             raise ValueError(f"Unsupported modality: {modality}")
-
-        metrics = evaluate_predictions(
-            task_name=task_name,
-            case_ids=case_ids,
-            test_predictions=predictions,
-            test_labels=case_labels,
-            test_extra_labels=case_extra_labels,
-            save_predictions=save_predictions
-        )
-        task_metrics[task_name] = metrics
 
         # free up memory
         del task_results, predictions, case_labels, case_ids
