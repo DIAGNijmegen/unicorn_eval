@@ -786,17 +786,6 @@ def main():
                     seed=seed,
                 )
 
-                # delete arrays and run garbage collection
-                del (
-                    shot_embeddings, case_embeddings, shot_labels, shot_extra_labels,
-                    shot_ids, shot_image_sizes, shot_image_spacings, shot_image_origins,
-                    shot_image_directions, shot_patch_sizes, shot_patch_spacings, shot_label_spacings, shot_label_origins,
-                    shot_label_directions, case_image_sizes, case_image_spacings,
-                    case_image_origins, case_image_directions, case_patch_sizes, case_patch_spacings, case_label_sizes,
-                    case_label_spacings, case_label_origins, case_label_directions
-                )
-                gc.collect()
-
                 metrics = evaluate_predictions(
                     task_name=task_name,
                     case_ids=case_ids,
@@ -807,8 +796,20 @@ def main():
                 )
                 metric_list.append(metrics)
 
+
             avg_metric = np.mean(metric_list)
             task_metrics[task_name] = avg_metric
+
+            # delete arrays and run garbage collection
+            del (
+                shot_embeddings, case_embeddings, shot_labels, shot_extra_labels,
+                shot_ids, shot_image_sizes, shot_image_spacings, shot_image_origins,
+                shot_image_directions, shot_patch_sizes, shot_patch_spacings, shot_label_spacings, shot_label_origins,
+                shot_label_directions, case_image_sizes, case_image_spacings,
+                case_image_origins, case_image_directions, case_patch_sizes, case_patch_spacings, case_label_sizes,
+                case_label_spacings, case_label_origins, case_label_directions
+            )
+            gc.collect()
 
         elif modality == "vision-language":
             predictions = [pred["text"] for pred in task_results["prediction"]]
