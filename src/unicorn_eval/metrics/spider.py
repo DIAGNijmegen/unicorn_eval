@@ -1,6 +1,7 @@
 from collections import OrderedDict, defaultdict
 from typing import Iterable
 
+import logging
 import numpy as np
 import pandas
 
@@ -37,7 +38,7 @@ class Spider:
 
         # Check if manual and automatic mask have the same dimensions
         if mask_manual.shape != mask_automatic.shape:
-            print(
+            logging.warning(
                 " > Manual and automatic masks have different shapes: {} vs {}".format(
                     mask_manual.shape, mask_automatic.shape
                 )

@@ -13,6 +13,7 @@
 #  limitations under the License.
 from __future__ import annotations
 
+import logging
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -49,7 +50,7 @@ def train_decoder(decoder, dataloader, num_epochs=200, lr=0.001):
 
             total_loss += loss.item()
 
-        tqdm.write(f"Epoch {epoch+1}, Loss: {total_loss / len(dataloader)}")
+        logging.info(f"Epoch {epoch+1}, Loss: {total_loss / len(dataloader)}")
 
     return decoder
 
@@ -90,6 +91,6 @@ def train_decoder3d(decoder, data_loader, device, num_epochs: int = 3, iteration
             if iterations_per_epoch is not None and iteration_count >= iterations_per_epoch:
                 break
 
-        tqdm.write(f"Epoch {epoch+1}: Avg total loss = {epoch_loss / iteration_count:.4f}")
+        logging.info(f"Epoch {epoch+1}: Avg total loss = {epoch_loss / iteration_count:.4f}")
 
     return decoder

@@ -14,6 +14,8 @@
 
 from __future__ import annotations
 
+import logging
+
 import numpy as np
 import torch
 from tqdm import tqdm
@@ -206,19 +208,33 @@ class SegmentationUpsampling3D_V2(PatchLevelTaskAdaptor):
             "upsample_mode": "deconv",
             "act": "leakyrelu",
         }
-        print(f"Setting up decoder with: {latent_dim=}, {target_shape=}, {decoder_kwargs=}")
+        logging.info(f"Setting up decoder with: {latent_dim=}, {target_shape=}, {decoder_kwargs=}")
         decoder = Decoder3D(
             latent_dim=latent_dim,
             target_shape=target_shape,
             decoder_kwargs=decoder_kwargs,
         )
 
-        decoder.to(self.device)
-        self.decoder = train_decoder3d_v2(
-            decoder=decoder,
-            data_loader=train_loader,
-            device=self.device,
-        )
+        try:
+            decoder.to(self.device)
+            self.decoder = train_decoder3d_v2(
+                decoder=decoder,
+                data_loader=train_loader,
+                device=self.device,
+            )
+        except torch.cuda.OutOfMemoryError as e:
+            logging.warning(f"Out of memory error occurred while training decoder: {e}")
+            if self.device.type == 'cuda':
+                logging.info("Retrying using CPU")
+                self.device = torch.device("cpu")
+                decoder.to(self.device)
+                self.decoder = train_decoder3d_v2(
+                    decoder=decoder,
+                    data_loader=train_loader,
+                    device=self.device,
+                )
+            else:
+                raise
 
     def predict(self) -> list:
         # build test data and loader

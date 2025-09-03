@@ -43,5 +43,5 @@ def download_predictions(
 
 if __name__ == "__main__":
     download_predictions(
-        output_dir=Path("/Users/joeranbosma/repos/unicorn_eval/tests/vision/input-task10-check"),
+        output_dir=Path("/Users/joeranbosma/repos/unicorn_eval/tests/vision/check-all-submission-7626164d-dd32-42ba-9185-0df31a312d3e"),
     )

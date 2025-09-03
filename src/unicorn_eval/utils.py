@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 import json
+import logging
 from functools import partial
 from typing import Any
 
@@ -950,7 +951,7 @@ def process_detection_radiology(data, task_name: str | None = None):
                     element = first_tuple[0]
 
                     if element is None:
-                        print("nothing to process in this case (got [(None,)])")
+                        logging.info("nothing to process in this case (got [(None,)])")
 
                     elif isinstance(element, dict):
                         for idx, d in enumerate(element.get("points")):

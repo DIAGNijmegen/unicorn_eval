@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Callable
 
 import torch
@@ -20,7 +21,7 @@ def train_decoder3d_v2(
     loss_fn: nn.Module | None = None,
     optimizer: optim.Optimizer | None = None,
     label_mapper: Callable | None = None,
-    verbose: bool = True,
+    verbose: bool = False,
 ):
     if loss_fn is None:
         loss_fn = DiceCELoss(softmax=True, lambda_dice=0.25)
@@ -82,7 +83,7 @@ def train_decoder3d_v2(
 
         if iteration_count % 100 == 0:
             avg_loss = epoch_loss / epoch_iterations
-            tqdm.write(f"Iteration {iteration_count}: avg_loss={avg_loss:.5e}")
+            logging.info(f"Iteration {iteration_count}: avg_loss={avg_loss:.5e}")
 
             epoch_loss = 0.0
             epoch_iterations = 0

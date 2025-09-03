@@ -13,6 +13,8 @@
 #  limitations under the License.
 from __future__ import annotations
 
+import gc
+import logging
 from collections import defaultdict
 from typing import Callable
 
@@ -80,8 +82,8 @@ def inference(decoder, dataloader, patch_size, test_image_sizes=None):
                 x : x + slice_width, y : y + slice_height
             ] = pred_masks_resized
         else:
-            print(
-                f"[WARNING] Skipping assignment for case {case} at ({x}, {y}) due to invalid slice size"
+            logging.warning(
+                f"Skipping assignment for case {case} at ({x}, {y}) due to invalid slice size"
             )
 
     return [v.T for v in predicted_masks.values()]
@@ -100,56 +102,12 @@ def create_grid(decoded_patches):
     for idx, patches in tqdm(decoded_patches.items(), desc="Creating grids"):
         stitched = stitch_patches_fast(patches)
         grids[idx] = stitched
+        
+        # Clear patches from memory immediately after processing
+        decoded_patches[idx].clear()
+        del patches
+        gc.collect()
 
-    if False:
-        # deprecated
-
-        # Pull meta from the first patch
-        meta = patches[0]
-        image_size = meta["image_size"]
-        image_origin = meta["image_origin"]
-        image_spacing = meta["image_spacing"]
-        direction = np.array(meta["image_direction"]).reshape(3, 3)
-        inv_direction = np.linalg.inv(direction)
-        patch_size = meta["patch_size"]
-
-        padded_shape = [
-            int(np.ceil(image_size[d] / patch_size[d]) * patch_size[d])
-            for d in range(3)
-        ]
-        pX, pY, pZ = patch_size  # SITK order
-        patch_size = (pZ, pY, pX)  # NumPy order
-        padding = [(padded_shape[d] - image_size[d]) // 2 for d in range(3)]
-        padding_mm = np.array(padding) * image_spacing
-        adjusted_origin = image_origin - direction @ padding_mm
-        # Initialize grid
-        pX, pY, pZ = padded_shape  # SITK order
-        grid_shape = (pZ, pY, pX)  # NumPy order
-        grid = np.zeros(grid_shape, dtype=np.float32)
-
-        for patch in patches:
-            i, j, k = world_to_voxel(
-                patch["coord"], adjusted_origin, image_spacing, inv_direction
-            )
-            patch_array = patch["features"].squeeze(0)
-            grid[
-                k : k + patch_size[0], j : j + patch_size[1], i : i + patch_size[2]
-            ] += patch_array
-
-        x_start = padding[0]
-        x_end = x_start + image_size[0]
-        y_start = padding[1]
-        y_end = y_start + image_size[1]
-        z_start = padding[2]
-        z_end = z_start + image_size[2]
-        cropped = grid[z_start:z_end, y_start:y_end, x_start:x_end]
-
-        pred_img = sitk.GetImageFromArray(cropped)
-        pred_img.SetOrigin(tuple(image_origin))
-        pred_img.SetSpacing(tuple(image_spacing))
-        pred_img.SetDirection(tuple(np.array(meta["image_direction"])))
-
-        grids.update({idx: pred_img})
     return grids
 
 
@@ -243,8 +201,18 @@ def inference3d(
                         "image_direction": patches[0]["image_direction"],
                     }
                 )
+                # Clear intermediate data to save memory
+                del all_features, stacked, patches
+
+        # Clear grouped_predictions after processing to free memory
+        del grouped_predictions
+        gc.collect()
 
         grids = create_grid(averaged_patches)
+
+        # Clear averaged_patches after grid creation to free memory
+        del averaged_patches
+        gc.collect()
 
         aligned_preds = {}
 
@@ -268,4 +236,12 @@ def inference3d(
             aligned_preds[case_id] = sitk.GetArrayFromImage(pred_on_gt)
             if mask_postprocessor is not None:
                 aligned_preds[case_id] = mask_postprocessor(aligned_preds[case_id], pred_on_gt)
+
+            # Clear individual grid to save memory during iteration
+            del pred_msk
+
+        # Clear grids after processing all cases
+        del grids
+        gc.collect()
+
         return [j for j in aligned_preds.values()]

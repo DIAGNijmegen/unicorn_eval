@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import math
 from collections import defaultdict
 from typing import Type
@@ -173,9 +174,19 @@ class LinearUpsampleConv3D_V2(SegmentationUpsampling3D):
             num_classes=num_classes,
         )
 
-        print(f"Training decoder with {num_classes} classes")
+        logging.info(f"Training decoder with {num_classes} classes")
         decoder.to(self.device)
-        self.decoder = train_seg_adaptor3d(decoder, train_loader, self.device, is_task11=self.is_task11, is_task06=self.is_task06)
+        try:
+            self.decoder = train_seg_adaptor3d(decoder, train_loader, self.device, is_task11=self.is_task11, is_task06=self.is_task06)
+        except torch.cuda.OutOfMemoryError as e:
+            logging.warning(f"Out of memory error occurred while training decoder: {e}")
+            if self.device.type == 'cuda':
+                logging.info("Retrying using CPU")
+                self.device = torch.device("cpu")
+                decoder.to(self.device)
+                self.decoder = train_seg_adaptor3d(decoder, train_loader, self.device, is_task11=self.is_task11, is_task06=self.is_task06)
+            else:
+                raise
 
     def predict(self) -> list:
         # build test data and loader
@@ -527,7 +538,7 @@ def train_seg_adaptor3d(decoder, data_loader, device, num_epochs = 3, iterations
             if iterations_per_epoch is not None and iteration_count >= iterations_per_epoch:
                 break
 
-        tqdm.write(f"Epoch {epoch+1}: Avg total loss = {epoch_loss / iteration_count:.4f}")
+        logging.info(f"Epoch {epoch+1}: Avg total loss = {epoch_loss / iteration_count:.4f}")
 
     return decoder
 
