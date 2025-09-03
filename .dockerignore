@@ -1,3 +1,4 @@
 tests/**
 **/__pycache__
 unicorn_eval*.tar.gz
+.git/
