@@ -745,7 +745,9 @@ def main():
             num_run = 5
             if adaptor_name in DETERMINISTIC_ADAPTORS:
                 num_run = 1
-            metric_list = []
+
+            first_metric, first_additional_metric = True, True
+            running_metrics = {"metrics": {}, "additional_metrics": {}}
             for seed in range(num_run):
 
                 set_all_seeds(seed)
@@ -794,11 +796,28 @@ def main():
                     test_extra_labels=case_extra_labels,
                     save_predictions=save_predictions
                 )
-                metric_list.append(metrics)
 
+                # store metrics
+                for metric_name, metric_value in metrics["metrics"].items():
+                    if first_metric:
+                        first_metric = False
+                        running_metrics["metrics"][metric_name] = metric_value
+                    else:
+                        running_metrics["metrics"][metric_name] += metric_value
+                for metric_name, metric_value in metrics["additional_metrics"].items():
+                    if first_additional_metric:
+                        first_additional_metric = False
+                        running_metrics["additional_metrics"][metric_name] = metric_value
+                    else:
+                        running_metrics["additional_metrics"][metric_name] += metric_value
 
-            avg_metric = np.mean(metric_list)
-            task_metrics[task_name] = avg_metric
+            # average metrics
+            avg_metrics = {
+                "metrics": {k: v / num_run for k, v in running_metrics["metrics"].items()},
+                "additional_metrics": {k: v / num_run for k, v in running_metrics["additional_metrics"].items()}
+            }
+
+            task_metrics[task_name] = avg_metrics
 
             # delete arrays and run garbage collection
             del (
