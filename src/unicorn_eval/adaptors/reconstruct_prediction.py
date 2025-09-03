@@ -74,12 +74,12 @@ def stitch_patches_fast(patches: list[dict]):
     out_origin_world = tuple((Dmat @ u_origin).tolist())
 
     # Allocate arrays
-    sum_arr = np.zeros(out_size_xyz[::-1], dtype=np.float64)  # (z,y,x)
-    count_arr = np.zeros_like(sum_arr)
+    sum_arr = np.zeros(out_size_xyz[::-1], dtype=np.float32)  # (z,y,x)
+    count_arr = np.zeros(out_size_xyz[::-1], dtype=np.int16)  # (z,y,x)
 
     # Accumulate patches
     for p in patches:
-        arr = np.asarray(p["features"], dtype=np.float64)
+        arr = np.asarray(p["features"], dtype=np.float32)
         if arr.ndim != 3:
             if arr.ndim == 4 and arr.shape[0] == 1:
                 arr = arr[0]  # drop class dimension
