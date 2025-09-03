@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import numpy as np
 import torch
 import torch.nn as nn
@@ -25,7 +26,7 @@ class ConvDecoder3D(nn.Module):
         super().__init__()
         self.patch_size = patch_size
         self.num_classes, self.num_channels, self.spatials = num_classes, target_shape[0], target_shape[1:]
-        print(f"ConvDecoder3D: {self.num_classes=}, {self.num_channels=}, {self.spatials=}")
+        logging.info(f"ConvDecoder3D: {self.num_classes=}, {self.num_channels=}, {self.spatials=}")
         self.emb_norm = nn.GroupNorm(1, self.num_channels)
         self.emb_activation = nn.GELU()
         self.ctx_stacks = nn.ModuleList(
@@ -86,7 +87,7 @@ class ConvSegmentation3D(SegmentationUpsampling3D):
         assert multiclass_mask.ndim == 3, f"Expected 3D input, got {multiclass_mask.shape}"
         instance_regions, num_instances = label(multiclass_mask == divider_class, connectivity=1, return_num=True)
         if num_instances == 0:
-            print(f"Found no instances of class {divider_class} in the mask.")
+            logging.info(f"Found no instances of class {divider_class} in the mask.")
             return multiclass_mask
         dividers = [int(np.round(region.centroid[dim])) for region in regionprops(instance_regions)]
 
@@ -152,7 +153,7 @@ class ConvSegmentation3D(SegmentationUpsampling3D):
             self.mask_processor = None
         num_channels, self.num_classes = z_dim // num_spatials, 4 if self.is_task11 else 2
         if self.num_classes != maxlabel + 1:
-            print(f"Warning: {self.num_classes=} != {maxlabel + 1=}, will use {self.num_classes} classes for training")
+            logging.warning(f"{self.num_classes=} != {maxlabel + 1=}, will use {self.num_classes} classes for training")
         target_shape = (num_channels, *self.pack_size[::-1])
 
         # set up device and model

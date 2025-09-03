@@ -14,6 +14,7 @@
 
 import gc
 import json
+import logging
 from collections import defaultdict
 from multiprocessing import Pool
 from pathlib import Path
@@ -196,7 +197,7 @@ def process(job):
     except FileNotFoundError:
         # if the mapping file is not found, we assume that the evaluation is for a language task
         # and we do not need the mapping
-        print(f"{mapping_path} not found, cannot group by task.")
+        logging.error(f"{mapping_path} not found, cannot group by task.")
         return {}
 
     image_name = None
@@ -341,7 +342,7 @@ def process(job):
             if extra_label_path.exists():
                 extra_labels[slug_name] = load_json_file(location=extra_label_path)
             else:
-                print(f"WARNING: extra label file not found: {extra_label_path}")
+                logging.warning(f"extra label file not found: {extra_label_path}")
                 extra_labels[slug_name] = None
 
         # convert extra_labels dictionary to a structured numpy array
@@ -376,7 +377,7 @@ def print_directory_contents(path: Path | str):
         if child.is_dir():
             print_directory_contents(child)
         else:
-            print(child)
+            logging.info(str(child))
 
 
 def read_adaptors():
@@ -428,7 +429,7 @@ def load_json_file(*, location):
 
 def load_tif_file(*, location):
     slide = openslide.OpenSlide(location)
-    print("Image dimensions:", slide.dimensions)
+    logging.info(f"Image dimensions: {slide.dimensions}")
     level_0 = slide.read_region((0, 0), 0, slide.dimensions)
     #   save_tif(level_0, location.stem)
     level_0_np = np.array(level_0)
@@ -483,7 +484,7 @@ def write_combined_metrics(
         [metric_value for _, metric_value in metrics["normalized_metrics"].items()]
     )
 
-    print(f"{metrics=}")
+    logging.info(f"metrics={metrics}")
     write_json_file(
         location=OUTPUT_DIRECTORY / "metrics.json",
         content=metrics,
@@ -590,7 +591,7 @@ def evaluate_language_predictions():
             return json.load(f)
 
     else:
-        print("No language tasks found in the ground truth files.")
+        logging.info("No language tasks found in the ground truth files.")
         return {}
 
 
@@ -604,7 +605,7 @@ def group_predictions_by_task(predictions, gt_dir: Path = GROUNDTRUTH_DIRECTORY)
         mapping = pd.read_csv(mapping_path, dtype={"case_id": str})  # ensure case_id is string to enable leading zeros
     except FileNotFoundError:
         # if the mapping file is not found, we assume that the evaluation is for a language task
-        print(f"{mapping_path} not found, cannot group by task.")
+        logging.error(f"{mapping_path} not found, cannot group by task.")
         return {}
 
     for prediction in predictions:
@@ -640,16 +641,16 @@ def group_predictions_by_task(predictions, gt_dir: Path = GROUNDTRUTH_DIRECTORY)
 
 
 def main():
-    print("Input folder contents:")
+    logging.info("Input folder contents:")
     print_directory_contents(INPUT_DIRECTORY)
-    print("=+=" * 10)
-    print("Groundtruth folder contents:")
+    logging.info("=+=" * 10)
+    logging.info("Groundtruth folder contents:")
     print_directory_contents(GROUNDTRUTH_DIRECTORY)
-    print("=+=" * 10)
+    logging.info("=+=" * 10)
 
-    print("Evaluating language predictions")
+    logging.info("Evaluating language predictions")
     task_metrics = reformat_language_metrics(evaluate_language_predictions())
-    print("=+=" * 10)
+    logging.info("=+=" * 10)
 
     metrics = {}
     adaptors = read_adaptors()
@@ -663,7 +664,7 @@ def main():
 
     # process task sequentially and manage memory
     for task_name, task_predictions in list(predictions_by_task.items()):
-        print(f"Processing task: {task_name}")
+        logging.info(f"Processing task: {task_name}")
 
         max_workers = get_max_workers()
         with Pool(processes=max_workers) as pool:
@@ -691,7 +692,7 @@ def main():
             if task_name not in adaptors:
                 raise Exception(f"No adaptor found for task {task_name}")
             adaptor_name = adaptors[task_name]
-            print(f"Using adaptor: {adaptor_name}")
+            logging.info(f"Using adaptor: {adaptor_name}")
             return_probabilities = REQUIRES_PROBABILITIES_DICT[task_name]
 
             # Set global values if all are the same, otherwise None
@@ -805,16 +806,16 @@ def main():
             del case_extra_labels
         gc.collect()
 
-        print(f"Completed processing task: {task_name}")
-        print("=+=" * 10)
+        logging.info(f"Completed processing task: {task_name}")
+        logging.info("=+=" * 10)
 
     # clean up any remaining memory
     del predictions_by_task, predictions_all
     gc.collect()
 
-    print(f"Writing metrics for {len(task_metrics)} tasks...")
+    logging.info(f"Writing metrics for {len(task_metrics)} tasks...")
     write_combined_metrics(metric_dict=task_metrics, save_predictions=False)
-    print("Metrics written successfully.")
+    logging.info("Metrics written successfully.")
     return 0
 
 

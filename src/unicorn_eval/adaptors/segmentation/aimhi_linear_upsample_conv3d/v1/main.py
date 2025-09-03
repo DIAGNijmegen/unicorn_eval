@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from collections import defaultdict
 
 import numpy as np
@@ -427,5 +428,5 @@ def train_seg_adaptor3d(decoder, data_loader, device, num_epochs = 3):
             epoch_loss += loss.item()
             batch_iter.set_postfix(loss=f"{loss.item():.4f}", avg=f"{epoch_loss / iteration_count:.4f}")
 
-        print(f"Epoch {epoch+1}: Avg total loss = {epoch_loss / iteration_count:.4f}")                               
+        logging.info(f"Epoch {epoch+1}: Avg total loss = {epoch_loss / iteration_count:.4f}")                               
     return decoder

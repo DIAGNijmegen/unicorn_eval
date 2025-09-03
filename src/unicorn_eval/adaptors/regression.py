@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import logging
 import tqdm
 import numpy as np
 import torch
@@ -306,10 +307,10 @@ class LinearProbingRegressor(CaseLevelTaskAdaptor):
         total_params = sum(
             p.numel() for p in self.model.parameters() if p.requires_grad
         )
-        print(
-            f"🚀 Starting training on {self.device} with {total_params:,} trainable parameters."
+        logging.info(
+            f"Starting training on {self.device} with {total_params:,} trainable parameters."
         )
-        print(self.model)
+        logging.info(str(self.model))
 
         best_loss = float("inf")
         best_epoch = 0
@@ -337,15 +338,15 @@ class LinearProbingRegressor(CaseLevelTaskAdaptor):
                 best_epoch = epoch
                 best_state = self.model.state_dict()
             elif epoch - best_epoch > self.patience:
-                tqdm.tqdm.write(f"Early stopping at epoch {epoch+1}")
+                logging.info(f"Early stopping at epoch {epoch+1}")
                 break
 
-            tqdm.tqdm.write(
+            logging.info(
                 f"Epoch {epoch+1}/{self.num_epochs} - Loss: {loss.item():.4f}"
             )
 
         self.model.load_state_dict(best_state)
-        tqdm.tqdm.write(
+        logging.info(
             f"Restored best model from epoch {best_epoch+1} with loss {best_loss:.4f}"
         )
 
@@ -480,10 +481,10 @@ class MultiLayerPerceptronRegressor(CaseLevelTaskAdaptor):
         total_params = sum(
             p.numel() for p in self.model.parameters() if p.requires_grad
         )
-        print(
-            f"🚀 Starting training on {self.device} with {total_params:,} trainable parameters."
+        logging.info(
+            f"Starting training on {self.device} with {total_params:,} trainable parameters."
         )
-        print(self.model)
+        logging.info(str(self.model))
 
         best_loss = float("inf")
         best_epoch = 0
@@ -511,15 +512,15 @@ class MultiLayerPerceptronRegressor(CaseLevelTaskAdaptor):
                 best_epoch = epoch
                 best_state = self.model.state_dict()
             elif epoch - best_epoch > self.patience:
-                tqdm.tqdm.write(f"Early stopping at epoch {epoch+1}")
+                logging.info(f"Early stopping at epoch {epoch+1}")
                 break
 
-            tqdm.tqdm.write(
+            logging.info(
                 f"Epoch {epoch+1}/{self.num_epochs} - Loss: {epoch_loss:.4f}"
             )
 
         self.model.load_state_dict(best_state)
-        tqdm.tqdm.write(
+        logging.info(
             f"Restored best model from epoch {best_epoch+1} with loss {best_loss:.4f}"
         )
 

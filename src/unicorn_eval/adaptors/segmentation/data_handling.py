@@ -334,8 +334,8 @@ class BalancedSegmentationDataset(Dataset):
             raise ValueError("No positive classes found.")
 
         num_patches_per_label = {k: len(v) for k, v in self.patches_by_label.items()}
-        print(f"BalancedSegmentationDataset: Num patches per class: {num_patches_per_label}")
-        print(f"Total balanced dataset size: {self.total_length}")
+        logging.info(f"BalancedSegmentationDataset: Num patches per class: {num_patches_per_label}")
+        logging.info(f"Total balanced dataset size: {self.total_length}")
 
     def __len__(self):
         return self.total_length

@@ -1,3 +1,4 @@
+import logging
 import multiprocessing
 import os
 import sys
@@ -14,19 +15,19 @@ class PredictionProcessingError(Exception):
 
 
 def display_processing_report(succeeded, canceled, failed):
-    print("PROCESSING REPORT")
+    logging.info("PROCESSING REPORT")
     total = len(succeeded) + len(canceled) + len(failed)
 
-    print(f"Succeeded ({len(succeeded)}/{total}):")
+    logging.info(f"Succeeded ({len(succeeded)}/{total}):")
     for s in succeeded or "-":
-        print(f"\t{s}")
-    print(f"Canceled ({len(canceled)}/{total}):")
+        logging.info(f"\t{s}")
+    logging.info(f"Canceled ({len(canceled)}/{total}):")
     for c in canceled or "-":
-        print(f"\t{c}")
-    print(f"Failed ({len(failed)}/{total}):")
+        logging.info(f"\t{c}")
+    logging.info(f"Failed ({len(failed)}/{total}):")
     for f in failed or "-":
-        print(f"\t{f}")
-    print("")
+        logging.info(f"\t{f}")
+    logging.info("")
 
 
 def get_max_workers():
@@ -95,9 +96,8 @@ def run_prediction_processing(*, fn, predictions):
 
         if errors:
             for prediction_pk, tb_str in errors.items():
-                print(
-                    f"Error in prediction: {prediction_pk}\n{tb_str}",
-                    file=sys.stderr,
+                logging.error(
+                    f"Error in prediction: {prediction_pk}\n{tb_str}"
                 )
 
             raise PredictionProcessingError()

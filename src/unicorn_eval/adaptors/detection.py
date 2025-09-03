@@ -14,6 +14,7 @@
 
 from typing import Sequence
 
+import logging
 import numpy as np
 import scipy.ndimage as ndimage
 import torch
@@ -146,7 +147,7 @@ def train_decoder(decoder, dataloader, heatmap_size=16, num_epochs=200, lr=1e-5)
 
             total_loss += loss.item()
 
-        print(f"Epoch {epoch+1}, Loss: {total_loss / len(dataloader)}")
+        logging.info(f"Epoch {epoch+1}, Loss: {total_loss / len(dataloader)}")
 
     return decoder
 
@@ -402,7 +403,7 @@ class ConvDetectionDecoder(nn.Module):
         output_size = heatmap_size * heatmap_size
         assert input_dim_flat % (heatmap_size**2) == 0, f"{input_dim_flat=} needs to be divisable by {heatmap_size**2=}"
         self.spatial_dim = input_dim_flat // (heatmap_size**2)
-        print(f"{self.spatial_dim=}, {output_size=}, {heatmap_size=}")
+        logging.info(f"{self.spatial_dim=}, {output_size=}, {heatmap_size=}")
         self.convs = nn.ModuleList(
             [ConvStack(channels=self.spatial_dim) for _ in range(2)]
         )
@@ -494,7 +495,7 @@ class ConvDetector(DensityMap):
 
                 total_loss += loss.item()
 
-            print(f"Epoch {epoch+1}, Loss: {total_loss / len(dataloader)}")
+            logging.info(f"Epoch {epoch+1}, Loss: {total_loss / len(dataloader)}")
 
 
 class TwoLayerPerceptron(nn.Module):
@@ -727,7 +728,7 @@ class PatchNoduleRegressor(PatchLevelTaskAdaptor):
 
         # Nodule count printout
         n_kept = int(mask.sum())
-        print(
+        logging.info(
             f"[MLPRegressor] Returning {n_kept} nodules (p > 0.9) "
             f"out of {len(mask)} patches"
         )

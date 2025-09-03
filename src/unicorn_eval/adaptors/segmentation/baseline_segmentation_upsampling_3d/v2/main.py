@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import logging
 import numpy as np
 import torch
 from tqdm import tqdm
@@ -206,7 +207,7 @@ class SegmentationUpsampling3D_V2(PatchLevelTaskAdaptor):
             "upsample_mode": "deconv",
             "act": "leakyrelu",
         }
-        print(f"Setting up decoder with: {latent_dim=}, {target_shape=}, {decoder_kwargs=}")
+        logging.info(f"Setting up decoder with: {latent_dim=}, {target_shape=}, {decoder_kwargs=}")
         decoder = Decoder3D(
             latent_dim=latent_dim,
             target_shape=target_shape,

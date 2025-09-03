@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import logging
 import numpy as np
 from evalutils.evalutils import score_detection
 
@@ -26,7 +27,7 @@ def score(gt_coords, pred_coords, dist_thresh):
     tps, fns, fps = 0, 0, 0
 
     for i, (gt, pred) in enumerate(zip(gt_coords, pred_coords)):
-        print(f"[ROI {i+1}] Ground Truths: {len(gt)}, Predictions: {len(pred)}")
+        logging.info(f"[ROI {i+1}] Ground Truths: {len(gt)}, Predictions: {len(pred)}")
 
         if len(pred) == 0:
             fns += len(gt)  # no tp or fp
@@ -43,9 +44,9 @@ def score(gt_coords, pred_coords, dist_thresh):
             fns += det_score.false_negatives
             fps += det_score.false_positives
 
-        print(f"  → TP: {tps}, FN: {fns}, FP: {fps}")
+        logging.info(f"  → TP: {tps}, FN: {fns}, FP: {fps}")
 
-    print(
+    logging.info(
         f"\nCompleted {len(gt_coords)} ROIs — Empty GTs: {n_empty_rois}, No Predictions: {no_pred_rois}"
     )
 
@@ -61,27 +62,27 @@ def score(gt_coords, pred_coords, dist_thresh):
 
 
 def do_prints(gts, preds_list):
-    print(f"\n[INFO] Ground Truths for {len(gts)} files")
-    print(f"[INFO] Total ROIs during inference: {len(preds_list)}\n")
+    logging.info(f"\n[INFO] Ground Truths for {len(gts)} files")
+    logging.info(f"[INFO] Total ROIs during inference: {len(preds_list)}\n")
 
     for i, gt in enumerate(gts):
-        print(f"  GT File {i+1}: {len(gt)} cells")
+        logging.info(f"  GT File {i+1}: {len(gt)} cells")
 
-    print(f"\n[INFO] Predictions for {len(preds_list)} files")
+    logging.info(f"\n[INFO] Predictions for {len(preds_list)} files")
     for i, pr in enumerate(preds_list):
         pred_count = len(pr) if isinstance(pr, list) else int(bool(pr))
-        print(f"  Prediction File {i+1}: {pred_count} predictions")
+        logging.info(f"  Prediction File {i+1}: {pred_count} predictions")
 
 
 def compute_f1(gts, preds_list, dist_thresh):
     do_prints(gts, preds_list)
 
     if not preds_list or np.sum([len(pr) for pr in preds_list]) == 0:
-        print("[WARN] No predictions found!")
+        logging.warning("No predictions found!")
         return 0.0
 
     f1_score = score(gts, preds_list, dist_thresh)
 
-    print(f"\n[RESULTS] ROIs Processed: {len(gts)}")
-    print(f"[RESULTS] F1 Score: {f1_score:.5f}")
+    logging.info(f"\n[RESULTS] ROIs Processed: {len(gts)}")
+    logging.info(f"[RESULTS] F1 Score: {f1_score:.5f}")
     return f1_score

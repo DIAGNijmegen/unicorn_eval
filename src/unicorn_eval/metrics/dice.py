@@ -12,6 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import logging
 import numpy as np
 from pycm import ConfusionMatrix
 from sklearn.metrics import confusion_matrix
@@ -127,6 +128,6 @@ def compute_dice_score(gts, preds):
 
     final_score = scorer.get_score()
     avg_tumor_stroma_dice = (final_score["Tumor"] + final_score["Stroma"]) / 2
-    print(f"Score: {final_score}")
-    print(f"Avg Tumor-Stroma Dice: {avg_tumor_stroma_dice:.4f}")
+    logging.info(f"Score: {final_score}")
+    logging.info(f"Avg Tumor-Stroma Dice: {avg_tumor_stroma_dice:.4f}")
     return avg_tumor_stroma_dice

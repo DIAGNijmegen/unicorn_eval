@@ -13,6 +13,7 @@
 #  limitations under the License.
 from __future__ import annotations
 
+import logging
 from collections import defaultdict
 from typing import Callable
 
@@ -80,8 +81,8 @@ def inference(decoder, dataloader, patch_size, test_image_sizes=None):
                 x : x + slice_width, y : y + slice_height
             ] = pred_masks_resized
         else:
-            print(
-                f"[WARNING] Skipping assignment for case {case} at ({x}, {y}) due to invalid slice size"
+            logging.warning(
+                f"Skipping assignment for case {case} at ({x}, {y}) due to invalid slice size"
             )
 
     return [v.T for v in predicted_masks.values()]
