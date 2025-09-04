@@ -15,8 +15,7 @@
 import gc
 import json
 import logging
-from collections import defaultdict
-from multiprocessing import Pool
+import multiprocessing
 from pathlib import Path
 from pprint import pformat
 
@@ -28,9 +27,14 @@ from dragon_eval import DragonEval
 from dragon_eval.evaluation import REGRESSION_EPSILON, TASK_TYPE, EvalType
 
 from unicorn_eval.helpers import get_max_workers
-from unicorn_eval.utils import (adapt_features, evaluate_predictions,
-                                extract_data, extract_embeddings_and_labels,
-                                normalize_metric, write_json_file)
+from unicorn_eval.utils import (
+    adapt_features,
+    evaluate_predictions,
+    extract_data,
+    extract_embeddings_and_labels,
+    normalize_metric,
+    write_json_file,
+)
 
 INPUT_DIRECTORY = Path("/input")
 OUTPUT_DIRECTORY = Path("/output")
@@ -625,6 +629,149 @@ def evaluate_language_predictions():
         return {}
 
 
+def process_task_in_subprocess(task_name, mapping, adaptors, save_predictions, metrics_path):
+    logging.info(f"Processing task in subprocess: {task_name}")
+
+    # identify task cases to filter predictions
+    task_case_names = mapping[mapping["task_name"] == task_name]["case_id"].tolist()
+    task_predictions = read_predictions(input_dir=INPUT_DIRECTORY, case_names=task_case_names)
+
+    # process the task's predictions in parallel
+    max_workers = get_max_workers()
+    pool = multiprocessing.Pool(processes=max_workers)
+    processed_results = pool.map(process, task_predictions)
+    pool.close()
+    pool.join()
+
+    task_results = extract_embeddings_and_labels(processed_results, task_name)
+    del task_predictions
+    del processed_results
+    gc.collect()
+
+    modality = task_results["modality"]
+    case_labels = task_results["case_labels"]
+    case_ids = task_results["case_ids"]
+    task_type = task_results["task_type"]
+
+    if modality == "vision":
+
+        # ensure we have an adaptor for this task
+        if task_name not in adaptors:
+            raise Exception(f"No adaptor found for task {task_name}")
+
+        adaptor_name = adaptors[task_name]
+        return_probabilities = REQUIRES_PROBABILITIES_DICT[task_name]
+
+        global_patch_size = task_results["global_patch_size"]
+        global_patch_spacing = task_results["global_patch_spacing"]
+        feature_grid_resolution = task_results["feature_grid_resolution"]
+
+        shot_embeddings = task_results["shot_embeddings"]
+        shot_labels = task_results["shot_labels"]
+        shot_extra_labels = task_results["shot_extra_labels"]
+        shot_ids = task_results["shot_ids"]
+        shot_image_sizes = task_results["shot_image_sizes"]
+        shot_image_spacings = task_results["shot_image_spacings"]
+        shot_image_origins = task_results["shot_image_origins"]
+        shot_image_directions = task_results["shot_image_directions"]
+        shot_patch_sizes = task_results["shot_patch_sizes"]
+        shot_patch_spacings = task_results["shot_patch_spacings"]
+        shot_label_spacings = task_results["shot_label_spacings"]
+        shot_label_origins = task_results["shot_label_origins"]
+        shot_label_directions = task_results["shot_label_directions"]
+
+        case_embeddings = task_results["case_embeddings"]
+        case_extra_labels = task_results["case_extra_labels"]
+        case_image_sizes = task_results["cases_image_sizes"]
+        case_image_spacings = task_results["cases_image_spacings"]
+        case_image_origins = task_results["cases_image_origins"]
+        case_image_directions = task_results["cases_image_directions"]
+        case_patch_sizes = task_results["cases_patch_sizes"]
+        case_patch_spacings = task_results["cases_patch_spacings"]
+        case_label_sizes = task_results["cases_label_sizes"]
+        case_label_spacings = task_results["cases_label_spacings"]
+        case_label_origins = task_results["cases_label_origins"]
+        case_label_directions = task_results["cases_label_directions"]
+
+        if task_type in ["classification", "regression"]:
+            save_predictions = True
+            if len(shot_embeddings.shape) > 2:
+                shot_embeddings = shot_embeddings.squeeze(1)
+            if len(case_embeddings.shape) > 2:
+                case_embeddings = case_embeddings.squeeze(1)
+
+        predictions = adapt_features(
+            adaptor_name=adaptor_name,
+            task_type=task_type,
+            shot_features=shot_embeddings,
+            shot_names=shot_ids,
+            shot_labels=shot_labels,
+            test_features=case_embeddings,
+            shot_coordinates=task_results["shot_coordinates"],
+            test_coordinates=task_results["cases_coordinates"],
+            test_names=case_ids,
+            global_patch_size=global_patch_size,
+            global_patch_spacing=global_patch_spacing,
+            shot_patch_sizes=shot_patch_sizes,
+            test_patch_sizes=case_patch_sizes,
+            shot_patch_spacings=shot_patch_spacings,
+            test_patch_spacings=case_patch_spacings,
+            feature_grid_resolution=feature_grid_resolution,
+            test_image_sizes=case_image_sizes,
+            shot_extra_labels=shot_extra_labels,
+            test_image_spacing=case_image_spacings,
+            test_image_origins=case_image_origins,
+            test_image_directions=case_image_directions,
+            test_label_spacing=case_label_spacings,
+            test_label_origins=case_label_origins,
+            test_label_directions=case_label_directions,
+            test_label_sizes=case_label_sizes,
+            shot_image_sizes=shot_image_sizes,
+            shot_image_spacing=shot_image_spacings,
+            shot_image_origins=shot_image_origins,
+            shot_image_directions=shot_image_directions,
+            shot_label_spacing=shot_label_spacings,
+            shot_label_origins=shot_label_origins,
+            shot_label_directions=shot_label_directions,
+            return_probabilities=return_probabilities,
+        )
+        del (
+            shot_embeddings, case_embeddings, shot_labels, shot_extra_labels,
+            shot_ids, shot_image_sizes, shot_image_spacings, shot_image_origins,
+            shot_image_directions, shot_patch_sizes, shot_patch_spacings, shot_label_spacings, shot_label_origins,
+            shot_label_directions, case_image_sizes, case_image_spacings,
+            case_image_origins, case_image_directions, case_patch_sizes, case_patch_spacings, case_label_sizes,
+            case_label_spacings, case_label_origins, case_label_directions
+        )
+        gc.collect()
+
+    elif modality == "vision-language":
+        predictions = [pred["text"] for pred in task_results["prediction"]]
+        case_labels = [label["text"] for case in task_results["case_labels"] for label in case]
+        case_extra_labels = None
+
+    else:
+        raise ValueError(f"Unsupported modality: {modality}")
+
+    metrics = evaluate_predictions(
+        task_name=task_name,
+        case_ids=case_ids,
+        test_predictions=predictions,
+        test_labels=case_labels,
+        test_extra_labels=case_extra_labels,
+        save_predictions=save_predictions
+    )
+
+    # save metrics
+    with open(metrics_path, "w") as f:
+        json.dump(metrics, f)
+
+    del task_results, predictions, case_labels, case_ids
+    if 'case_extra_labels' in locals():
+        del case_extra_labels
+    gc.collect()
+
+
 def main():
     logging.info("Input folder contents:")
     print_directory_contents(INPUT_DIRECTORY)
@@ -646,155 +793,19 @@ def main():
         mapping = pd.read_csv(mapping_path, dtype={"case_id": str})
         all_tasks = mapping["task_name"].unique()
         save_predictions = False
-        max_workers = get_max_workers()
-        task_metrics = {}
 
-        # process task sequentially and manage memory
         for task_name in all_tasks:
-            logging.info(f"Processing task: {task_name}")
-
-            # only keep predictions for the current task
-            task_case_names = mapping[mapping["task_name"] == task_name]["case_id"].tolist()
-            task_predictions = read_predictions(input_dir=INPUT_DIRECTORY, case_names=task_case_names)
-
-            with Pool(processes=max_workers) as pool:
-                processed_results = pool.map(process, task_predictions)
-
-            # extract embeddings and labels for the current task
-            task_results = extract_embeddings_and_labels(processed_results, task_name)
-
-            # free memory
-            del task_predictions
-            del processed_results
-            gc.collect()
-
-            if task_results is None:
-                # skip if no valid results (e.g., language-only task)
-                continue
-
-            modality = task_results["modality"]
-            case_labels = task_results["case_labels"]
-            case_ids = task_results["case_ids"]
-            task_type = task_results["task_type"]
-
-            if modality == "vision":
-                if task_name not in adaptors:
-                    raise Exception(f"No adaptor found for task {task_name}")
-                adaptor_name = adaptors[task_name]
-                print(f"Using adaptor: {adaptor_name}")
-                return_probabilities = REQUIRES_PROBABILITIES_DICT[task_name]
-
-                # Set global values if all are the same, otherwise None
-                global_patch_size = task_results["global_patch_size"]
-                global_patch_spacing = task_results["global_patch_spacing"]
-
-                feature_grid_resolution = task_results["feature_grid_resolution"]
-
-                shot_embeddings = task_results["shot_embeddings"]
-                shot_labels = task_results["shot_labels"]
-                shot_extra_labels = task_results["shot_extra_labels"]
-                shot_ids = task_results["shot_ids"]
-                shot_image_sizes = task_results["shot_image_sizes"]
-                shot_image_spacings = task_results["shot_image_spacings"]
-                shot_image_origins = task_results["shot_image_origins"]
-                shot_image_directions = task_results["shot_image_directions"]
-                shot_patch_sizes = task_results["shot_patch_sizes"]
-                shot_patch_spacings = task_results["shot_patch_spacings"]
-                shot_label_spacings = task_results["shot_label_spacings"]
-                shot_label_origins = task_results["shot_label_origins"]
-                shot_label_directions = task_results["shot_label_directions"]
-
-                case_embeddings = task_results["case_embeddings"]
-                case_extra_labels = task_results["case_extra_labels"]
-                case_image_sizes = task_results["cases_image_sizes"]
-                case_image_spacings = task_results["cases_image_spacings"]
-                case_image_origins = task_results["cases_image_origins"]
-                case_image_directions = task_results["cases_image_directions"]
-                case_patch_sizes = task_results["cases_patch_sizes"]
-                case_patch_spacings = task_results["cases_patch_spacings"]
-                case_label_sizes = task_results["cases_label_sizes"]
-                case_label_spacings = task_results["cases_label_spacings"]
-                case_label_origins = task_results["cases_label_origins"]
-                case_label_directions = task_results["cases_label_directions"]
-
-                if task_type in ["classification", "regression"]:
-                    save_predictions = True
-                    if len(shot_embeddings.shape) > 2:
-                        shot_embeddings = shot_embeddings.squeeze(1)
-                    if len(case_embeddings.shape) > 2:
-                        case_embeddings = case_embeddings.squeeze(1)
-
-                predictions = adapt_features(
-                    adaptor_name=adaptor_name,
-                    task_type=task_type,
-                    shot_features=shot_embeddings,
-                    shot_names=shot_ids,
-                    shot_labels=shot_labels,
-                    test_features=case_embeddings,
-                    shot_coordinates=task_results["shot_coordinates"],
-                    test_coordinates=task_results["cases_coordinates"],
-                    test_names=case_ids,
-                    global_patch_size=global_patch_size,
-                    global_patch_spacing=global_patch_spacing,
-                    shot_patch_sizes=shot_patch_sizes,
-                    test_patch_sizes=case_patch_sizes,
-                    shot_patch_spacings=shot_patch_spacings,
-                    test_patch_spacings=case_patch_spacings,
-                    feature_grid_resolution=feature_grid_resolution,
-                    test_image_sizes=case_image_sizes,
-                    shot_extra_labels=shot_extra_labels,
-                    test_image_spacing=case_image_spacings,
-                    test_image_origins=case_image_origins,
-                    test_image_directions=case_image_directions,
-                    test_label_spacing=case_label_spacings,
-                    test_label_origins=case_label_origins,
-                    test_label_directions=case_label_directions,
-                    test_label_sizes=case_label_sizes,
-                    shot_image_sizes=shot_image_sizes,
-                    shot_image_spacing=shot_image_spacings,
-                    shot_image_origins=shot_image_origins,
-                    shot_image_directions=shot_image_directions,
-                    shot_label_spacing=shot_label_spacings,
-                    shot_label_origins=shot_label_origins,
-                    shot_label_directions=shot_label_directions,
-                    return_probabilities=return_probabilities,
-                )
-
-                # delete arrays and run garbage collection
-                del (
-                    shot_embeddings, case_embeddings, shot_labels, shot_extra_labels,
-                    shot_ids, shot_image_sizes, shot_image_spacings, shot_image_origins,
-                    shot_image_directions, shot_patch_sizes, shot_patch_spacings, shot_label_spacings, shot_label_origins,
-                    shot_label_directions, case_image_sizes, case_image_spacings,
-                    case_image_origins, case_image_directions, case_patch_sizes, case_patch_spacings, case_label_sizes,
-                    case_label_spacings, case_label_origins, case_label_directions
-                )
-                gc.collect()
-            elif modality == "vision-language":
-                predictions = [pred["text"] for pred in task_results["prediction"]]
-                case_labels = [
-                    label["text"] for case in task_results["case_labels"] for label in case
-                ]
-                case_extra_labels = None
-            else:
-                raise ValueError(f"Unsupported modality: {modality}")
-
-            metrics = evaluate_predictions(
-                task_name=task_name,
-                case_ids=case_ids,
-                test_predictions=predictions,
-                test_labels=case_labels,
-                test_extra_labels=case_extra_labels,
-                save_predictions=save_predictions
+            logging.info(f"Processing task: {task_name} (in subprocess)")
+            metrics_path = OUTPUT_DIRECTORY / f"{task_name}.json"
+            p = multiprocessing.Process(
+                target=process_task_in_subprocess,
+                args=(task_name, mapping, adaptors, save_predictions, metrics_path)
             )
-            task_metrics[task_name] = metrics
-
-            # free up memory
-            del task_results, predictions, case_labels, case_ids
-            if 'case_extra_labels' in locals():
-                del case_extra_labels
-            gc.collect()
-
+            p.start()
+            p.join()
+            with open(metrics_path, "r") as f:
+                metrics = json.load(f)
+                task_metrics[task_name] = metrics
             print(f"Completed processing task: {task_name}")
             print("=+=" * 10)
 
