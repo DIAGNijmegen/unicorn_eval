@@ -769,8 +769,7 @@ def process_task_in_subprocess(task_name, mapping, adaptors, save_predictions, m
         )
 
         # save metrics
-        with open(metrics_path, "w") as f:
-            json.dump(metrics, f)
+        write_json_file(location=metrics_path, content=metrics)
 
         del task_results, predictions, case_labels, case_ids
         if 'case_extra_labels' in locals():
