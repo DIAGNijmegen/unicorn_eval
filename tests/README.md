@@ -5,7 +5,7 @@ To debug and test your adaptor solution in our evaluation pipeline locally, foll
 First, clone this repo and build the evaluation Docker container locally by running the provided build script:
 [do\_build.sh](https://github.com/DIAGNijmegen/unicorn_eval/blob/add-local-debugging/tests/do_build.sh)
 
-## 2. Prepare the Input Folder
+## 2. Prepare the input
 Your input data, i.e., the output produced by your algorithm Docker container, should follow this folder structure:
 
 ```
@@ -28,9 +28,9 @@ You can find working examples of these files in the `tests` folder of this repos
 * [`tests/vision/input/adaptor-pathology-classification.json`](vision/input/adaptor-pathology-classification.json)
 * [`tests/vision/input/0403dcc49b1420545299f692f7d8e270/output/image-neural-representation.json`](vision/input/0403dcc49b1420545299f692f7d8e270/output/image-neural-representation.json)
 
-You can also download `patch-neural-representation.json` or `image-neural-representation.json` from Grand Challenge after executing your algorithm on a leaderboard. Downloading these files will help you understand its structure. Or, alternative, create them yourself by running your algorithm locally.
+You can also download `patch-neural-representation.json` or `image-neural-representation.json` from Grand Challenge after executing your algorithm on a leaderboard. Downloading these files will help you understand their structure. Or, alternatively, create them yourself by running your algorithm locally.
 
-The simplified `predictions.json` file follows this structure, for local debugging, you'll need to modify this file so that it includes all `case IDs` from `mapping.csv`, with each `pk` corresponding to a local folder name.
+The simplified `predictions.json` is structured as follows:
 ```
 [
   {
@@ -57,10 +57,12 @@ The simplified `predictions.json` file follows this structure, for local debuggi
 ]
 ```
 
-The `adaptor-task-file.json` file is a task-specific file that indicates which adaptor method to use. Its filename (e.g., adaptor-pathology-classification.json) can be retrieved from ADAPTOR_SLUGS_DICT (defined in [`evaluate.py`](../src/unicorn_eval/evaluate.py)). The content of this file is the adaptor name, which can be selected when submitting to a task on Grand Challenge—such as "1-nn", "linear-probing", "mlp", ... .
+For local debugging, edit this file so that it includes all case ids from the `mapping.csv`.
 
-## 3. Ground Truth Setup
-The evaluation also requires ground truth data, structured in the following way:
+The `adaptor-task-file.json` file is a task-specific file that indicates which adaptor method to use. Its filename (e.g., adaptor-pathology-classification.json) can be retrieved from ADAPTOR_SLUGS_DICT (defined in [`evaluate.py`](../src/unicorn_eval/evaluate.py)). The content of this file is the adaptor name, which can be selected when submitting to a task on Grand Challenge (e.g. "linear-probing", "mlp", ...).
+
+## 3. Prepare the groundtruth
+The evaluation also requires ground truth data, structured as follows:
 
 ``` 
 /opt/ml/input/data/ground_truth/
@@ -73,27 +75,23 @@ The evaluation also requires ground truth data, structured in the following way:
 * **`mapping.csv`** maps case IDs to relevant task metadata, such as task_name and domain, and specifies whether the case is used for training (“shot”) or testing (“case”).
 * **`label`** is the ground truth as is shown on Zenodo.
 
-**Important:** The `name` field in `predictions.json` must exactly match the case ID used in `mapping.csv`. If they don't align, the evaluation container will be unable to associate predictions with the correct ground truth data.
+**Important:** The `name` field in `predictions.json` must exactly match the case id used in `mapping.csv`. If they don't align, the evaluation container will be unable to associate predictions with the correct ground truth data.
 
-To generate your own `mapping.csv`, we provided [this script](generate_mapping.py). An example of the `mapping.csv` structure can be found below:
-```
-case_id,task_name,task_type,domain,modality,split
-<case_id>,<task_name>,classification/detection/segmentation,pathology/CT/MR,vision,shot/case
-```
+This repository comes with a `mapping.csv` and grountruth files based on the public few-shots released on Zenodo, ready to be used for local debugging:
 
-**Reference example files**
 * [`tests/vision/ground_truth/mapping.csv`](vision/ground_truth/mapping.csv)
 * [`tests/vision/ground_truth/Task01_classifying_he_prostate_biopsies_into_isup_scores/0403dcc49b1420545299f692f7d8e270/isup-grade.json`](vision/ground_truth/Task01_classifying_he_prostate_biopsies_into_isup_scores/0403dcc49b1420545299f692f7d8e270/isup-grade.json)
 
+If you need to generate your own `mapping.csv`, we provide the following [script](generate_mapping.py). 
 
-## 3. Running the Evaluation Locally
+## 4. Running the Evaluation Locally
 - Obtain the neural representation `JSON` files by either:
-  - Using the [task 1 examples from this repo](vision/input)  **or**
+  - Using the [examples from this repo](vision/input)  (will only work if you do not use a custom adaptor) **or**
   - Downloading them from Grand Challenge when navigating to `Submit` -> `Submissions` -> your algorithm run -> `Result` or navigate to your algorithm page -> `Results` after running your algorithm on the leaderboard, **or**
   - Running your algorithm locally on public data from Zenodo ([baseline setup example](https://github.com/DIAGNijmegen/unicorn_baseline/blob/main/setup-docker.md)).
 - Ensure that:
   - The input folder structure matches the specification above.
-  - Case IDs align exactly across `predictions.json`, `mapping.csv`, and folder names.
+  - Case ids align exactly across `predictions.json`, `mapping.csv`, and folder names.
 - Use the evaluation container or the provided ``do_test_run.sh`` script to run the evaluation locally and verify that everything works correctly. Usage:
 ```
 ./tests/do_test_run.sh <INPUT_FOLDER> <GROUND_TRUTH_FOLDER> <OUTPUT_FOLDER> [DOCKER_IMAGE_TAG]
@@ -103,7 +101,3 @@ case_id,task_name,task_type,domain,modality,split
     - GROUND_TRUTH_FOLDER: Folder containing mapping.csv and ground truth JSON files (should follow structure above).
     - OUTPUT_FOLDER: Where evaluation results are saved.
     - DOCKER_IMAGE_TAG: (optional) Defaults to unicorn_eval.
-
-## Example Data and Tips
-- If you're using your own algorithm or working on a task other than Task 1, the [public few-shot example data on Zenodo](https://doi.org/10.5281/zenodo.14832502) is a great starting point. These datasets provide sample inputs and labels for multiple tasks, allowing you to set up and test your local environment effectively.
-- We recommend creating a custom `mapping.csv` using the provided template, and defining your own data split. For instance, you might allocate 30% of the few-shot examples as "shot" and the remaining 70% as "case" to simulate different experimental conditions.
