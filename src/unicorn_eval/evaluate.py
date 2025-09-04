@@ -644,6 +644,10 @@ def process_task_in_subprocess(task_name, mapping, adaptors, save_predictions, m
     pool.join()
 
     task_results = extract_embeddings_and_labels(processed_results, task_name)
+    if task_results is None:
+        logging.warning(f"No results found for task {task_name}, skipping.")
+        return
+
     del task_predictions
     del processed_results
     gc.collect()
