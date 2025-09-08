@@ -25,7 +25,7 @@ from torch.utils.data import DataLoader, Dataset
 from torch.utils.data._utils.collate import default_collate
 
 from unicorn_eval.adaptors.base import PatchLevelTaskAdaptor
-from unicorn_eval.utils import INPUT_DIRECTORY, extract_embeddings, process, read_inputs
+from unicorn_eval.io import INPUT_DIRECTORY, process, read_inputs, extract_embeddings
 
 
 class DetectionDecoder(nn.Module):

@@ -26,18 +26,21 @@ from dragon_eval import DragonEval
 from dragon_eval.evaluation import REGRESSION_EPSILON, TASK_TYPE, EvalType
 
 from unicorn_eval.helpers import get_max_workers
-from unicorn_eval.utils import (
+from unicorn_eval.io import (
     read_inputs,
     process,
-    get_adaptor,
-    evaluate_predictions,
-    extract_embeddings_and_labels,
-    normalize_metric,
     write_json_file,
     INPUT_DIRECTORY,
     OUTPUT_DIRECTORY,
     GROUNDTRUTH_DIRECTORY,
 )
+from unicorn_eval.utils import (
+    get_adaptor,
+    evaluate_predictions,
+    extract_embeddings_and_labels,
+    normalize_metric,
+)
+
 
 ADAPTOR_SLUGS_DICT = {
     "Task01_classifying_he_prostate_biopsies_into_isup_scores": "adaptor-pathology-classification",

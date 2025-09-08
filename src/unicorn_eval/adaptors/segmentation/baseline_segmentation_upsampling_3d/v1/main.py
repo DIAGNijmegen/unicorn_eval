@@ -30,7 +30,8 @@ from unicorn_eval.adaptors.segmentation.decoders import (Decoder3D,
 from unicorn_eval.adaptors.segmentation.inference import inference, inference3d
 from unicorn_eval.adaptors.segmentation.training import (train_decoder,
                                                          train_decoder3d)
-from unicorn_eval.utils import INPUT_DIRECTORY, extract_embeddings, process, read_inputs
+from unicorn_eval.io import INPUT_DIRECTORY, process, read_inputs, extract_embeddings
+
 
 class SegmentationUpsampling(PatchLevelTaskAdaptor):
     def __init__(

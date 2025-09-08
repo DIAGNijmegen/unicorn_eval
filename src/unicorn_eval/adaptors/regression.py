@@ -23,7 +23,7 @@ from sklearn.metrics.pairwise import cosine_similarity, euclidean_distances
 
 from unicorn_eval.adaptors.base import CaseLevelTaskAdaptor
 from unicorn_eval.adaptors.components import NLLSurvLoss
-from unicorn_eval.utils import INPUT_DIRECTORY, extract_embeddings, process, read_inputs
+from unicorn_eval.io import INPUT_DIRECTORY, process, read_inputs, extract_embeddings
 
 
 def preprocess_features(
