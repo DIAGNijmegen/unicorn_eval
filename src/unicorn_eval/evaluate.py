@@ -12,10 +12,12 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import copy
 import gc
 import json
 import logging
 import multiprocessing
+import random
 from pathlib import Path
 from pprint import pformat
 
@@ -137,7 +139,7 @@ LABEL_SLUG_DICT = {
 EXTRA_LABEL_SLUG_DICT = {
     "Task03_predicting_the_time_to_biochemical_recurrence_in_he_prostatectomies": [
         "event.json",
-        "cohort.json"
+        "cohort.json",
     ],
     "Task07_detecting_lung_nodules_in_thoracic_ct": ["diameter.json"],
 }
@@ -197,7 +199,9 @@ def process(job):
 
     mapping_path = GROUNDTRUTH_DIRECTORY / "mapping.csv"
     try:
-        mapping = pd.read_csv(mapping_path, dtype={"case_id": str})  # ensure case_id is string to enable leading zeros
+        mapping = pd.read_csv(
+            mapping_path, dtype={"case_id": str}
+        )  # ensure case_id is string to enable leading zeros
     except FileNotFoundError:
         # if the mapping file is not found, we assume that the evaluation is for a language task
         # and we do not need the mapping
@@ -290,14 +294,30 @@ def process(job):
                     image_direction = curr_image_direction
                     first = False
                 else:
-                    assert np.all(coordinates == curr_coordinates), "Coordinates do not match between images of the same case"
-                    assert np.all(spacing == curr_spacing), "Spacing does not match between images of the same case"
-                    assert np.all(patch_size == curr_patch_size), "Patch size does not match between images of the same case"
-                    assert np.all(patch_spacing == curr_patch_spacing), "Patch spacing does not match between images of the same case"
-                    assert np.all(image_size == curr_image_size), "Image size does not match between images of the same case"
-                    assert np.all(image_spacing == curr_image_spacing), "Image spacing does not match between images of the same case"
-                    assert np.all(image_origin == curr_image_origin), "Image origin does not match between images of the same case"
-                    assert np.all(image_direction == curr_image_direction), "Image direction does not match between images of the same case"
+                    assert np.all(
+                        coordinates == curr_coordinates
+                    ), "Coordinates do not match between images of the same case"
+                    assert np.all(
+                        spacing == curr_spacing
+                    ), "Spacing does not match between images of the same case"
+                    assert np.all(
+                        patch_size == curr_patch_size
+                    ), "Patch size does not match between images of the same case"
+                    assert np.all(
+                        patch_spacing == curr_patch_spacing
+                    ), "Patch spacing does not match between images of the same case"
+                    assert np.all(
+                        image_size == curr_image_size
+                    ), "Image size does not match between images of the same case"
+                    assert np.all(
+                        image_spacing == curr_image_spacing
+                    ), "Image spacing does not match between images of the same case"
+                    assert np.all(
+                        image_origin == curr_image_origin
+                    ), "Image origin does not match between images of the same case"
+                    assert np.all(
+                        image_direction == curr_image_direction
+                    ), "Image direction does not match between images of the same case"
             embeddings = np.concatenate(features)
 
     elif modality == "vision-language":
@@ -406,7 +426,9 @@ def read_predictions(input_dir: Path, case_names: list[str]):
         for slug_inputs in INPUT_SLUGS_DICT.values():
             for slug_input in slug_inputs:
                 try:
-                    image_name = get_image_name(values=prediction["inputs"], slug=slug_input)
+                    image_name = get_image_name(
+                        values=prediction["inputs"], slug=slug_input
+                    )
                     case_name = Path(image_name).stem
                     # remove suffixes "_adc", "_t2w", and "_hbv" from the case name if present
                     for suffix in ["_adc", "_t2w", "_hbv", "_tissue"]:
@@ -549,9 +571,18 @@ def reformat_language_metrics(metrics: dict) -> dict:
 def prepare_predictions_language(input_dir: Path, output_dir: Path, gt_dir: Path):
     """
     Map the predictions with random filenames to the correct task and fold.
+
+    New behavior:
+    - If a prediction file matches a GT task except for a few missing cases:
+        * If missing <= 5% of that task's total UIDs, we fill the gaps by
+          duplicating a randomly chosen existing prediction and replacing only
+          the 'uid' field with each missing UID.
+        * If missing > 5%, we raise a ValueError.
+    - If a prediction file contains UIDs not present in the matched GT task,
+      we warn and skip that file.
     """
-    # Collect the uids of the ground truth files if the path contains a task name
     task_uids = {}
+    print(f"Scanning ground truth directory: {gt_dir}")
     for gt_file in gt_dir.rglob("*.json"):
         if any(task_name in str(gt_file) for task_name in LANGUAGE_TASK_NAMES):
             with open(gt_file, "r") as f:
@@ -561,25 +592,97 @@ def prepare_predictions_language(input_dir: Path, output_dir: Path, gt_dir: Path
             )
             uids = set(entry["uid"] for entry in entries)
             task_uids[matched_task] = uids
+            print(
+                f"→ Found GT task '{matched_task}' with {len(uids)} UIDs from {gt_file}"
+            )
 
-    # Match the predictions with the correct ground truth file
     for pred_file in input_dir.rglob("*/output/nlp-predictions-dataset.json"):
         if pred_file.name in ["predictions.json", "inputs.json"]:
             continue
 
+        print(f"\nProcessing prediction file: {pred_file}")
         with open(pred_file, "r") as f:
             entries = json.load(f)
 
-        uids = set([entry["uid"] for entry in entries])
+        uids = set(entry["uid"] for entry in entries)
+        matched = False
+
         for task, gt_uids in task_uids.items():
-            if uids == gt_uids:
+            # Only proceed if all predicted UIDs are part of this GT task.
+            extra_uids = uids - gt_uids
+            if extra_uids:
+                # This prediction file cannot belong to this task.
+                continue
+
+            # Check how many are missing vs GT.
+            missing_uids = gt_uids - uids
+            total_gt = len(gt_uids)
+
+            if not missing_uids and uids == gt_uids:
+                # Perfect match
                 output_file = (
                     output_dir / f"{task}-fold0" / "nlp-predictions-dataset.json"
                 )
                 output_file.parent.mkdir(parents=True, exist_ok=True)
                 with open(output_file, "w") as f:
                     json.dump(entries, f)
+                print(
+                    f"✓ Matched to task '{task}', wrote {len(entries)} entries → {output_file}"
+                )
+                matched = True
                 break
+
+            # If we reach here, there are no extra UIDs, but some may be missing.
+            if missing_uids:
+                missing_ratio = len(missing_uids) / float(total_gt)
+                percent = round(missing_ratio * 100, 3)
+
+                if missing_ratio > 0.05:
+                    # Too many missing → error
+                    raise ValueError(
+                        f"Prediction file {pred_file} matched task '{task}' but is missing "
+                        f"{len(missing_uids)}/{total_gt} UIDs ({percent}%), which exceeds the 5% threshold."
+                    )
+
+                # Fill small gaps by duplicating a random existing prediction and replacing only the 'uid'.
+                print(
+                    f"• '{task}' missing {len(missing_uids)}/{total_gt} UIDs ({percent}%). "
+                    f"Filling gaps by duplicating random predictions."
+                )
+                if not entries:
+                    raise ValueError(
+                        f"Cannot fill missing UIDs for {pred_file}: no existing entries to sample from."
+                    )
+
+                for missing_uid in missing_uids:
+                    template = copy.deepcopy(random.choice(entries))
+                    template["uid"] = missing_uid
+                    entries.append(template)
+
+                # Sanity: now we should match exactly
+                final_uids = set(e["uid"] for e in entries)
+                assert (
+                    final_uids == gt_uids
+                ), "Internal error: after gap-filling, UIDs still do not match GT."
+
+                output_file = (
+                    output_dir / f"{task}-fold0" / "nlp-predictions-dataset.json"
+                )
+                output_file.parent.mkdir(parents=True, exist_ok=True)
+                with open(output_file, "w") as f:
+                    json.dump(entries, f)
+                print(
+                    f"✓ Matched to task '{task}' after filling, wrote {len(entries)} entries → {output_file}"
+                )
+                matched = True
+                break
+
+        if not matched:
+            print(
+                f"⚠ No matching ground truth found for {pred_file} "
+                f"(either extra UIDs present or task mismatch). "
+                f"Pred UID count = {len(uids)}"
+            )
 
 
 def evaluate_language_predictions():
@@ -629,12 +732,16 @@ def evaluate_language_predictions():
         return {}
 
 
-def process_task_in_subprocess(task_name, mapping, adaptors, save_predictions, metrics_path):
+def process_task_in_subprocess(
+    task_name, mapping, adaptors, save_predictions, metrics_path
+):
     logging.info(f"Processing task in subprocess: {task_name}")
 
     # identify task cases to filter predictions
     task_case_names = mapping[mapping["task_name"] == task_name]["case_id"].tolist()
-    task_predictions = read_predictions(input_dir=INPUT_DIRECTORY, case_names=task_case_names)
+    task_predictions = read_predictions(
+        input_dir=INPUT_DIRECTORY, case_names=task_case_names
+    )
 
     # process the task's predictions in parallel
     max_workers = get_max_workers()
@@ -742,18 +849,38 @@ def process_task_in_subprocess(task_name, mapping, adaptors, save_predictions, m
                 return_probabilities=return_probabilities,
             )
             del (
-                shot_embeddings, case_embeddings, shot_labels, shot_extra_labels,
-                shot_ids, shot_image_sizes, shot_image_spacings, shot_image_origins,
-                shot_image_directions, shot_patch_sizes, shot_patch_spacings, shot_label_spacings, shot_label_origins,
-                shot_label_directions, case_image_sizes, case_image_spacings,
-                case_image_origins, case_image_directions, case_patch_sizes, case_patch_spacings, case_label_sizes,
-                case_label_spacings, case_label_origins, case_label_directions
+                shot_embeddings,
+                case_embeddings,
+                shot_labels,
+                shot_extra_labels,
+                shot_ids,
+                shot_image_sizes,
+                shot_image_spacings,
+                shot_image_origins,
+                shot_image_directions,
+                shot_patch_sizes,
+                shot_patch_spacings,
+                shot_label_spacings,
+                shot_label_origins,
+                shot_label_directions,
+                case_image_sizes,
+                case_image_spacings,
+                case_image_origins,
+                case_image_directions,
+                case_patch_sizes,
+                case_patch_spacings,
+                case_label_sizes,
+                case_label_spacings,
+                case_label_origins,
+                case_label_directions,
             )
             gc.collect()
 
         elif modality == "vision-language":
             predictions = [pred["text"] for pred in task_results["prediction"]]
-            case_labels = [label["text"] for case in task_results["case_labels"] for label in case]
+            case_labels = [
+                label["text"] for case in task_results["case_labels"] for label in case
+            ]
             case_extra_labels = None
 
         else:
@@ -765,14 +892,14 @@ def process_task_in_subprocess(task_name, mapping, adaptors, save_predictions, m
             test_predictions=predictions,
             test_labels=case_labels,
             test_extra_labels=case_extra_labels,
-            save_predictions=save_predictions
+            save_predictions=save_predictions,
         )
 
         # save metrics
         write_json_file(location=metrics_path, content=metrics)
 
         del task_results, predictions, case_labels, case_ids
-        if 'case_extra_labels' in locals():
+        if "case_extra_labels" in locals():
             del case_extra_labels
         gc.collect()
 
@@ -804,7 +931,7 @@ def main():
             metrics_path = OUTPUT_DIRECTORY / f"{task_name}.json"
             p = multiprocessing.Process(
                 target=process_task_in_subprocess,
-                args=(task_name, mapping, adaptors, save_predictions, metrics_path)
+                args=(task_name, mapping, adaptors, save_predictions, metrics_path),
             )
             p.start()
             p.join()
