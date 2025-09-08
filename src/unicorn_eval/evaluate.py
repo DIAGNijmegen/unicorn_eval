@@ -582,7 +582,7 @@ def prepare_predictions_language(input_dir: Path, output_dir: Path, gt_dir: Path
       we warn and skip that file.
     """
     task_uids = {}
-    print(f"Scanning ground truth directory: {gt_dir}")
+    logging.info(f"Scanning ground truth directory: {gt_dir}")
     for gt_file in gt_dir.rglob("*.json"):
         if any(task_name in str(gt_file) for task_name in LANGUAGE_TASK_NAMES):
             with open(gt_file, "r") as f:
@@ -592,7 +592,7 @@ def prepare_predictions_language(input_dir: Path, output_dir: Path, gt_dir: Path
             )
             uids = set(entry["uid"] for entry in entries)
             task_uids[matched_task] = uids
-            print(
+            logging.info(
                 f"→ Found GT task '{matched_task}' with {len(uids)} UIDs from {gt_file}"
             )
 
@@ -600,7 +600,7 @@ def prepare_predictions_language(input_dir: Path, output_dir: Path, gt_dir: Path
         if pred_file.name in ["predictions.json", "inputs.json"]:
             continue
 
-        print(f"\nProcessing prediction file: {pred_file}")
+        logging.info(f"\nProcessing prediction file: {pred_file}")
         with open(pred_file, "r") as f:
             entries = json.load(f)
 
@@ -626,7 +626,7 @@ def prepare_predictions_language(input_dir: Path, output_dir: Path, gt_dir: Path
                 output_file.parent.mkdir(parents=True, exist_ok=True)
                 with open(output_file, "w") as f:
                     json.dump(entries, f)
-                print(
+                logging.info(
                     f"✓ Matched to task '{task}', wrote {len(entries)} entries → {output_file}"
                 )
                 matched = True
@@ -645,7 +645,7 @@ def prepare_predictions_language(input_dir: Path, output_dir: Path, gt_dir: Path
                     )
 
                 # Fill small gaps by duplicating a random existing prediction and replacing only the 'uid'.
-                print(
+                logging.info(
                     f"• '{task}' missing {len(missing_uids)}/{total_gt} UIDs ({percent}%). "
                     f"Filling gaps by duplicating random predictions."
                 )
@@ -671,14 +671,14 @@ def prepare_predictions_language(input_dir: Path, output_dir: Path, gt_dir: Path
                 output_file.parent.mkdir(parents=True, exist_ok=True)
                 with open(output_file, "w") as f:
                     json.dump(entries, f)
-                print(
+                logging.info(
                     f"✓ Matched to task '{task}' after filling, wrote {len(entries)} entries → {output_file}"
                 )
                 matched = True
                 break
 
         if not matched:
-            print(
+            logging.info(
                 f"⚠ No matching ground truth found for {pred_file} "
                 f"(either extra UIDs present or task mismatch). "
                 f"Pred UID count = {len(uids)}"
@@ -912,9 +912,9 @@ def main():
     print_directory_contents(GROUNDTRUTH_DIRECTORY)
     logging.info("=+=" * 10)
 
-    logging.info("Evaluating language predictions")
+    print("Evaluating language predictions")
     task_metrics = reformat_language_metrics(evaluate_language_predictions())
-    logging.info("=+=" * 10)
+    print("=+=" * 10)
 
     metrics = {}
     adaptors = read_adaptors()
@@ -927,7 +927,7 @@ def main():
         save_predictions = False
 
         for task_name in all_tasks:
-            logging.info(f"Processing task: {task_name} (in subprocess)")
+            print(f"Processing task: {task_name} (in subprocess)")
             metrics_path = OUTPUT_DIRECTORY / f"{task_name}.json"
             p = multiprocessing.Process(
                 target=process_task_in_subprocess,
@@ -939,8 +939,8 @@ def main():
                 with open(metrics_path, "r") as f:
                     metrics = json.load(f)
                     task_metrics[task_name] = metrics
-                logging.info(f"Completed processing task: {task_name}")
-                logging.info("=+=" * 10)
+                print(f"Completed processing task: {task_name}")
+                print("=+=" * 10)
 
         logging.info(f"Writing metrics for {len(task_metrics)} tasks...")
         write_combined_metrics(metric_dict=task_metrics, save_predictions=False)
