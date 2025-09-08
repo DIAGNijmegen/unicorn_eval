@@ -25,6 +25,7 @@ from torch.utils.data import DataLoader, Dataset
 from torch.utils.data._utils.collate import default_collate
 
 from unicorn_eval.adaptors.base import PatchLevelTaskAdaptor
+from unicorn_eval.utils import INPUT_DIRECTORY, extract_embeddings, process, read_inputs
 
 
 class DetectionDecoder(nn.Module):
@@ -126,7 +127,7 @@ def heatmap_to_cells_using_maxima(heatmap, neighborhood_size=5, threshold=0.01):
     return x, y
 
 
-def train_decoder(decoder, dataloader, heatmap_size=16, num_epochs=200, lr=1e-5):
+def train_decoder(decoder, dataloader, num_epochs=200, lr=1e-5):
     """Trains the decoder using the given data."""
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -293,41 +294,25 @@ def construct_detection_labels(
 class DensityMap(PatchLevelTaskAdaptor):
     def __init__(
         self,
-        shot_features,
-        shot_labels,
-        shot_coordinates,
-        shot_names,
-        test_features,
-        test_coordinates,
-        test_names,
         global_patch_size=224,
         heatmap_size=16,
         num_epochs=200,
         learning_rate=1e-5,
     ):
-        super().__init__(
-            shot_features,
-            shot_labels,
-            shot_coordinates,
-            test_features,
-            test_coordinates,
-        )
-        self.shot_names = shot_names
-        self.test_names = test_names
         self.patch_size = global_patch_size
         self.heatmap_size = heatmap_size
         self.num_epochs = num_epochs
         self.learning_rate = learning_rate
         self.decoder = None
 
-    def fit(self):
-        input_dim = self.shot_features[0].shape[1]
+    def fit(self, shot_features, shot_coordinates, shot_labels, shot_names, **kwargs):
+        input_dim = shot_features[0].shape[1]
 
         shot_data = construct_detection_labels(
-            self.shot_coordinates,
-            self.shot_features,
-            self.shot_names,
-            labels=self.shot_labels,
+            shot_coordinates,
+            shot_features,
+            shot_names,
+            labels=shot_labels,
             patch_size=self.patch_size,
             heatmap_size=self.heatmap_size,
         )
@@ -349,28 +334,38 @@ class DensityMap(PatchLevelTaskAdaptor):
             lr=self.learning_rate,
         )
 
-    def predict(self) -> list:
-        test_data = construct_detection_labels(
-            self.test_coordinates,
-            self.test_features,
-            self.test_names,
-            patch_size=self.patch_size,
-            heatmap_size=self.heatmap_size,
-            is_train=False,
-        )
-        test_dataset = DetectionDataset(preprocessed_data=test_data)
-        test_dataloader = DataLoader(
-            test_dataset, batch_size=1, shuffle=False, collate_fn=custom_collate
-        )
+    def predict(self, test_cases) -> list:
+        predictions = []
+        for case_name in test_cases:
+            test_input = process(
+                read_inputs(
+                    input_dir=INPUT_DIRECTORY, case_names=[case_name]
+                )
+            )
+            case_informations = extract_embeddings(test_input)
+            test_data = construct_detection_labels(
+                [case_informations["coordinates"]],
+                [case_informations["embeddings"]],
+                [case_informations["names"]],
+                patch_size=self.patch_size,
+                heatmap_size=self.heatmap_size,
+                is_train=False,
+            )
 
-        predicted_points = inference(
-            self.decoder,
-            test_dataloader,
-            heatmap_size=self.heatmap_size,
-            patch_size=self.patch_size,
-        )
+            test_dataset = DetectionDataset(preprocessed_data=test_data)
+            test_dataloader = DataLoader(
+                test_dataset, batch_size=1, shuffle=False, collate_fn=custom_collate
+            )
 
-        return predicted_points
+            predicted_points = inference(
+                self.decoder,
+                test_dataloader,
+                heatmap_size=self.heatmap_size,
+                patch_size=self.patch_size,
+            )
+            predictions.extend(predicted_points)
+
+        return predictions
 
 
 class ConvStack(nn.Module):
@@ -428,13 +423,6 @@ class ConvDetector(DensityMap):
 
     def __init__(
         self,
-        shot_features,
-        shot_labels,
-        shot_coordinates,
-        shot_names,
-        test_features,
-        test_coordinates,
-        test_names,
         patch_sizes: list[int],
     ):
         heatmap_size = 16 if len(patch_sizes) <= 2 else patch_sizes[2]
@@ -443,27 +431,20 @@ class ConvDetector(DensityMap):
         num_epochs = 200
         learning_rate = 0.00001
         super().__init__(
-            shot_features,
-            shot_labels,
-            shot_coordinates,
-            shot_names,
-            test_features,
-            test_coordinates,
-            test_names,
             patch_sizes[0],
             heatmap_size,
             num_epochs,
             learning_rate,
         )
 
-    def fit(self):
-        input_dim = self.shot_features[0].shape[1]
+    def fit(self, shot_features, shot_coordinates, shot_labels, shot_names, **kwargs):
+        input_dim = shot_features[0].shape[1]
 
         shot_data = construct_detection_labels(
-            self.shot_coordinates,
-            self.shot_features,
-            self.shot_names,
-            labels=self.shot_labels,
+            shot_coordinates,
+            shot_features,
+            shot_names,
+            labels=shot_labels,
             patch_size=self.patch_size,
             heatmap_size=self.heatmap_size,
             sigma=None,  # Scale heatmap values to [0, 1] for better training stability with BCEWithLogitsLoss
@@ -483,7 +464,7 @@ class ConvDetector(DensityMap):
 
         for epoch in range(self.num_epochs):
             total_loss = 0
-            for patch_emb, target_heatmap, patch_coordinates, case in dataloader:
+            for patch_emb, target_heatmap, _, _ in dataloader:
                 patch_emb = patch_emb.to(device)
                 target_heatmap = target_heatmap.to(device)
                 optimizer.zero_grad()

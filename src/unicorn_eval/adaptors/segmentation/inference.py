@@ -102,7 +102,7 @@ def create_grid(decoded_patches):
     for idx, patches in tqdm(decoded_patches.items(), desc="Creating grids"):
         stitched = stitch_patches_fast(patches)
         grids[idx] = stitched
-        
+
         # Clear patches from memory immediately after processing
         decoded_patches[idx].clear()
         del patches

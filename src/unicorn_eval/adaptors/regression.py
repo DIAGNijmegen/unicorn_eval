@@ -23,14 +23,15 @@ from sklearn.metrics.pairwise import cosine_similarity, euclidean_distances
 
 from unicorn_eval.adaptors.base import CaseLevelTaskAdaptor
 from unicorn_eval.adaptors.components import NLLSurvLoss
+from unicorn_eval.utils import INPUT_DIRECTORY, extract_embeddings, process, read_inputs
 
 
 def preprocess_features(
-    shot_features: np.ndarray,
-    test_features: np.ndarray,
+    features: np.ndarray,
     center: bool = True,
+    mean: np.ndarray = None,
     normalize_features: bool = True,
-) -> tuple[np.ndarray, np.ndarray]:
+) -> np.ndarray:
     """
     Preprocess feature vectors by centering and normalizing, optionally converting to NumPy.
 
@@ -44,19 +45,14 @@ def preprocess_features(
         Preprocessed (shot_features, test_features) as torch.Tensor or np.ndarray
     """
     if center:
-        mean_feature = shot_features.mean(dim=0, keepdims=True)
-        shot_features = shot_features - mean_feature
-        test_features = test_features - mean_feature
+        features = features - mean
 
     if normalize_features:
-        shot_features = shot_features / np.linalg.norm(
-            shot_features, axis=-1, keepdims=True
-        )
-        test_features = test_features / np.linalg.norm(
-            test_features, axis=-1, keepdims=True
+        features = features / np.linalg.norm(
+            features, axis=-1, keepdims=True
         )
 
-    return shot_features, test_features
+    return features
 
 
 class KNNRegressor(CaseLevelTaskAdaptor):
@@ -79,46 +75,55 @@ class KNNRegressor(CaseLevelTaskAdaptor):
 
     def __init__(
         self,
-        shot_features,
-        shot_labels,
-        test_features,
         k,
         num_workers=8,
         center_features=False,
         normalize_features=False,
     ):
-        super().__init__(shot_features, shot_labels, test_features)
         self.k = k
         self.num_workers = num_workers
         self.center_features = center_features
         self.normalize_features = normalize_features
         self.model = None
 
-    def fit(self):
-        processed_shot_features, _ = preprocess_features(
-            self.shot_features,
-            self.test_features,
+    def fit(self, shot_features, shot_labels, **kwargs):
+        self.mean_feature = shot_features.mean(dim=0, keepdims=True)
+        shot_features, _ = preprocess_features(
+            shot_features,
             center=self.center_features,
+            mean=self.mean_feature,
             normalize_features=self.normalize_features,
         )
 
         self.model = KNeighborsRegressor(n_neighbors=self.k, n_jobs=self.num_workers)
-        self.model.fit(processed_shot_features, self.shot_labels)
+        self.model.fit(shot_features, shot_labels)
 
-    def predict(self) -> np.ndarray:
-        _, processed_test_features = preprocess_features(
-            self.shot_features,
-            self.test_features,
-            center=self.center_features,
-            normalize_features=self.normalize_features,
-        )
-
-        if self.model is None:
-            raise ValueError(
-                "Model has not been fitted yet. Call `fit` before `predict`."
+    def predict(self, test_cases) -> np.ndarray:
+        predictions = []
+        for case_name in test_cases:
+            test_input = process(
+                read_inputs(
+                    input_dir=INPUT_DIRECTORY, case_names=[case_name]
+                )
+            )
+            case_informations = extract_embeddings(test_input)
+            test_feature = case_informations["embeddings"]
+            processed_test_feature = preprocess_features(
+                test_feature,
+                mean=self.mean_feature,
+                center=self.center_features,
+                normalize_features=self.normalize_features,
             )
 
-        return self.model.predict(processed_test_features)
+            if self.model is None:
+                raise ValueError(
+                    "Model has not been fitted yet. Call `fit` before `predict`."
+                )
+
+            prediction = self.model.predict(processed_test_feature)
+            predictions.append(prediction)
+
+        return np.array(predictions)
 
 
 class WeightedKNNRegressor(CaseLevelTaskAdaptor):
@@ -144,16 +149,12 @@ class WeightedKNNRegressor(CaseLevelTaskAdaptor):
 
     def __init__(
         self,
-        shot_features,
-        shot_labels,
-        test_features,
         k,
         metric="cosine",
         center_features=False,
         normalize_features=False,
         class_values=None,
     ):
-        super().__init__(shot_features, shot_labels, test_features)
         self.k = k
         self.metric = metric
         self.center_features = center_features
@@ -164,13 +165,16 @@ class WeightedKNNRegressor(CaseLevelTaskAdaptor):
         self.class_to_idx = None
         self.num_classes = None
 
-    def fit(self):
-        self.shot_features, self.test_features = preprocess_features(
-            self.shot_features,
-            self.test_features,
+    def fit(self, shot_features, shot_labels, **kwargs):
+        self.mean_feature = shot_features.mean(dim=0, keepdims=True)
+        self.shot_features = preprocess_features(
+            shot_features,
             center=self.center_features,
+            mean=self.mean_feature,
             normalize_features=self.normalize_features,
         )
+
+        self.shot_labels = shot_labels
 
         # define similarity function
         if callable(self.metric):
@@ -182,11 +186,33 @@ class WeightedKNNRegressor(CaseLevelTaskAdaptor):
         else:
             raise ValueError(f"Unsupported metric: {self.metric}")
 
-    def predict(self) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
-        test_predictions = []
-        for test_point in self.test_features:
+    def predict(self, test_cases) -> np.ndarray:
+        predictions = []
+        for case_name in test_cases:
+            test_input = process(
+                read_inputs(
+                    input_dir=INPUT_DIRECTORY, case_names=[case_name]
+                )
+            )
+            case_informations = extract_embeddings(test_input)
+            test_feature = case_informations["embeddings"]
+            processed_test_feature = preprocess_features(
+                test_feature,
+                mean=self.mean_feature,
+                center=self.center_features,
+                normalize_features=self.normalize_features,
+            )
+
+            if (
+                self.shot_features is None
+                or self.similarity_fn is None
+            ):
+                raise ValueError(
+                    "Model has not been fitted yet. Call `fit` before `predict`."
+                )
+
             similarities = self.similarity_fn(
-                test_point.reshape(1, -1), self.shot_features
+                processed_test_feature.reshape(1, -1), self.shot_features
             ).flatten()
             k_indices = np.argsort(-similarities)[: self.k]
             k_labels = self.shot_labels[k_indices]
@@ -198,11 +224,11 @@ class WeightedKNNRegressor(CaseLevelTaskAdaptor):
             if self.class_values is not None:
                 diffs = np.abs(self.class_values - weighted_avg)
                 class_label = self.class_values[np.argmin(diffs)]
-                test_predictions.append(class_label)
+                predictions.append(class_label)
             else:
-                test_predictions.append(weighted_avg)
-        test_predictions = np.array(test_predictions)
-        return test_predictions
+                predictions.append(weighted_avg)
+
+        return np.array(predictions)
 
 
 class LinearClassifier(nn.Module):
@@ -241,40 +267,35 @@ class LinearProbingRegressor(CaseLevelTaskAdaptor):
 
     def __init__(
         self,
-        shot_features,
-        shot_labels,
-        test_features,
         survival=False,
         num_epochs=100,
         learning_rate=0.001,
         patience=10,
-        shot_extra_labels=None,
     ):
-        super().__init__(shot_features, shot_labels, test_features, shot_extra_labels)
         self.survival = survival
         self.num_epochs = num_epochs
         self.learning_rate = learning_rate
         self.patience = patience
 
-    def fit(self):
-        input_dim = self.shot_features.shape[1]
+    def fit(self, shot_features, shot_labels, shot_extra_labels=None, **kwargs):
+        input_dim = shot_features.shape[1]
         if self.survival:
             # discretize survival time into bins
             nbins = 4
             eps = 1e-6
-            events = self.shot_extra_labels["event"]
-            uncensored_labels = self.shot_labels[events == 1]
+            events = shot_extra_labels["event"]
+            uncensored_labels = shot_labels[events == 1]
             if len(uncensored_labels) > 0:
                 q_bins = np.quantile(uncensored_labels, q=np.linspace(0, 1, nbins + 1))
             else:
                 # if all events are censored, use the entire range of labels
-                q_bins = np.quantile(self.shot_labels, q=np.linspace(0, 1, nbins + 1))
-            q_bins[0] = self.shot_labels.min() - eps
-            q_bins[-1] = self.shot_labels.max() + eps
-            self.shot_labels = (
-                np.digitize(self.shot_labels, bins=q_bins, right=False) - 1
+                q_bins = np.quantile(shot_labels, q=np.linspace(0, 1, nbins + 1))
+            q_bins[0] = shot_labels.min() - eps
+            q_bins[-1] = shot_labels.max() + eps
+            shot_labels = (
+                np.digitize(shot_labels, bins=q_bins, right=False) - 1
             )
-            self.censoring = 1 - events
+            censoring = 1 - events
             self.num_classes = nbins  # number of bins
             self.criterion = NLLSurvLoss()
         else:
@@ -282,22 +303,19 @@ class LinearProbingRegressor(CaseLevelTaskAdaptor):
             self.criterion = nn.MSELoss()
 
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.shot_features = torch.tensor(self.shot_features, dtype=torch.float32).to(
-            self.device
-        )
-        self.test_features = torch.tensor(self.test_features, dtype=torch.float32).to(
+        shot_features = torch.tensor(shot_features, dtype=torch.float32).to(
             self.device
         )
 
         if self.survival:
-            self.shot_labels = torch.tensor(self.shot_labels, dtype=torch.long).to(
+            shot_labels = torch.tensor(shot_labels, dtype=torch.long).to(
                 self.device
             )
-            self.censoring = torch.tensor(self.censoring, dtype=torch.long).to(
+            censoring = torch.tensor(censoring, dtype=torch.long).to(
                 self.device
             )
         else:
-            self.shot_labels = torch.tensor(self.shot_labels, dtype=torch.float32).to(
+            shot_labels = torch.tensor(shot_labels, dtype=torch.float32).to(
                 self.device
             )
 
@@ -321,15 +339,15 @@ class LinearProbingRegressor(CaseLevelTaskAdaptor):
         ):
             self.model.train()
             self.optimizer.zero_grad()
-            logits = self.model(self.shot_features)
+            logits = self.model(shot_features)
             if self.survival:
                 hazards = torch.sigmoid(logits)  # [B, nbins]
                 survival = torch.cumprod(1 - hazards, dim=1)  # [B, nbins]
                 loss = self.criterion(
-                    hazards, survival, self.shot_labels, self.censoring
+                    hazards, survival, shot_labels, censoring
                 )
             else:
-                loss = self.criterion(logits, self.shot_labels)
+                loss = self.criterion(logits, shot_labels)
             loss.backward()
             self.optimizer.step()
             epoch_loss = loss.item()
@@ -350,18 +368,34 @@ class LinearProbingRegressor(CaseLevelTaskAdaptor):
             f"Restored best model from epoch {best_epoch+1} with loss {best_loss:.4f}"
         )
 
-    def predict(self) -> np.ndarray:
+    def predict(self, test_cases) -> np.ndarray:
+        predictions = []
         self.model.eval()
         with torch.no_grad():
-            logits = self.model(self.test_features)
-            if self.survival:
-                hazards = torch.sigmoid(logits)
-                survival = torch.cumprod(1 - hazards, dim=1)
-                risk_scores = -torch.sum(survival, dim=1)
-                test_predictions = -risk_scores
-            else:
-                _, test_predictions = torch.max(logits, 1)
-        return test_predictions.cpu().numpy()
+            for case_name in test_cases:
+                test_input = process(
+                    read_inputs(
+                        input_dir=INPUT_DIRECTORY, case_names=[case_name]
+                    )
+                )
+                case_informations = extract_embeddings(test_input)
+                test_feature = case_informations["embeddings"]
+                test_features = torch.tensor(test_feature, dtype=torch.float32).to(
+                    self.device
+                )
+
+                logits = self.model(test_features)
+                if self.survival:
+                    hazards = torch.sigmoid(logits)
+                    survival = torch.cumprod(1 - hazards, dim=1)
+                    risk_scores = -torch.sum(survival, dim=1)
+                    prediction = -risk_scores
+                    predictions.append(prediction.cpu().numpy())
+                else:
+                    _, prediction = torch.max(logits, 1)
+                    predictions.append(prediction.cpu().numpy())
+
+        return np.array(predictions)
 
 
 class MLPClassifier(nn.Module):
@@ -409,18 +443,13 @@ class MultiLayerPerceptronRegressor(CaseLevelTaskAdaptor):
 
     def __init__(
         self,
-        shot_features,
-        shot_labels,
-        test_features,
         survival=False,
         hidden_dim=256,
         num_layers=3,
         num_epochs=100,
         learning_rate=0.001,
         patience=10,
-        shot_extra_labels=None,
     ):
-        super().__init__(shot_features, shot_labels, test_features, shot_extra_labels)
         self.survival = survival
         self.hidden_dim = hidden_dim
         self.num_layers = num_layers
@@ -428,25 +457,25 @@ class MultiLayerPerceptronRegressor(CaseLevelTaskAdaptor):
         self.learning_rate = learning_rate
         self.patience = patience
 
-    def fit(self):
-        input_dim = self.shot_features.shape[1]
+    def fit(self, shot_features, shot_labels, shot_extra_labels=None, **kwargs):
+        input_dim = shot_features.shape[1]
         if self.survival:
             # discretize survival time into bins
             nbins = 4
             eps = 1e-6
-            events = self.shot_extra_labels["event"]
-            uncensored_labels = self.shot_labels[events == 1]
+            events = shot_extra_labels["event"]
+            uncensored_labels = shot_labels[events == 1]
             if len(uncensored_labels) > 0:
                 q_bins = np.quantile(uncensored_labels, q=np.linspace(0, 1, nbins + 1))
             else:
                 # if all events are censored, use the entire range of labels
-                q_bins = np.quantile(self.shot_labels, q=np.linspace(0, 1, nbins + 1))
-            q_bins[0] = self.shot_labels.min() - eps
-            q_bins[-1] = self.shot_labels.max() + eps
-            self.shot_labels = (
-                np.digitize(self.shot_labels, bins=q_bins, right=False) - 1
+                q_bins = np.quantile(shot_labels, q=np.linspace(0, 1, nbins + 1))
+            q_bins[0] = shot_labels.min() - eps
+            q_bins[-1] = shot_labels.max() + eps
+            shot_labels = (
+                np.digitize(shot_labels, bins=q_bins, right=False) - 1
             )
-            self.censoring = 1 - events
+            censoring = 1 - events
             self.num_classes = nbins  # number of bins
             self.criterion = NLLSurvLoss()
         else:
@@ -454,22 +483,19 @@ class MultiLayerPerceptronRegressor(CaseLevelTaskAdaptor):
             self.criterion = nn.MSELoss()
 
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.shot_features = torch.tensor(self.shot_features, dtype=torch.float32).to(
-            self.device
-        )
-        self.test_features = torch.tensor(self.test_features, dtype=torch.float32).to(
+        self.shot_features = torch.tensor(shot_features, dtype=torch.float32).to(
             self.device
         )
 
         if self.survival:
-            self.shot_labels = torch.tensor(self.shot_labels, dtype=torch.long).to(
+            shot_labels = torch.tensor(shot_labels, dtype=torch.long).to(
                 self.device
             )
-            self.censoring = torch.tensor(self.censoring, dtype=torch.long).to(
+            censoring = torch.tensor(censoring, dtype=torch.long).to(
                 self.device
             )
         else:
-            self.shot_labels = torch.tensor(self.shot_labels, dtype=torch.float32).to(
+            shot_labels = torch.tensor(shot_labels, dtype=torch.float32).to(
                 self.device
             )
 
@@ -495,15 +521,15 @@ class MultiLayerPerceptronRegressor(CaseLevelTaskAdaptor):
         ):
             self.model.train()
             self.optimizer.zero_grad()
-            logits = self.model(self.shot_features)
+            logits = self.model(shot_features)
             if self.survival:
                 hazards = torch.sigmoid(logits)  # [B, nbins]
                 survival = torch.cumprod(1 - hazards, dim=1)  # [B, nbins]
                 loss = self.criterion(
-                    hazards, survival, self.shot_labels, self.censoring
+                    hazards, survival, shot_labels, censoring
                 )
             else:
-                loss = self.criterion(logits, self.shot_labels)
+                loss = self.criterion(logits, shot_labels)
             loss.backward()
             self.optimizer.step()
             epoch_loss = loss.item()
@@ -524,15 +550,31 @@ class MultiLayerPerceptronRegressor(CaseLevelTaskAdaptor):
             f"Restored best model from epoch {best_epoch+1} with loss {best_loss:.4f}"
         )
 
-    def predict(self) -> np.ndarray:
+    def predict(self, test_cases) -> np.ndarray:
+        predictions = []
         self.model.eval()
         with torch.no_grad():
-            logits = self.model(self.test_features)
-            if self.survival:
-                hazards = torch.sigmoid(logits)
-                survival = torch.cumprod(1 - hazards, dim=1)
-                risk_scores = -torch.sum(survival, dim=1)
-                test_predictions = -risk_scores
-            else:
-                _, test_predictions = torch.max(logits, 1)
-        return test_predictions.cpu().numpy()
+            for case_name in test_cases:
+                test_input = process(
+                    read_inputs(
+                        input_dir=INPUT_DIRECTORY, case_names=[case_name]
+                    )
+                )
+                case_informations = extract_embeddings(test_input)
+                test_feature = case_informations["embeddings"]
+                test_features = torch.tensor(test_feature, dtype=torch.float32).to(
+                    self.device
+                )
+
+                logits = self.model(test_features)
+                if self.survival:
+                    hazards = torch.sigmoid(logits)
+                    survival = torch.cumprod(1 - hazards, dim=1)
+                    risk_scores = -torch.sum(survival, dim=1)
+                    prediction = -risk_scores
+                    predictions.append(prediction.cpu().numpy())
+                else:
+                    _, prediction = torch.max(logits, 1)
+                    predictions.append(prediction.cpu().numpy())
+
+        return np.array(predictions)

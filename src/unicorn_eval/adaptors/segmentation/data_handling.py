@@ -316,10 +316,10 @@ class BalancedSegmentationDataset(Dataset):
     def __init__(self, data, transform=None, random_seed=42):
         self.transform = transform
         self.rng = random.Random(random_seed)
-    
+
         # Keep track which patches contain which labels
         self.patches_by_label: dict[int, list[dict]] = {}
-    
+
         for data_dict in data:
             patch_label = data_dict["patch_label"]
             for label_value in np.unique(patch_label):
