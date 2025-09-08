@@ -17,6 +17,7 @@ import gc
 import json
 import logging
 import multiprocessing
+import os
 import random
 from pathlib import Path
 from pprint import pformat
@@ -29,14 +30,12 @@ from dragon_eval import DragonEval
 from dragon_eval.evaluation import REGRESSION_EPSILON, TASK_TYPE, EvalType
 
 from unicorn_eval.helpers import get_max_workers
-from unicorn_eval.utils import (
-    adapt_features,
-    evaluate_predictions,
-    extract_data,
-    extract_embeddings_and_labels,
-    normalize_metric,
-    write_json_file,
-)
+from unicorn_eval.memory_profiler import (finalize_memory_profiler,
+                                          init_memory_profiler, log_memory,
+                                          start_continuous_logging)
+from unicorn_eval.utils import (adapt_features, evaluate_predictions,
+                                extract_data, extract_embeddings_and_labels,
+                                normalize_metric, write_json_file)
 
 INPUT_DIRECTORY = Path("/input")
 OUTPUT_DIRECTORY = Path("/output")
@@ -905,12 +904,20 @@ def process_task_in_subprocess(
 
 
 def main():
+    # Initialize memory profiling
+    enable_wandb = os.getenv("ENABLE_WANDB", "false").lower() == "true"
+    init_memory_profiler(output_dir=OUTPUT_DIRECTORY, enable_wandb=enable_wandb)
+    log_memory("evaluation_start")
+    start_continuous_logging()
+
     logging.info("Input folder contents:")
     print_directory_contents(INPUT_DIRECTORY)
     logging.info("=+=" * 10)
     logging.info("Groundtruth folder contents:")
     print_directory_contents(GROUNDTRUTH_DIRECTORY)
     logging.info("=+=" * 10)
+
+    log_memory("directory_contents_loaded")
 
     print("Evaluating language predictions")
     task_metrics = reformat_language_metrics(evaluate_language_predictions())
@@ -952,6 +959,9 @@ def main():
         write_combined_metrics(metric_dict=task_metrics, save_predictions=False)
         logging.info("Metrics written successfully.")
         return 0
+
+    finally:
+        finalize_memory_profiler()
 
 
 if __name__ == "__main__":
