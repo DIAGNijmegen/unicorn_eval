@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
 import numpy as np
 import torch
@@ -8,13 +9,15 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from monai.losses.dice import DiceFocalLoss
+from tqdm import tqdm
 
 from unicorn_eval.adaptors.segmentation.baseline_segmentation_upsampling_3d.v1 import \
     SegmentationUpsampling3D
 from unicorn_eval.adaptors.segmentation.data_handling import (
-    construct_data_with_labels, load_patch_data)
+    construct_data_with_labels, extract_patch_labels, load_patch_data)
 from unicorn_eval.adaptors.segmentation.inference import inference3d
 from unicorn_eval.adaptors.segmentation.training import train_decoder3d
+from unicorn_eval.io import INPUT_DIRECTORY, process, read_inputs
 
 
 class ConvDecoder3D(nn.Module):
@@ -167,15 +170,55 @@ class ConvSegmentation3D(SegmentationUpsampling3D):
                 1
             )  # later code will squeeze second dim
 
-    def fit(self):
+    def fit(
+        self,
+        *,
+        shot_features,
+        shot_labels,
+        shot_coordinates,
+        shot_ids,
+        shot_patch_sizes,
+        shot_patch_spacings,
+        shot_image_sizes,
+        shot_image_origins,
+        shot_image_spacings,
+        shot_image_directions,
+        shot_label_spacings,
+        shot_label_origins,
+        shot_label_directions,
+        **kwargs,
+    ):
+        patch_labels = []
+        for idx, label in tqdm(enumerate(shot_labels), desc="Extracting patch labels"):
+            case_patch_labels = extract_patch_labels(
+                label=label,
+                label_spacing=shot_label_spacings[shot_ids[idx]],
+                label_origin=shot_label_origins[shot_ids[idx]],
+                label_direction=shot_label_directions[shot_ids[idx]],
+                image_size=shot_image_sizes[shot_ids[idx]],
+                image_origin=shot_image_origins[shot_ids[idx]],
+                image_spacing=shot_image_spacings[shot_ids[idx]],
+                image_direction=shot_image_directions[shot_ids[idx]],
+                start_coordinates=shot_coordinates[idx],
+                patch_size=self.global_patch_size,
+                patch_spacing=self.global_patch_spacing,
+            )
+            patch_labels.append(case_patch_labels)
+
+        patch_labels = np.array(patch_labels, dtype=object)
+
         # build training data and loader
         train_data = construct_data_with_labels(
-            coordinates=self.shot_coordinates,
-            embeddings=self.shot_features,
-            case_ids=self.shot_names,
-            patch_sizes=self.shot_patch_sizes,
-            patch_spacings=self.shot_patch_spacings,
-            labels=self.shot_labels,
+            coordinates=shot_coordinates,
+            embeddings=shot_features,
+            case_ids=shot_ids,
+            patch_sizes=shot_patch_sizes,
+            patch_spacings=shot_patch_spacings,
+            labels=patch_labels,
+            image_sizes=shot_image_sizes,
+            image_origins=shot_image_origins,
+            image_spacings=shot_image_spacings,
+            image_directions=shot_image_directions,
         )
         train_loader = load_patch_data(
             train_data, batch_size=32, balance_bg=self.balance_bg
@@ -183,7 +226,7 @@ class ConvSegmentation3D(SegmentationUpsampling3D):
 
         # Channels are the remaining dimension before the spatial dimensions
         z_dim, num_spatials = (
-            len(self.shot_features[0][0]),
+            len(shot_features[0][0]),
             self.pack_size[0] * self.pack_size[1] * self.pack_size[2],
         )
         assert (
@@ -194,7 +237,7 @@ class ConvSegmentation3D(SegmentationUpsampling3D):
             max(
                 [
                     np.max(patch["features"])
-                    for label in self.shot_labels
+                    for label in patch_labels
                     for patch in label["patches"]
                 ]
             )
@@ -233,7 +276,7 @@ class ConvSegmentation3D(SegmentationUpsampling3D):
                 decoder,
                 train_loader,
                 self.device,
-                num_epochs=8,
+                num_epochs=50,
                 loss_fn=loss,
                 optimizer=optimizer,
                 label_mapper=self.gt_to_multiclass,
@@ -256,30 +299,54 @@ class ConvSegmentation3D(SegmentationUpsampling3D):
             else:
                 raise
 
-    def predict(self):  # Copied from SegmentationUpsampling3D to change activation
-        test_data = construct_data_with_labels(
-            coordinates=self.test_coordinates,
-            embeddings=self.test_features,
-            case_ids=self.test_cases,
-            patch_sizes=self.test_patch_sizes,
-            patch_spacings=self.test_patch_spacings,
-            image_sizes=self.test_image_sizes,
-            image_origins=self.test_image_origins,
-            image_spacings=self.test_image_spacings,
-            image_directions=self.test_image_directions,
-        )
+    def predict(self, test_case_ids):
+        predictions = []
+        for case_id in test_case_ids:
+            logging.info(f"Running inference for case {case_id}")
+            test_input = process(
+                read_inputs(input_dir=INPUT_DIRECTORY, case_names=[case_id])[0]
+            )
 
-        test_loader = load_patch_data(test_data, batch_size=10)
-        return inference3d(
-            decoder=self.decoder,
-            data_loader=test_loader,
-            device=self.device,
-            return_binary=self.return_binary,
-            test_cases=self.test_cases,
-            test_label_sizes=self.test_label_sizes,
-            test_label_spacing=self.test_label_spacing,
-            test_label_origins=self.test_label_origins,
-            test_label_directions=self.test_label_directions,
-            inference_postprocessor=self.inference_postprocessor,  # overwrite original behaviour of applying sigmoid
-            mask_postprocessor=self.mask_processor,
-        )
+            test_data = construct_data_with_labels(
+                coordinates=[test_input["coordinates"]],
+                embeddings=[test_input["embeddings"]],
+                case_ids=[case_id],
+                patch_sizes={case_id: test_input["patch_size"]},
+                patch_spacings={case_id: test_input["patch_spacing"]},
+                image_sizes={case_id: test_input["image_size"]},
+                image_origins={case_id: test_input["image_origin"]},
+                image_spacings={case_id: test_input["image_spacing"]},
+                image_directions={case_id: test_input["image_direction"]},
+            )
+
+            test_loader = load_patch_data(test_data, batch_size=1)
+
+            # run inference using the trained decoder
+            prediction = inference3d(
+                decoder=self.decoder,
+                data_loader=test_loader,
+                device=self.device,
+                return_binary=self.return_binary,
+                test_cases=[case_id],
+                test_label_sizes={case_id: test_input["label_size"]},
+                test_label_spacing={case_id: test_input["label_spacing"]},
+                test_label_origins={case_id: test_input["label_origin"]},
+                test_label_directions={case_id: test_input["label_direction"]},
+                inference_postprocessor=self.inference_postprocessor,  # overwrite original behaviour of applying sigmoid
+                mask_postprocessor=self.mask_processor,
+            )
+            assert len(prediction) == 1
+            prediction = prediction[0]
+
+            workdir = (
+                Path("/opt/app/predictions")
+                if Path("/opt/app/predictions").exists()
+                else Path("unicorn/workdir")
+            )
+            path = workdir / f"vision/{case_id}_pred.npy"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            np.save(path, prediction)
+
+            predictions.append(path)
+
+        return predictions
