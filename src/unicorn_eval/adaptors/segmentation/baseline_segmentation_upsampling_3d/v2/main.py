@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
 import numpy as np
 import torch
@@ -138,7 +139,7 @@ class SegmentationUpsampling3D_V2(PatchLevelTaskAdaptor):
         train_data = construct_data_with_labels(
             coordinates=shot_coordinates,
             embeddings=shot_features,
-            case_names=shot_ids,
+            case_ids=shot_ids,
             patch_sizes=shot_patch_sizes,
             patch_spacings=shot_patch_spacings,
             labels=shot_labels,
@@ -248,9 +249,21 @@ class SegmentationUpsampling3D_V2(PatchLevelTaskAdaptor):
                 test_label_directions=[case_information["label_direction"]],
                 inference_postprocessor=self.inference_postprocessor,
             )
-            predictions.extend(prediction)
+            assert len(prediction) == 1
+            prediction = prediction[0]
 
-        return np.array(predictions)
+            workdir = (
+                Path("/opt/app/predictions")
+                if Path("/opt/app/predictions").exists()
+                else Path("unicorn/workdir")
+            )
+            path = workdir / f"vision/{case_id}_pred.npy"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            np.save(path, prediction)
+
+            predictions.append(path)
+
+        return predictions
 
     def inference_postprocessor(self, mask: torch.Tensor) -> torch.Tensor:
         # Apply post-processing to the predicted mask

@@ -1,7 +1,8 @@
+import logging
 from collections import OrderedDict, defaultdict
+from pathlib import Path
 from typing import Iterable
 
-import logging
 import numpy as np
 import pandas
 
@@ -29,6 +30,10 @@ class Spider:
         self.case_ids = case_ids
 
     def score_case(self, gt, pred):
+        if isinstance(gt, (Path, str)):
+            gt = np.load(gt)
+        if isinstance(pred, (Path, str)):
+            pred = np.load(pred)
 
         mask_manual = gt.astype(np.int64)
         mask_automatic = pred.astype(np.int64)

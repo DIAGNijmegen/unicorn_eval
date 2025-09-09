@@ -1,5 +1,5 @@
-from report_guided_annotation import extract_lesion_candidates
 from picai_eval import evaluate
+from report_guided_annotation import extract_lesion_candidates
 
 
 def compute_picai_score(gts, preds):

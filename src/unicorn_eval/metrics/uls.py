@@ -1,9 +1,11 @@
-import numpy as np
 import collections
-from scipy.spatial.distance import pdist, squareform
-from scipy.ndimage import binary_erosion, label
 import itertools
+from pathlib import Path
+
+import numpy as np
 import SimpleITK as sitk
+from scipy.ndimage import binary_erosion, label
+from scipy.spatial.distance import pdist, squareform
 from skimage.measure import regionprops
 
 
@@ -136,6 +138,11 @@ def compute_uls_score(gts, preds):
     uls_scores = 0
     for i, gt in enumerate(gts):
         pred = preds[i]
+        if isinstance(gt, (Path, str)):
+            gt = np.load(gt)
+        if isinstance(pred, (Path, str)):
+            pred = np.load(pred)
+
         gt_long, gt_short, _, _ = long_and_short_axis_diameters(gt)
         pred_long, pred_short, _, _ = long_and_short_axis_diameters(pred)
 
