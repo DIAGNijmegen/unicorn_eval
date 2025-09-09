@@ -513,47 +513,15 @@ class PatchNoduleRegressor(PatchLevelTaskAdaptor):
 
     def __init__(
         self,
-        shot_features: list[np.ndarray],
-        shot_labels: list[list[Sequence[float]]],
-        shot_coordinates: list[np.ndarray],
-        shot_ids: list[str],
-        test_features: list[np.ndarray],
-        test_coordinates: list[np.ndarray],
-        test_ids: list[str],
-        shot_image_origins: dict[str, Sequence[float]],
-        shot_image_spacings: dict[str, Sequence[float]],
-        shot_image_directions: dict[str, Sequence[float]],
-        test_image_origins: dict[str, Sequence[float]],
-        test_image_spacings: dict[str, Sequence[float]],
-        test_image_directions: dict[str, Sequence[float]],
         hidden_dim: int = 64,
         num_epochs: int = 50,
         lr: float = 1e-3,
         shot_extra_labels: np.ndarray | None = None,
     ):
-        super().__init__(
-            shot_features,
-            shot_labels,
-            shot_coordinates,
-            test_features,
-            test_coordinates,
-            shot_extra_labels,
-        )
-        self.shot_ids = shot_ids
-        self.test_ids = test_ids
-        self.shot_image_origins = shot_image_origins
-        self.shot_image_spacings = shot_image_spacings
-        self.shot_image_directions = shot_image_directions
-        self.test_image_origins = test_image_origins
-        self.test_image_spacings = test_image_spacings
-        self.test_image_directions = test_image_directions
         self.hidden_dim = hidden_dim
         self.num_epochs = num_epochs
         self.lr = lr
-        input_dim = shot_features[0].shape[1]
-        self.fc1 = nn.Linear(input_dim, hidden_dim)
-        self.relu = nn.ReLU()
-        self.fc2 = nn.Linear(hidden_dim, 4)
+        self.shot_extra_labels = shot_extra_labels
 
     def compute_patch_center_3d(self, patch_idx, spacing, origin, direction):
         """
@@ -597,8 +565,8 @@ class PatchNoduleRegressor(PatchLevelTaskAdaptor):
             cls_labels.append(label)
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         x = torch.tensor(feats, dtype=torch.float32, device=device)
-        y_off = torch.tensor(offsets, dtype=torch.float32, device=device)
-        y_cls = torch.tensor(cls_labels, dtype=torch.float32, device=device)
+        y_off = torch.tensor(np.array(offsets), dtype=torch.float32, device=device)
+        y_cls = torch.tensor(np.array(cls_labels), dtype=torch.float32, device=device)
         self.model = TwoLayerPerceptron(input_dim=x.shape[1], hidden_dim=hidden_dim).to(
             device
         )
@@ -638,18 +606,34 @@ class PatchNoduleRegressor(PatchLevelTaskAdaptor):
         probs = 1 / (1 + np.exp(-logits))
         return np.concatenate([world_centres, probs[:, None]], axis=1)
 
-    def fit(self):
+    def fit(
+        self,
+        *,
+        shot_features: list[np.ndarray],
+        shot_labels: list[list[Sequence[float]]],
+        shot_coordinates: list[np.ndarray],
+        shot_ids: list[str],
+        shot_image_origins: dict[str, Sequence[float]],
+        shot_image_spacings: dict[str, Sequence[float]],
+        shot_image_directions: dict[str, Sequence[float]],
+        **kwargs,
+    ) -> None:
+        input_dim = shot_features[0].shape[1]
+        self.fc1 = nn.Linear(input_dim, self.hidden_dim)
+        self.relu = nn.ReLU()
+        self.fc2 = nn.Linear(self.hidden_dim, 4)
+
         # build a *flat* list of per-patch dicts for training
         patch_dicts: list[dict] = []
         for feats_case, idxs_case, nods_case, case_id in zip(
-            self.shot_features,
-            self.shot_coordinates,
-            self.shot_labels,
-            self.shot_ids,
+            shot_features,
+            shot_coordinates,
+            shot_labels,
+            shot_ids,
         ):
-            origin = self.shot_image_origins[case_id]
-            spacing = self.shot_image_spacings[case_id]
-            direction = self.shot_image_directions[case_id]
+            origin = shot_image_origins[case_id]
+            spacing = shot_image_spacings[case_id]
+            direction = shot_image_directions[case_id]
             for feat, idx in zip(feats_case, idxs_case):
                 patch_dicts.append(
                     {
@@ -668,31 +652,31 @@ class PatchNoduleRegressor(PatchLevelTaskAdaptor):
             lr=self.lr,
         )
 
-    def predict(self) -> np.ndarray:
-
+    def predict(self, test_case_ids: list[str]) -> np.ndarray:
         test_dicts: list[dict] = []
-        case_ids: list[str] = []
+        per_patch_case_ids = []
 
-        for feats_case, idxs_case, case_id in zip(
-            self.test_features,
-            self.test_coordinates,
-            self.test_ids,
-        ):
-            origin = self.test_image_origins[case_id]
-            spacing = self.test_image_spacings[case_id]
-            direction = self.test_image_directions[case_id]
-            for feat, idx in zip(feats_case, idxs_case):
+        for case_id in test_case_ids:
+            logging.info(f"Running inference for case {case_id}")
+            test_input = process(
+                read_inputs(input_dir=INPUT_DIRECTORY, case_names=[case_id])[0]
+            )
+
+            case_features = test_input["embeddings"]
+            case_coordinates = test_input["coordinates"]
+
+            for feat, coord in zip(case_features, case_coordinates):
                 test_dicts.append(
                     {
                         "feature": feat,
-                        "patch_idx": idx,
-                        "image_origin": origin,
-                        "image_spacing": spacing,
-                        "image_direction": direction,
+                        "patch_idx": coord,
+                        "image_origin": test_input["image_origin"],
+                        "image_spacing": test_input["image_spacing"],
+                        "image_direction": test_input["image_direction"],
                         "patch_nodules": [],  # no GT here
                     }
                 )
-                case_ids.append(case_id)  # keep alignment with test_dicts
+                per_patch_case_ids.append(case_id)  # keep alignment with test_dicts
 
         # raw predictions [x,y,z,p] for every patch
         raw_preds = self.infer_from_patches(test_dicts)
@@ -701,10 +685,10 @@ class PatchNoduleRegressor(PatchLevelTaskAdaptor):
         # ------- ONLY KEEP p > 0.9 -------- #
         mask = probs > 0.9
         raw_preds = raw_preds[mask]
-        case_ids = np.array(case_ids, dtype=object)[mask]
+        per_patch_case_ids = np.array(per_patch_case_ids, dtype=object)[mask]
 
         # prepend test_id to each prediction row
-        rows = [[cid, *pred] for cid, pred in zip(case_ids, raw_preds)]
+        rows = [[cid, *pred] for cid, pred in zip(per_patch_case_ids, raw_preds)]
         preds = np.array(rows, dtype=object)
 
         # Nodule count printout
