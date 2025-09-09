@@ -13,17 +13,19 @@
 #  limitations under the License.
 
 import logging
-import tqdm
+
 import numpy as np
+import sklearn
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import sklearn
-from sklearn.neighbors import KNeighborsClassifier
+import tqdm
 from sklearn.metrics.pairwise import cosine_similarity, euclidean_distances
+from sklearn.neighbors import KNeighborsClassifier
 
 from unicorn_eval.adaptors.base import CaseLevelTaskAdaptor
-from unicorn_eval.io import INPUT_DIRECTORY, process, read_inputs, extract_embeddings
+from unicorn_eval.io import (INPUT_DIRECTORY, extract_embeddings, process,
+                             read_inputs)
 
 
 def preprocess_features(
@@ -394,19 +396,20 @@ class LinearProbing(CaseLevelTaskAdaptor):
                 test_input = process(
                     read_inputs(input_dir=INPUT_DIRECTORY, case_names=[case_name])[0]
                 )
-            case_informations = extract_embeddings(test_input)
-            test_feature = case_informations["embeddings"]
-            test_features = torch.tensor(test_feature, dtype=torch.float32).to(
-                self.device
-            )
 
-            logits = self.model(test_features)
-            if self.return_probabilities:
-                prediction = torch.softmax(logits, dim=0)
-                predictions.append(prediction.cpu().numpy())
-            else:
-                _, prediction = torch.max(logits, 0)
-                predictions.append(prediction.cpu().numpy())
+                case_informations = extract_embeddings(test_input)
+                test_feature = case_informations["embeddings"]
+                test_features = torch.tensor(test_feature, dtype=torch.float32).to(
+                    self.device
+                )
+
+                logits = self.model(test_features)
+                if self.return_probabilities:
+                    prediction = torch.softmax(logits, dim=0)
+                    predictions.append(prediction.cpu().numpy())
+                else:
+                    _, prediction = torch.max(logits, dim=0)
+                    predictions.append(prediction.cpu().numpy())
 
         return np.array(predictions).squeeze()
 
