@@ -375,97 +375,103 @@ def process_task_in_subprocess(
         del shots
         gc.collect()
 
-        # ensure we have an adaptor for this task
-        if task_name not in adaptors:
-            raise Exception(f"No adaptor found for task {task_name}")
+        if shot_informations is None:
+            logging.info(f"No shots found for task {task_name}, skipping.")
+            logging.info("=+=" * 10)
+            return 0
 
-        adaptor_name = adaptors[task_name]
-        return_probabilities = REQUIRES_PROBABILITIES_DICT[task_name]
+        else:
+            # ensure we have an adaptor for this task
+            if task_name not in adaptors:
+                raise Exception(f"No adaptor found for task {task_name}")
 
-        global_patch_size = shot_informations["global_patch_size"]
-        global_patch_spacing = shot_informations["global_patch_spacing"]
-        feature_grid_resolution = shot_informations["feature_grid_resolution"]
+            adaptor_name = adaptors[task_name]
+            return_probabilities = REQUIRES_PROBABILITIES_DICT[task_name]
 
-        shot_embeddings = shot_informations["embeddings"]
-        shot_coordinates = shot_informations["coordinates"]
-        shot_labels = shot_informations["labels"]
-        shot_extra_labels = shot_informations["extra_labels"]
-        shot_ids = shot_informations["ids"]
-        shot_image_sizes = shot_informations["image_sizes"]
-        shot_image_spacings = shot_informations["image_spacings"]
-        shot_image_origins = shot_informations["image_origins"]
-        shot_image_directions = shot_informations["image_directions"]
-        shot_patch_sizes = shot_informations["patch_sizes"]
-        shot_patch_spacings = shot_informations["patch_spacings"]
-        shot_label_spacings = shot_informations["label_spacings"]
-        shot_label_origins = shot_informations["label_origins"]
-        shot_label_directions = shot_informations["label_directions"]
+            global_patch_size = shot_informations["global_patch_size"]
+            global_patch_spacing = shot_informations["global_patch_spacing"]
+            feature_grid_resolution = shot_informations["feature_grid_resolution"]
 
-        task_type = shot_informations["task_type"]
-        if task_type in ["classification", "regression"]:
-            save_predictions = True
-            if len(shot_embeddings.shape) > 2:
-                shot_embeddings = shot_embeddings.squeeze(1)
+            shot_embeddings = shot_informations["embeddings"]
+            shot_coordinates = shot_informations["coordinates"]
+            shot_labels = shot_informations["labels"]
+            shot_extra_labels = shot_informations["extra_labels"]
+            shot_ids = shot_informations["ids"]
+            shot_image_sizes = shot_informations["image_sizes"]
+            shot_image_spacings = shot_informations["image_spacings"]
+            shot_image_origins = shot_informations["image_origins"]
+            shot_image_directions = shot_informations["image_directions"]
+            shot_patch_sizes = shot_informations["patch_sizes"]
+            shot_patch_spacings = shot_informations["patch_spacings"]
+            shot_label_spacings = shot_informations["label_spacings"]
+            shot_label_origins = shot_informations["label_origins"]
+            shot_label_directions = shot_informations["label_directions"]
 
-        num_shots = len(shot_ids)
+            task_type = shot_informations["task_type"]
+            if task_type in ["classification", "regression"]:
+                save_predictions = True
+                if len(shot_embeddings.shape) > 2:
+                    shot_embeddings = shot_embeddings.squeeze(1)
 
-        adaptor = get_adaptor(
-            adaptor_name=adaptor_name,
-            task_type=task_type,
-            num_shots=num_shots,
-            feature_grid_resolution=feature_grid_resolution,
-            global_patch_size=global_patch_size,
-            global_patch_spacing=global_patch_spacing,
-            return_probabilities=return_probabilities,
-        )
+            num_shots = len(shot_ids)
 
-        adaptor.fit(
-            shot_features=shot_embeddings,
-            shot_labels=shot_labels,
-            shot_ids=shot_ids,
-            shot_coordinates=shot_coordinates,
-            shot_patch_sizes=shot_patch_sizes,
-            shot_patch_spacings=shot_patch_spacings,
-            shot_extra_labels=shot_extra_labels,
-            shot_image_sizes=shot_image_sizes,
-            shot_image_spacings=shot_image_spacings,
-            shot_image_origins=shot_image_origins,
-            shot_image_directions=shot_image_directions,
-            shot_label_spacings=shot_label_spacings,
-            shot_label_origins=shot_label_origins,
-            shot_label_directions=shot_label_directions,
-        )
+            adaptor = get_adaptor(
+                adaptor_name=adaptor_name,
+                task_type=task_type,
+                num_shots=num_shots,
+                feature_grid_resolution=feature_grid_resolution,
+                global_patch_size=global_patch_size,
+                global_patch_spacing=global_patch_spacing,
+                return_probabilities=return_probabilities,
+            )
 
-        del (
-            shot_embeddings,
-            shot_labels,
-            shot_extra_labels,
-            shot_ids,
-            shot_image_sizes,
-            shot_image_spacings,
-            shot_image_origins,
-            shot_image_directions,
-            shot_patch_sizes,
-            shot_patch_spacings,
-            shot_label_spacings,
-            shot_label_origins,
-            shot_label_directions,
-            shot_informations,
-        )
-        gc.collect()
+            adaptor.fit(
+                shot_features=shot_embeddings,
+                shot_labels=shot_labels,
+                shot_ids=shot_ids,
+                shot_coordinates=shot_coordinates,
+                shot_patch_sizes=shot_patch_sizes,
+                shot_patch_spacings=shot_patch_spacings,
+                shot_extra_labels=shot_extra_labels,
+                shot_image_sizes=shot_image_sizes,
+                shot_image_spacings=shot_image_spacings,
+                shot_image_origins=shot_image_origins,
+                shot_image_directions=shot_image_directions,
+                shot_label_spacings=shot_label_spacings,
+                shot_label_origins=shot_label_origins,
+                shot_label_directions=shot_label_directions,
+            )
 
-        case_inputs = read_inputs(
-            input_dir=INPUT_DIRECTORY, case_names=task_shots
-        )
-        pool = multiprocessing.Pool(processes=max_workers)
-        cases = pool.map(process, case_inputs)
-        pool.close()
-        pool.join()
+            del (
+                shot_embeddings,
+                shot_labels,
+                shot_extra_labels,
+                shot_ids,
+                shot_image_sizes,
+                shot_image_spacings,
+                shot_image_origins,
+                shot_image_directions,
+                shot_patch_sizes,
+                shot_patch_spacings,
+                shot_label_spacings,
+                shot_label_origins,
+                shot_label_directions,
+                shot_informations,
+            )
+            gc.collect()
 
-        case_informations = extract_labels(cases, task_name)
-        case_ids, case_labels, case_extra_labels = case_informations["ids"], case_informations["labels"], case_informations["extra_labels"]
+            case_inputs = read_inputs(
+                input_dir=INPUT_DIRECTORY, case_names=task_shots
+            )
+            pool = multiprocessing.Pool(processes=max_workers)
+            cases = pool.map(process, case_inputs)
+            pool.close()
+            pool.join()
 
-        predictions = adaptor.predict(case_ids)
+            case_informations = extract_labels(cases, task_name)
+            case_ids, case_labels, case_extra_labels = case_informations["ids"], case_informations["labels"], case_informations["extra_labels"]
+
+            predictions = adaptor.predict(case_ids)
 
     elif modality == "vision-language":
 
