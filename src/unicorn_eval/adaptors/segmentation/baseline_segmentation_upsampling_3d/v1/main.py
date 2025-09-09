@@ -47,14 +47,14 @@ class SegmentationUpsampling(PatchLevelTaskAdaptor):
         self.learning_rate = learning_rate
         self.decoder = None
 
-    def fit(self, shot_features, shot_labels, shot_coordinates, shot_names, **kwargs):
+    def fit(self, shot_features, shot_labels, shot_coordinates, shot_ids, **kwargs):
         input_dim = shot_features[0].shape[1]
         num_classes = max([np.max(label) for label in shot_labels]) + 1
 
         shot_data = construct_segmentation_labels(
             shot_coordinates,
             shot_features,
-            shot_names,
+            shot_ids,
             labels=shot_labels,
             patch_size=self.patch_size,
         )
@@ -121,7 +121,7 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
         shot_features : Patch-level feature embeddings of few shots used for for training.
         shot_labels : Full-resolution segmentation labels.
         shot_coordinates : Patch coordinates corresponding to shot_features.
-        shot_names : Case identifiers for few shot patches.
+        shot_ids : Case identifiers for few shot patches.
         test_features : Patch-level feature embeddings for testing.
         test_coordinates : Patch coordinates corresponding to test_features.
         test_names : Case identifiers for testing patches.
@@ -147,21 +147,21 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
         self.return_binary = return_binary
         self.balance_bg = balance_bg
 
-    def fit(self, shot_features, shot_labels, shot_coordinates, shot_names, shot_patch_sizes, shot_patch_spacings, shot_image_sizes, shot_image_origins, shot_image_spacings, shot_image_directions, shot_label_spacings, shot_label_origins, shot_label_directions, **kwargs):
+    def fit(self, shot_features, shot_labels, shot_coordinates, shot_ids, shot_patch_sizes, shot_patch_spacings, shot_image_sizes, shot_image_origins, shot_image_spacings, shot_image_directions, shot_label_spacings, shot_label_origins, shot_label_directions, **kwargs):
         label_patch_features = []
         for idx, label in tqdm(enumerate(shot_labels), desc="Extracting patch labels"):
             label_feats = extract_patch_labels(
                 label=label,
-                label_spacing=shot_label_spacings[shot_names[idx]],
-                label_origin=shot_label_origins[shot_names[idx]],
-                label_direction=shot_label_directions[shot_names[idx]],
-                image_size=shot_image_sizes[shot_names[idx]],
-                image_origin=shot_image_origins[shot_names[idx]],
-                image_spacing=shot_image_spacings[shot_names[idx]],
-                image_direction=shot_image_directions[shot_names[idx]],
+                label_spacing=shot_label_spacings[shot_ids[idx]],
+                label_origin=shot_label_origins[shot_ids[idx]],
+                label_direction=shot_label_directions[shot_ids[idx]],
+                image_size=shot_image_sizes[shot_ids[idx]],
+                image_origin=shot_image_origins[shot_ids[idx]],
+                image_spacing=shot_image_spacings[shot_ids[idx]],
+                image_direction=shot_image_directions[shot_ids[idx]],
                 start_coordinates=shot_coordinates[idx],
-                patch_size=shot_patch_sizes[shot_names[idx]],
-                patch_spacing=shot_patch_spacings[shot_names[idx]],
+                patch_size=shot_patch_sizes[shot_ids[idx]],
+                patch_spacing=shot_patch_spacings[shot_ids[idx]],
             )
             label_patch_features.append(label_feats)
         label_patch_features = np.array(label_patch_features, dtype=object)
@@ -170,7 +170,7 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
         train_data = construct_data_with_labels(
             coordinates=shot_coordinates,
             embeddings=shot_features,
-            case_names=shot_names,
+            case_ids=shot_ids,
             patch_sizes=shot_patch_sizes,
             patch_spacings=shot_patch_spacings,
             labels=label_patch_features,
@@ -229,7 +229,7 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
             test_data = construct_data_with_labels(
                 coordinates=[case_informations["coordinates"]],
                 embeddings=[case_informations["embeddings"]],
-                case_names=[case_name],
+                case_ids=[case_name],
                 patch_sizes={case_name: case_informations["patch_size"]},
                 patch_spacings={case_name: case_informations["patch_spacing"]},
                 image_sizes={case_name: case_informations["image_size"]},

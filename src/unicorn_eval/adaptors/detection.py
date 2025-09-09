@@ -249,7 +249,7 @@ def coordinates_to_heatmap(
 def construct_detection_labels(
     coordinates,
     embeddings,
-    names,
+    ids,
     labels=None,
     patch_size=224,
     heatmap_size=16,
@@ -259,7 +259,7 @@ def construct_detection_labels(
 
     processed_data = []
 
-    for case_idx, case_name in enumerate(names):
+    for case_idx, case_id in enumerate(ids):
         patch_coordinates = coordinates[case_idx]
         case_embeddings = embeddings[case_idx]
 
@@ -285,7 +285,7 @@ def construct_detection_labels(
                 heatmap = None
 
             processed_data.append(
-                (patch_emb, heatmap, (x_patch, y_patch), f"{case_name}")
+                (patch_emb, heatmap, (x_patch, y_patch), f"{case_id}")
             )
 
     return processed_data
