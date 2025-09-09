@@ -21,20 +21,16 @@ import torch
 from tqdm import tqdm
 
 from unicorn_eval.adaptors.base import PatchLevelTaskAdaptor
-from unicorn_eval.adaptors.segmentation.aimhi_linear_upsample_conv3d.v2.main import (
-    max_class_label_from_labels,
-)
-from unicorn_eval.adaptors.segmentation.baseline_segmentation_upsampling_3d.v2.training import (
-    train_decoder3d_v2,
-)
+from unicorn_eval.adaptors.segmentation.aimhi_linear_upsample_conv3d.v2.main import \
+    max_class_label_from_labels
+from unicorn_eval.adaptors.segmentation.baseline_segmentation_upsampling_3d.v2.training import \
+    train_decoder3d_v2
 from unicorn_eval.adaptors.segmentation.data_handling import (
-    construct_data_with_labels,
-    extract_patch_labels,
-    load_patch_data,
-)
+    construct_data_with_labels, extract_patch_labels, load_patch_data)
 from unicorn_eval.adaptors.segmentation.decoders import Decoder3D
 from unicorn_eval.adaptors.segmentation.inference import inference3d
-from unicorn_eval.io import INPUT_DIRECTORY, process, read_inputs, extract_embeddings
+from unicorn_eval.io import (INPUT_DIRECTORY, extract_embeddings, process,
+                             read_inputs)
 
 
 def label_mapper(y: np.ndarray) -> np.ndarray:
@@ -216,25 +212,25 @@ class SegmentationUpsampling3D_V2(PatchLevelTaskAdaptor):
             else:
                 raise
 
-    def predict(self, test_cases) -> list:
+    def predict(self, test_case_ids) -> list:
         predictions = []
-        for case_name in test_cases:
+        for case_id in test_case_ids:
             test_input = process(
-                read_inputs(input_dir=INPUT_DIRECTORY, case_names=[case_name])[0]
+                read_inputs(input_dir=INPUT_DIRECTORY, case_names=[case_id])[0]
             )
-            case_informations = extract_embeddings(test_input)
+            case_information = extract_embeddings(test_input)
 
             # build test data and loader
             test_data = construct_data_with_labels(
-                coordinates=[case_informations["coordinates"]],
-                embeddings=[case_informations["embeddings"]],
-                case_ids=[case_name],
-                patch_sizes={case_name: case_informations["patch_size"]},
-                patch_spacings={case_name: case_informations["patch_spacing"]},
-                image_sizes={case_name: case_informations["image_size"]},
-                image_origins={case_name: case_informations["image_origin"]},
-                image_spacings={case_name: case_informations["image_spacing"]},
-                image_directions={case_name: case_informations["image_direction"]},
+                coordinates=[case_information["coordinates"]],
+                embeddings=[case_information["embeddings"]],
+                case_ids=[case_id],
+                patch_sizes={case_id: case_information["patch_size"]},
+                patch_spacings={case_id: case_information["patch_spacing"]},
+                image_sizes={case_id: case_information["image_size"]},
+                image_origins={case_id: case_information["image_origin"]},
+                image_spacings={case_id: case_information["image_spacing"]},
+                image_directions={case_id: case_information["image_direction"]},
             )
 
             test_loader = load_patch_data(test_data, batch_size=1)
@@ -245,11 +241,11 @@ class SegmentationUpsampling3D_V2(PatchLevelTaskAdaptor):
                 data_loader=test_loader,
                 device=self.device,
                 return_binary=self.return_binary,
-                test_cases=[case_name],
-                test_label_sizes=[case_informations["label_size"]],
-                test_label_spacing=[case_informations["label_spacing"]],
-                test_label_origins=[case_informations["label_origin"]],
-                test_label_directions=[case_informations["label_direction"]],
+                test_cases=[case_id],
+                test_label_sizes=[case_information["label_size"]],
+                test_label_spacing=[case_information["label_spacing"]],
+                test_label_origins=[case_information["label_origin"]],
+                test_label_directions=[case_information["label_direction"]],
                 inference_postprocessor=self.inference_postprocessor,
             )
             predictions.extend(prediction)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -8,13 +9,10 @@ import torch.nn.functional as F
 import torch.optim as optim
 from monai.losses.dice import DiceFocalLoss
 
-from unicorn_eval.adaptors.segmentation.baseline_segmentation_upsampling_3d.v1 import (
-    SegmentationUpsampling3D,
-)
+from unicorn_eval.adaptors.segmentation.baseline_segmentation_upsampling_3d.v1 import \
+    SegmentationUpsampling3D
 from unicorn_eval.adaptors.segmentation.data_handling import (
-    construct_data_with_labels,
-    load_patch_data,
-)
+    construct_data_with_labels, load_patch_data)
 from unicorn_eval.adaptors.segmentation.inference import inference3d
 from unicorn_eval.adaptors.segmentation.training import train_decoder3d
 
@@ -97,9 +95,7 @@ class ConvSegmentation3D(SegmentationUpsampling3D):
         ), f"Metadata inconsistency, cannot process instances {sitk_mask.GetSize()=}"
 
         from skimage.measure import (  # import inline because it is not used for all tasks
-            label,
-            regionprops,
-        )
+            label, regionprops)
 
         assert (
             multiclass_mask.ndim == 3
@@ -176,7 +172,7 @@ class ConvSegmentation3D(SegmentationUpsampling3D):
         train_data = construct_data_with_labels(
             coordinates=self.shot_coordinates,
             embeddings=self.shot_features,
-            case_names=self.shot_names,
+            case_ids=self.shot_names,
             patch_sizes=self.shot_patch_sizes,
             patch_spacings=self.shot_patch_spacings,
             labels=self.shot_labels,
@@ -264,7 +260,7 @@ class ConvSegmentation3D(SegmentationUpsampling3D):
         test_data = construct_data_with_labels(
             coordinates=self.test_coordinates,
             embeddings=self.test_features,
-            case_names=self.test_cases,
+            case_ids=self.test_cases,
             patch_sizes=self.test_patch_sizes,
             patch_spacings=self.test_patch_spacings,
             image_sizes=self.test_image_sizes,

@@ -14,16 +14,12 @@ import torch.optim as optim
 from scipy import ndimage as ndi
 from tqdm import tqdm
 
-from unicorn_eval.adaptors.segmentation.aimhi_linear_upsample_conv3d.v1.main import (
-    dice_loss,
-)
-from unicorn_eval.adaptors.segmentation.baseline_segmentation_upsampling_3d.v1 import (
-    SegmentationUpsampling3D,
-)
+from unicorn_eval.adaptors.segmentation.aimhi_linear_upsample_conv3d.v1.main import \
+    dice_loss
+from unicorn_eval.adaptors.segmentation.baseline_segmentation_upsampling_3d.v1 import \
+    SegmentationUpsampling3D
 from unicorn_eval.adaptors.segmentation.data_handling import (
-    construct_data_with_labels,
-    load_patch_data,
-)
+    construct_data_with_labels, load_patch_data)
 from unicorn_eval.adaptors.segmentation.inference import create_grid
 
 
@@ -160,7 +156,7 @@ class LinearUpsampleConv3D_V2(SegmentationUpsampling3D):
         train_data = construct_data_with_labels(
             coordinates=self.shot_coordinates,
             embeddings=self.shot_features,
-            case_names=self.shot_names,
+            case_ids=self.shot_names,
             patch_sizes=self.shot_patch_sizes,
             patch_spacings=self.shot_patch_spacings,
             labels=self.shot_labels,
@@ -218,7 +214,7 @@ class LinearUpsampleConv3D_V2(SegmentationUpsampling3D):
         test_data = construct_data_with_labels(
             coordinates=self.test_coordinates,
             embeddings=self.test_features,
-            case_names=self.test_cases,
+            case_ids=self.test_cases,
             patch_sizes=self.test_patch_sizes,
             patch_spacings=self.test_patch_spacings,
             image_sizes=self.test_image_sizes,

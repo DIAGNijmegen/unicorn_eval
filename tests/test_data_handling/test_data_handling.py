@@ -184,7 +184,7 @@ def test_end_to_end_data_handling(
         data_array = construct_data_with_labels(
             coordinates=[np.asarray(patch_coordinates)],
             embeddings=[np.random.rand(len(patch_coordinates), 32)],
-            case_names=[case_name],
+            case_ids=[case_name],
             patch_sizes={case_name: patch_size},
             patch_spacings={case_name: patch_spacing},
             labels=[patch_labels_dict],

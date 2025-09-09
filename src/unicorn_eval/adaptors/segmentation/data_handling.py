@@ -128,7 +128,7 @@ def custom_collate(batch):
 def construct_data_with_labels(
     coordinates: list[np.ndarray],
     embeddings: list[np.ndarray],
-    case_names: list[str],
+    case_ids: list[str],
     patch_sizes: dict[str, list[int]],
     patch_spacings: dict[str, list[float]],
     labels: np.ndarray | None = None,  # contains dict[str, any]
@@ -140,7 +140,7 @@ def construct_data_with_labels(
 ):
     data_array = []
 
-    for case_idx, case_name in enumerate(case_names):
+    for case_idx, case_name in enumerate(case_ids):
         # patch_spacing = img_feat['meta']['patch-spacing']
         case_embeddings = embeddings[case_idx]
         patch_coordinates = coordinates[case_idx]
