@@ -100,6 +100,7 @@ class SegmentationUpsampling3D_V2(PatchLevelTaskAdaptor):
 
     def fit(
         self,
+        *,
         shot_features,
         shot_labels,
         shot_coordinates,
@@ -116,9 +117,9 @@ class SegmentationUpsampling3D_V2(PatchLevelTaskAdaptor):
         **kwargs,
     ):
         # TODO: set type hints for all args
-        label_patch_features = []
+        patch_labels = []
         for idx, label in tqdm(enumerate(shot_labels), desc="Extracting patch labels"):
-            label_feats = extract_patch_labels(
+            case_patch_labels = extract_patch_labels(
                 label=label,
                 label_spacing=shot_label_spacings[shot_ids[idx]],
                 label_origin=shot_label_origins[shot_ids[idx]],
@@ -131,9 +132,9 @@ class SegmentationUpsampling3D_V2(PatchLevelTaskAdaptor):
                 patch_size=self.patch_size,
                 patch_spacing=self.patch_spacing,
             )
-            label_patch_features.append(label_feats)
+            patch_labels.append(case_patch_labels)
 
-        shot_labels = np.array(label_patch_features, dtype=object)
+        patch_labels = np.array(patch_labels, dtype=object)
 
         # build training data and loader
         train_data = construct_data_with_labels(
@@ -142,7 +143,7 @@ class SegmentationUpsampling3D_V2(PatchLevelTaskAdaptor):
             case_ids=shot_ids,
             patch_sizes=shot_patch_sizes,
             patch_spacings=shot_patch_spacings,
-            labels=shot_labels,
+            labels=patch_labels,
             image_sizes=shot_image_sizes,
             image_origins=shot_image_origins,
             image_spacings=shot_image_spacings,
