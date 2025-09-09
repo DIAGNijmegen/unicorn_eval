@@ -356,15 +356,17 @@ def inference3d_softmax(*, decoder, data_loader, device, return_binary, test_cas
 
         aligned_preds = {}
 
-        for case_id, pred_msk in grids.items():
+        for case_id, pred_path in tqdm(grids.items(), desc="Postprocessing predictions"):
             case = test_cases[case_id]
             gt_size = test_label_sizes[case]
             gt_spacing = test_label_spacing[case]
             gt_origin = test_label_origins[case]
             gt_direction = test_label_directions[case]
 
+            pred_mask = sitk.ReadImage(pred_path)
+
             pred_on_gt = sitk.Resample(
-                pred_msk,
+                pred_mask,
                 gt_size,
                 sitk.Transform(),
                 sitk.sitkNearestNeighbor,
@@ -372,13 +374,20 @@ def inference3d_softmax(*, decoder, data_loader, device, return_binary, test_cas
                 gt_spacing,
                 gt_direction
             )
-            
+
             if is_task11:
                 pred_on_gt_arr = sitk.GetArrayFromImage(pred_on_gt)
-                aligned_preds[case_id] = expand_instance_labels(pred_on_gt_arr)
+                pred_arr = expand_instance_labels(pred_on_gt_arr)
             else:
-                aligned_preds[case_id] = sitk.GetArrayFromImage(pred_on_gt)
-            
+                pred_arr = sitk.GetArrayFromImage(pred_on_gt)
+
+            postprocessed_mask = sitk.GetImageFromArray(pred_arr)
+            postprocessed_mask.CopyInformation(pred_on_gt)
+
+            # save aligned prediction
+            sitk.WriteImage(postprocessed_mask, pred_path)
+            aligned_preds[case_id] = pred_path
+
         return [j for j in aligned_preds.values()]
 
 

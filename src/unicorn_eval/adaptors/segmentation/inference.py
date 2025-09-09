@@ -16,6 +16,7 @@ from __future__ import annotations
 import gc
 import logging
 from collections import defaultdict
+from pathlib import Path
 from typing import Callable
 
 import numpy as np
@@ -100,9 +101,13 @@ def create_grid(decoded_patches):
     grids = {}
 
     for idx, patches in tqdm(decoded_patches.items(), desc="Creating grids"):
-        stitched = stitch_patches_fast(patches)
-        grids[idx] = stitched
-        
+        prediction_path = stitch_patches_fast(
+            patches=patches,
+            save_location=Path("/opt/app/predictions"),
+            idx=idx,
+        )
+        grids[idx] = prediction_path
+
         # Clear patches from memory immediately after processing
         decoded_patches[idx].clear()
         del patches
@@ -216,15 +221,17 @@ def inference3d(
 
         aligned_preds = {}
 
-        for case_id, pred_msk in grids.items():
+        for case_id, pred_path in tqdm(grids.items(), desc="Postprocessing predictions"):
             case = test_cases[case_id]
             gt_size = test_label_sizes[case]
             gt_spacing = test_label_spacing[case]
             gt_origin = test_label_origins[case]
             gt_direction = test_label_directions[case]
 
+            pred_mask = sitk.ReadImage(pred_path)
+
             pred_on_gt = sitk.Resample(
-                pred_msk,
+                pred_mask,
                 gt_size,
                 sitk.Transform(),
                 sitk.sitkNearestNeighbor,
@@ -233,12 +240,19 @@ def inference3d(
                 gt_direction
             )
 
-            aligned_preds[case_id] = sitk.GetArrayFromImage(pred_on_gt)
+            pred_arr = sitk.GetArrayFromImage(pred_on_gt)
             if mask_postprocessor is not None:
-                aligned_preds[case_id] = mask_postprocessor(aligned_preds[case_id], pred_on_gt)
+                pred_arr = mask_postprocessor(pred_arr, pred_on_gt)
+
+            postprocessed_mask = sitk.GetImageFromArray(pred_arr)
+            postprocessed_mask.CopyInformation(pred_on_gt)
+
+            # save aligned prediction
+            sitk.WriteImage(postprocessed_mask, pred_path)
+            aligned_preds[case_id] = pred_path
 
             # Clear individual grid to save memory during iteration
-            del pred_msk
+            del pred_mask
 
         # Clear grids after processing all cases
         del grids

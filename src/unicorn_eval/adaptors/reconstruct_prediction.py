@@ -1,4 +1,5 @@
 from itertools import product
+from pathlib import Path
 
 import numpy as np
 import SimpleITK as sitk
@@ -39,7 +40,11 @@ def _project_to_dir_coords(points_world, direction_flat):
     return (DT @ points_world.T).T
 
 
-def stitch_patches_fast(patches: list[dict]):
+def stitch_patches_fast(
+    patches: list[dict],
+    save_location: Path,
+    idx: int,
+) -> Path:
     if not patches:
         raise ValueError("No patches provided.")
 
@@ -113,4 +118,8 @@ def stitch_patches_fast(patches: list[dict]):
     out_img.SetDirection(ref_direction)
     out_img.SetOrigin(out_origin_world)
 
-    return out_img
+    # Save to file
+    output_path = save_location / f"prediction_{idx}.nii"
+    sitk.WriteImage(out_img, str(output_path))
+
+    return output_path
