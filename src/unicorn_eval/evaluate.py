@@ -358,10 +358,8 @@ def process_task_in_subprocess(
 
     if modality == "vision":
 
-        task_cases = mapping[(mapping.task_name == task_name) & (mapping.split == "case")]["case_id"].tolist()
-        task_shots = mapping[(mapping.task_name == task_name) & (mapping.split == "shot")]["case_id"].tolist()
-
         # only load few shots for the given task
+        task_shots = mapping[(mapping.task_name == task_name) & (mapping.split == "shot")]["case_id"].tolist()
         shot_inputs = read_inputs(
             input_dir=INPUT_DIRECTORY, case_names=task_shots
         )
@@ -443,7 +441,6 @@ def process_task_in_subprocess(
                 shot_label_origins=shot_label_origins,
                 shot_label_directions=shot_label_directions,
             )
-            predictions = adaptor.predict(task_cases)
 
             del (
                 shot_embeddings,
@@ -474,6 +471,8 @@ def process_task_in_subprocess(
             case_informations = extract_labels(cases, task_name)
             case_ids, case_labels, case_extra_labels = case_informations["ids"], case_informations["labels"], case_informations["extra_labels"]
 
+            predictions = adaptor.predict(case_ids)
+
     elif modality == "vision-language":
 
         case_inputs = read_inputs(
@@ -485,6 +484,7 @@ def process_task_in_subprocess(
         pool.join()
 
         case_informations = extract_embeddings_and_labels(cases, task_name)
+        case_ids = case_informations["ids"]
 
         predictions = [pred["text"] for pred in case_informations["prediction"]]
         case_labels = [
