@@ -119,7 +119,7 @@ class KNNRegressor(CaseLevelTaskAdaptor):
             prediction = self.model.predict(processed_test_feature)
             predictions.append(prediction)
 
-        return np.array(predictions)
+        return np.array(predictions).squeeze()
 
 
 class WeightedKNNRegressor(CaseLevelTaskAdaptor):
@@ -219,7 +219,7 @@ class WeightedKNNRegressor(CaseLevelTaskAdaptor):
             else:
                 predictions.append(weighted_avg)
 
-        return np.array(predictions)
+        return np.array(predictions).squeeze()
 
 
 class LinearClassifier(nn.Module):
@@ -370,7 +370,7 @@ class LinearProbingRegressor(CaseLevelTaskAdaptor):
                     _, prediction = torch.max(logits, 0)
                     predictions.append(prediction.cpu().numpy())
 
-        return np.array(predictions)
+        return np.array(predictions).squeeze()
 
 
 class MLPClassifier(nn.Module):
@@ -536,4 +536,4 @@ class MultiLayerPerceptronRegressor(CaseLevelTaskAdaptor):
                     _, prediction = torch.max(logits, 0)
                     predictions.append(prediction.cpu().numpy())
 
-        return np.array(predictions)
+        return np.array(predictions).squeeze()

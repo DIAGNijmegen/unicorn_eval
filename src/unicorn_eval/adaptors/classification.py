@@ -125,7 +125,7 @@ class KNN(CaseLevelTaskAdaptor):
                 prediction = self.model.predict(processed_test_feature)
                 predictions.append(prediction)
 
-        return np.array(predictions)
+        return np.array(predictions).squeeze()
 
 
 class WeightedKNN(CaseLevelTaskAdaptor):
@@ -230,9 +230,9 @@ class WeightedKNN(CaseLevelTaskAdaptor):
             predictions.append(predicted_class)
 
         if self.return_probabilities:
-            return np.array(probabilities)
+            return np.array(probabilities).squeeze()
         else:
-            return np.array(predictions)
+            return np.array(predictions).squeeze()
 
 
 class LogisticRegression(CaseLevelTaskAdaptor):
@@ -289,7 +289,7 @@ class LogisticRegression(CaseLevelTaskAdaptor):
                 prediction = self.model.predict(test_feature)
                 predictions.append(prediction)
 
-        return np.array(predictions)
+        return np.array(predictions).squeeze()
 
 
 class LinearClassifier(nn.Module):
@@ -408,7 +408,7 @@ class LinearProbing(CaseLevelTaskAdaptor):
                 _, prediction = torch.max(logits, 0)
                 predictions.append(prediction.cpu().numpy())
 
-        return np.array(predictions)
+        return np.array(predictions).squeeze()
 
 
 class MLPClassifier(nn.Module):
@@ -541,4 +541,4 @@ class MultiLayerPerceptron(CaseLevelTaskAdaptor):
                     _, prediction = torch.max(logits, 0)
                     predictions.append(prediction.cpu().numpy())
 
-        return np.array(predictions)
+        return np.array(predictions).squeeze()
