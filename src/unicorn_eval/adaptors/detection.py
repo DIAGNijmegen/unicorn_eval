@@ -362,7 +362,7 @@ class DensityMap(PatchLevelTaskAdaptor):
             )
             predictions.extend(predicted_points)
 
-        return np.array(predictions)
+        return predictions
 
 
 class ConvStack(nn.Module):
