@@ -483,7 +483,7 @@ class MultiLayerPerceptronRegressor(CaseLevelTaskAdaptor):
             self.criterion = nn.MSELoss()
 
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.shot_features = torch.tensor(shot_features, dtype=torch.float32).to(
+        shot_features = torch.tensor(shot_features, dtype=torch.float32).to(
             self.device
         )
 
