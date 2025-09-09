@@ -314,7 +314,7 @@ def inference3d_softmax(
     with torch.no_grad():
         grouped_predictions = defaultdict(lambda: defaultdict(list))
 
-        for batch in tqdm(data_loader, desc="Inference"):
+        for batch in data_loader:
             inputs = batch["patch"].to(device)  # shape: [B, ...]
             coords = batch["coordinates"]  # list of 3 tensors
             image_idxs = batch["case_number"]

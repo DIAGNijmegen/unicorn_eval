@@ -99,7 +99,7 @@ def world_to_voxel(coord, origin, spacing, inv_direction):
 def create_grid(decoded_patches):
     grids = {}
 
-    for idx, patches in tqdm(decoded_patches.items(), desc="Creating grids"):
+    for idx, patches in decoded_patches.items():
         stitched = stitch_patches_fast(patches)
         grids[idx] = stitched
 
@@ -129,7 +129,7 @@ def inference3d(
     with torch.no_grad():
         grouped_predictions = defaultdict(lambda: defaultdict(list))
 
-        for batch in tqdm(data_loader, desc="Inference"):
+        for batch in data_loader:
             inputs = batch["patch"].to(device)  # shape: [B, ...]
             coords = batch["coordinates"]  # list of 3 tensors
             image_idxs = batch["case_number"]

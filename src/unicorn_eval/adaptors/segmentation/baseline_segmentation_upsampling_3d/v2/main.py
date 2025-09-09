@@ -90,8 +90,8 @@ class SegmentationUpsampling3D_V2(PatchLevelTaskAdaptor):
         balance_bg=True,
     ):
 
-        self.patch_size = global_patch_size
-        self.patch_spacing = global_patch_spacing
+        self.patch_size = global_patch_size  # TODO: remove?
+        self.patch_spacing = global_patch_spacing  # TODO: remove?
         self.decoder = None
         self.return_binary = return_binary
         self.balance_bg = balance_bg
@@ -115,6 +115,7 @@ class SegmentationUpsampling3D_V2(PatchLevelTaskAdaptor):
         shot_label_directions,
         **kwargs,
     ):
+        # TODO: set type hints for all args
         label_patch_features = []
         for idx, label in tqdm(enumerate(shot_labels), desc="Extracting patch labels"):
             label_feats = extract_patch_labels(
@@ -215,6 +216,7 @@ class SegmentationUpsampling3D_V2(PatchLevelTaskAdaptor):
     def predict(self, test_case_ids) -> list:
         predictions = []
         for case_id in test_case_ids:
+            logging.info(f"Running inference for case {case_id}")
             test_input = process(
                 read_inputs(input_dir=INPUT_DIRECTORY, case_names=[case_id])[0]
             )
@@ -241,10 +243,10 @@ class SegmentationUpsampling3D_V2(PatchLevelTaskAdaptor):
                 device=self.device,
                 return_binary=self.return_binary,
                 test_cases=[case_id],
-                test_label_sizes=[test_input["label_size"]],
-                test_label_spacing=[test_input["label_spacing"]],
-                test_label_origins=[test_input["label_origin"]],
-                test_label_directions=[test_input["label_direction"]],
+                test_label_sizes={case_id: test_input["label_size"]},
+                test_label_spacing={case_id: test_input["label_spacing"]},
+                test_label_origins={case_id: test_input["label_origin"]},
+                test_label_directions={case_id: test_input["label_direction"]},
                 inference_postprocessor=self.inference_postprocessor,
             )
             assert len(prediction) == 1

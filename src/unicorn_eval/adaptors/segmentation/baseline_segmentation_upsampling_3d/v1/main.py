@@ -233,22 +233,22 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
 
     def predict(self, test_cases) -> list:
         predictions = []
-        for case_name in test_cases:
+        for case_id in test_cases:
             test_input = process(
-                read_inputs(input_dir=INPUT_DIRECTORY, case_names=[case_name])[0]
+                read_inputs(input_dir=INPUT_DIRECTORY, case_names=[case_id])[0]
             )
 
             # build test data and loader
             test_data = construct_data_with_labels(
                 coordinates=[test_input["coordinates"]],
                 embeddings=[test_input["embeddings"]],
-                case_ids=[case_name],
-                patch_sizes={case_name: test_input["patch_size"]},
-                patch_spacings={case_name: test_input["patch_spacing"]},
-                image_sizes={case_name: test_input["image_size"]},
-                image_origins={case_name: test_input["image_origin"]},
-                image_spacings={case_name: test_input["image_spacing"]},
-                image_directions={case_name: test_input["image_direction"]},
+                case_ids=[case_id],
+                patch_sizes={case_id: test_input["patch_size"]},
+                patch_spacings={case_id: test_input["patch_spacing"]},
+                image_sizes={case_id: test_input["image_size"]},
+                image_origins={case_id: test_input["image_origin"]},
+                image_spacings={case_id: test_input["image_spacing"]},
+                image_directions={case_id: test_input["image_direction"]},
             )
 
             test_loader = load_patch_data(test_data, batch_size=1)
@@ -259,11 +259,11 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
                 data_loader=test_loader,
                 device=self.device,
                 return_binary=self.return_binary,
-                test_cases=[case_name],
-                test_label_sizes=[test_input["label_size"]],
-                test_label_spacing=[test_input["label_spacing"]],
-                test_label_origins=[test_input["label_origin"]],
-                test_label_directions=[test_input["label_direction"]],
+                test_cases=[case_id],
+                test_label_sizes={case_id: test_input["label_size"]},
+                test_label_spacing={case_id: test_input["label_spacing"]},
+                test_label_origins={case_id: test_input["label_origin"]},
+                test_label_directions={case_id: test_input["label_direction"]},
             )
             predictions.extend(prediction)
 
