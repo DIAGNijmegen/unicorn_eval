@@ -26,22 +26,15 @@ from dragon_eval import DragonEval
 from dragon_eval.evaluation import REGRESSION_EPSILON, TASK_TYPE, EvalType
 
 from unicorn_eval.helpers import get_max_workers
-from unicorn_eval.io import (
-    read_inputs,
-    process,
-    write_json_file,
-    INPUT_DIRECTORY,
-    OUTPUT_DIRECTORY,
-    GROUNDTRUTH_DIRECTORY,
-)
-from unicorn_eval.utils import (
-    get_adaptor,
-    evaluate_predictions,
-    extract_labels,
-    extract_embeddings_and_labels,
-    normalize_metric,
-)
-
+from unicorn_eval.io import (GROUNDTRUTH_DIRECTORY, INPUT_DIRECTORY,
+                             OUTPUT_DIRECTORY, process, read_inputs,
+                             write_json_file)
+from unicorn_eval.memory_profiler import (finalize_memory_profiler,
+                                          init_memory_profiler, log_memory,
+                                          start_continuous_logging)
+from unicorn_eval.utils import (evaluate_predictions,
+                                extract_embeddings_and_labels, extract_labels,
+                                get_adaptor, normalize_metric)
 
 ADAPTOR_SLUGS_DICT = {
     "Task01_classifying_he_prostate_biopsies_into_isup_scores": "adaptor-pathology-classification",
@@ -514,6 +507,9 @@ def process_task_in_subprocess(
 
 
 def main():
+    init_memory_profiler(output_dir=OUTPUT_DIRECTORY)
+    start_continuous_logging()
+
     logging.info("Input folder contents:")
     print_directory_contents(INPUT_DIRECTORY)
     logging.info("=+=" * 10)
@@ -537,6 +533,7 @@ def main():
 
         for task_name in all_tasks:
             print(f"Processing task: {task_name} (in subprocess)")
+            log_memory(f"Starting task {task_name}")
             metrics_path = OUTPUT_DIRECTORY / f"{task_name}.json"
             p = multiprocessing.Process(
                 target=process_task_in_subprocess,
@@ -544,12 +541,15 @@ def main():
             )
             p.start()
             p.join()
-            if metrics_path.exists():
-                with open(metrics_path, "r") as f:
-                    metrics = json.load(f)
-                    task_metrics[task_name] = metrics
-                print(f"Completed processing task: {task_name}")
-                print("=+=" * 10)
+            if not metrics_path.exists():
+                raise FileNotFoundError(f"Metrics file not found for task {task_name}")
+
+            with open(metrics_path, "r") as f:
+                metrics = json.load(f)
+                task_metrics[task_name] = metrics
+            print(f"Completed processing task: {task_name}")
+            log_memory(f"Completed task {task_name}")
+            print("=+=" * 10)
 
         logging.info(f"Writing metrics for {len(task_metrics)} tasks...")
         write_combined_metrics(metric_dict=task_metrics, save_predictions=False)
@@ -562,6 +562,8 @@ def main():
         logging.info("Metrics written successfully.")
         return 0
 
+    finally:
+        finalize_memory_profiler()
 
 if __name__ == "__main__":
     raise SystemExit(main())
