@@ -12,9 +12,9 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import logging
 from typing import Sequence
 
-import logging
 import numpy as np
 import scipy.ndimage as ndimage
 import torch
@@ -25,7 +25,7 @@ from torch.utils.data import DataLoader, Dataset
 from torch.utils.data._utils.collate import default_collate
 
 from unicorn_eval.adaptors.base import PatchLevelTaskAdaptor
-from unicorn_eval.io import INPUT_DIRECTORY, process, read_inputs, extract_embeddings
+from unicorn_eval.io import INPUT_DIRECTORY, process, read_inputs
 
 
 class DetectionDecoder(nn.Module):
@@ -339,11 +339,10 @@ class DensityMap(PatchLevelTaskAdaptor):
             test_input = process(
                 read_inputs(input_dir=INPUT_DIRECTORY, case_names=[case_name])[0]
             )
-            case_informations = extract_embeddings(test_input)
             test_data = construct_detection_labels(
-                [case_informations["coordinates"]],
-                [case_informations["embeddings"]],
-                [case_informations["case_id"]],
+                [test_input["coordinates"]],
+                [test_input["embeddings"]],
+                [test_input["case_id"]],
                 patch_size=self.patch_size,
                 heatmap_size=self.heatmap_size,
                 is_train=False,

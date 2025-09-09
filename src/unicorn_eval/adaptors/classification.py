@@ -24,8 +24,7 @@ from sklearn.metrics.pairwise import cosine_similarity, euclidean_distances
 from sklearn.neighbors import KNeighborsClassifier
 
 from unicorn_eval.adaptors.base import CaseLevelTaskAdaptor
-from unicorn_eval.io import (INPUT_DIRECTORY, extract_embeddings, process,
-                             read_inputs)
+from unicorn_eval.io import INPUT_DIRECTORY, process, read_inputs
 
 
 def preprocess_features(
@@ -106,8 +105,7 @@ class KNN(CaseLevelTaskAdaptor):
             test_input = process(
                 read_inputs(input_dir=INPUT_DIRECTORY, case_names=[case_name])[0]
             )
-            case_informations = extract_embeddings(test_input)
-            test_feature = case_informations["embeddings"]
+            test_feature = test_input["embeddings"]
             processed_test_feature = preprocess_features(
                 test_feature,
                 mean=self.mean_feature,
@@ -200,8 +198,7 @@ class WeightedKNN(CaseLevelTaskAdaptor):
             test_input = process(
                 read_inputs(input_dir=INPUT_DIRECTORY, case_names=[case_name])[0]
             )
-            case_informations = extract_embeddings(test_input)
-            test_feature = case_informations["embeddings"]
+            test_feature = test_input["embeddings"]
             processed_test_feature = preprocess_features(
                 test_feature,
                 mean=self.mean_feature,
@@ -281,8 +278,7 @@ class LogisticRegression(CaseLevelTaskAdaptor):
             test_input = process(
                 read_inputs(input_dir=INPUT_DIRECTORY, case_names=[case_name])[0]
             )
-            case_informations = extract_embeddings(test_input)
-            test_feature = case_informations["embeddings"]
+            test_feature = test_input["embeddings"]
 
             if self.return_probabilities:
                 prediction = self.model.predict_proba(test_feature)
@@ -397,8 +393,7 @@ class LinearProbing(CaseLevelTaskAdaptor):
                     read_inputs(input_dir=INPUT_DIRECTORY, case_names=[case_name])[0]
                 )
 
-                case_informations = extract_embeddings(test_input)
-                test_feature = case_informations["embeddings"]
+                test_feature = test_input["embeddings"]
                 test_features = torch.tensor(test_feature, dtype=torch.float32).to(
                     self.device
                 )
@@ -531,8 +526,7 @@ class MultiLayerPerceptron(CaseLevelTaskAdaptor):
                 test_input = process(
                     read_inputs(input_dir=INPUT_DIRECTORY, case_names=[case_name])[0]
                 )
-                case_informations = extract_embeddings(test_input)
-                test_feature = case_informations["embeddings"]
+                test_feature = test_input["embeddings"]
                 test_features = torch.tensor(test_feature, dtype=torch.float32).to(
                     self.device
                 )

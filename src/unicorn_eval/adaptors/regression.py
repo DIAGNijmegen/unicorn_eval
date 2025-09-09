@@ -13,17 +13,18 @@
 #  limitations under the License.
 
 import logging
-import tqdm
+
 import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from sklearn.neighbors import KNeighborsRegressor
+import tqdm
 from sklearn.metrics.pairwise import cosine_similarity, euclidean_distances
+from sklearn.neighbors import KNeighborsRegressor
 
 from unicorn_eval.adaptors.base import CaseLevelTaskAdaptor
 from unicorn_eval.adaptors.components import NLLSurvLoss
-from unicorn_eval.io import INPUT_DIRECTORY, process, read_inputs, extract_embeddings
+from unicorn_eval.io import INPUT_DIRECTORY, process, read_inputs
 
 
 def preprocess_features(
@@ -102,8 +103,7 @@ class KNNRegressor(CaseLevelTaskAdaptor):
             test_input = process(
                 read_inputs(input_dir=INPUT_DIRECTORY, case_names=[case_name])[0]
             )
-            case_informations = extract_embeddings(test_input)
-            test_feature = case_informations["embeddings"]
+            test_feature = test_input["embeddings"]
             processed_test_feature = preprocess_features(
                 test_feature,
                 mean=self.mean_feature,
@@ -188,8 +188,7 @@ class WeightedKNNRegressor(CaseLevelTaskAdaptor):
             test_input = process(
                 read_inputs(input_dir=INPUT_DIRECTORY, case_names=[case_name])[0]
             )
-            case_informations = extract_embeddings(test_input)
-            test_feature = case_informations["embeddings"]
+            test_feature = test_input["embeddings"]
             processed_test_feature = preprocess_features(
                 test_feature,
                 mean=self.mean_feature,
@@ -353,8 +352,7 @@ class LinearProbingRegressor(CaseLevelTaskAdaptor):
                 test_input = process(
                     read_inputs(input_dir=INPUT_DIRECTORY, case_names=[case_name])[0]
                 )
-                case_informations = extract_embeddings(test_input)
-                test_feature = case_informations["embeddings"]
+                test_feature = test_input["embeddings"]
                 test_features = torch.tensor(test_feature, dtype=torch.float32).to(
                     self.device
                 )
@@ -519,8 +517,7 @@ class MultiLayerPerceptronRegressor(CaseLevelTaskAdaptor):
                 test_input = process(
                     read_inputs(input_dir=INPUT_DIRECTORY, case_names=[case_name])[0]
                 )
-                case_informations = extract_embeddings(test_input)
-                test_feature = case_informations["embeddings"]
+                test_feature = test_input["embeddings"]
                 test_features = torch.tensor(test_feature, dtype=torch.float32).to(
                     self.device
                 )

@@ -14,25 +14,24 @@
 
 from __future__ import annotations
 
+import logging
+
 import numpy as np
 import torch
-import logging
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from unicorn_eval.adaptors.base import PatchLevelTaskAdaptor
 from unicorn_eval.adaptors.segmentation.data_handling import (
-    SegmentationDataset,
-    construct_data_with_labels,
-    construct_segmentation_labels,
-    custom_collate,
-    extract_patch_labels,
-    load_patch_data,
-)
-from unicorn_eval.adaptors.segmentation.decoders import Decoder3D, SegmentationDecoder
+    SegmentationDataset, construct_data_with_labels,
+    construct_segmentation_labels, custom_collate, extract_patch_labels,
+    load_patch_data)
+from unicorn_eval.adaptors.segmentation.decoders import (Decoder3D,
+                                                         SegmentationDecoder)
 from unicorn_eval.adaptors.segmentation.inference import inference, inference3d
-from unicorn_eval.adaptors.segmentation.training import train_decoder, train_decoder3d
-from unicorn_eval.io import INPUT_DIRECTORY, process, read_inputs, extract_embeddings
+from unicorn_eval.adaptors.segmentation.training import (train_decoder,
+                                                         train_decoder3d)
+from unicorn_eval.io import INPUT_DIRECTORY, process, read_inputs
 
 
 class SegmentationUpsampling(PatchLevelTaskAdaptor):
@@ -78,10 +77,9 @@ class SegmentationUpsampling(PatchLevelTaskAdaptor):
             test_input = process(
                 read_inputs(input_dir=INPUT_DIRECTORY, case_names=[case_name])[0]
             )
-            case_informations = extract_embeddings(test_input)
             test_data = construct_segmentation_labels(
-                [case_informations["coordinates"]],
-                [case_informations["embeddings"]],
+                [test_input["coordinates"]],
+                [test_input["embeddings"]],
                 [case_name],
                 patch_size=self.patch_size,
                 is_train=False,
@@ -96,7 +94,7 @@ class SegmentationUpsampling(PatchLevelTaskAdaptor):
                 self.decoder,
                 test_dataloader,
                 patch_size=self.patch_size,
-                test_image_sizes={case_name: case_informations["image_size"]},
+                test_image_sizes={case_name: test_input["image_size"]},
             )
             predictions.extend(predicted_masks)
 
@@ -239,19 +237,18 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
             test_input = process(
                 read_inputs(input_dir=INPUT_DIRECTORY, case_names=[case_name])[0]
             )
-            case_informations = extract_embeddings(test_input)
 
             # build test data and loader
             test_data = construct_data_with_labels(
-                coordinates=[case_informations["coordinates"]],
-                embeddings=[case_informations["embeddings"]],
+                coordinates=[test_input["coordinates"]],
+                embeddings=[test_input["embeddings"]],
                 case_ids=[case_name],
-                patch_sizes={case_name: case_informations["patch_size"]},
-                patch_spacings={case_name: case_informations["patch_spacing"]},
-                image_sizes={case_name: case_informations["image_size"]},
-                image_origins={case_name: case_informations["image_origin"]},
-                image_spacings={case_name: case_informations["image_spacing"]},
-                image_directions={case_name: case_informations["image_direction"]},
+                patch_sizes={case_name: test_input["patch_size"]},
+                patch_spacings={case_name: test_input["patch_spacing"]},
+                image_sizes={case_name: test_input["image_size"]},
+                image_origins={case_name: test_input["image_origin"]},
+                image_spacings={case_name: test_input["image_spacing"]},
+                image_directions={case_name: test_input["image_direction"]},
             )
 
             test_loader = load_patch_data(test_data, batch_size=1)
@@ -263,10 +260,10 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
                 device=self.device,
                 return_binary=self.return_binary,
                 test_cases=[case_name],
-                test_label_sizes=[case_informations["label_size"]],
-                test_label_spacing=[case_informations["label_spacing"]],
-                test_label_origins=[case_informations["label_origin"]],
-                test_label_directions=[case_informations["label_direction"]],
+                test_label_sizes=[test_input["label_size"]],
+                test_label_spacing=[test_input["label_spacing"]],
+                test_label_origins=[test_input["label_origin"]],
+                test_label_directions=[test_input["label_direction"]],
             )
             predictions.extend(prediction)
 

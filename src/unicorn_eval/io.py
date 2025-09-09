@@ -23,7 +23,6 @@ import openslide
 import pandas as pd
 import SimpleITK as sitk
 
-
 INPUT_DIRECTORY = Path("/input")
 OUTPUT_DIRECTORY = Path("/output")
 GROUNDTRUTH_DIRECTORY = Path("/opt/ml/input/data/ground_truth")
@@ -441,28 +440,6 @@ def process(job):
     case_info_dict["label_direction"] = label_direction
 
     return case_info_dict
-
-
-def extract_embeddings(result):
-    """Extract embeddings from a single result."""
-    data = {
-        "task_type": result["task_type"],
-        "modality": result["modality"],
-        "domain": result["domain"],
-        "feature_grid_resolution": result["feature_grid_resolution"],
-    }
-
-    data["embeddings"] = result["embeddings"]
-    data["case_id"] = result["case_id"]
-    data["coordinates"] = result["coordinates"]
-    data["image_size"] = result["image_size"]
-    data["image_spacing"] = result["image_spacing"]
-    data["image_origin"] = result["image_origin"]
-    data["image_direction"] = result["image_direction"]
-    data["patch_spacing"] = result["patch_spacing"]
-    data["patch_size"] = result["patch_size"]
-
-    return data
 
 
 def extract_data(patch_neural_representation):
