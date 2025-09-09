@@ -230,12 +230,14 @@ def inference3d(
                 sitk.sitkNearestNeighbor,
                 gt_origin,
                 gt_spacing,
-                gt_direction
+                gt_direction,
             )
 
             aligned_preds[case_id] = sitk.GetArrayFromImage(pred_on_gt)
             if mask_postprocessor is not None:
-                aligned_preds[case_id] = mask_postprocessor(aligned_preds[case_id], pred_on_gt)
+                aligned_preds[case_id] = mask_postprocessor(
+                    aligned_preds[case_id], pred_on_gt
+                )
 
             # Clear individual grid to save memory during iteration
             del pred_msk

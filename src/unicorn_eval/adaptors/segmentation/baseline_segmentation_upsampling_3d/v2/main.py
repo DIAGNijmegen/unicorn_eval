@@ -21,12 +21,17 @@ import torch
 from tqdm import tqdm
 
 from unicorn_eval.adaptors.base import PatchLevelTaskAdaptor
-from unicorn_eval.adaptors.segmentation.aimhi_linear_upsample_conv3d.v2.main import \
-    max_class_label_from_labels
-from unicorn_eval.adaptors.segmentation.baseline_segmentation_upsampling_3d.v2.training import \
-    train_decoder3d_v2
+from unicorn_eval.adaptors.segmentation.aimhi_linear_upsample_conv3d.v2.main import (
+    max_class_label_from_labels,
+)
+from unicorn_eval.adaptors.segmentation.baseline_segmentation_upsampling_3d.v2.training import (
+    train_decoder3d_v2,
+)
 from unicorn_eval.adaptors.segmentation.data_handling import (
-    construct_data_with_labels, extract_patch_labels, load_patch_data)
+    construct_data_with_labels,
+    extract_patch_labels,
+    load_patch_data,
+)
 from unicorn_eval.adaptors.segmentation.decoders import Decoder3D
 from unicorn_eval.adaptors.segmentation.inference import inference3d
 from unicorn_eval.io import INPUT_DIRECTORY, process, read_inputs, extract_embeddings
@@ -97,7 +102,23 @@ class SegmentationUpsampling3D_V2(PatchLevelTaskAdaptor):
         self.num_classes = -1
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    def fit(self, shot_features, shot_labels, shot_coordinates, shot_ids, shot_patch_sizes, shot_patch_spacings, shot_image_sizes, shot_image_origins, shot_image_spacings, shot_image_directions, shot_label_spacings, shot_label_origins, shot_label_directions, **kwargs):
+    def fit(
+        self,
+        shot_features,
+        shot_labels,
+        shot_coordinates,
+        shot_ids,
+        shot_patch_sizes,
+        shot_patch_spacings,
+        shot_image_sizes,
+        shot_image_origins,
+        shot_image_spacings,
+        shot_image_directions,
+        shot_label_spacings,
+        shot_label_origins,
+        shot_label_directions,
+        **kwargs,
+    ):
         label_patch_features = []
         for idx, label in tqdm(enumerate(shot_labels), desc="Extracting patch labels"):
             label_feats = extract_patch_labels(
@@ -132,13 +153,20 @@ class SegmentationUpsampling3D_V2(PatchLevelTaskAdaptor):
             label_mapper=label_mapper,
         )
 
-        train_loader = load_patch_data(train_data, batch_size=10, balance_bg=self.balance_bg)
+        train_loader = load_patch_data(
+            train_data, batch_size=10, balance_bg=self.balance_bg
+        )
 
         max_class = max_class_label_from_labels(shot_labels)
         self.num_classes = max_class + 1
 
         latent_dim = len(shot_features[0][0])
-        blocks_up = (1, 1, 1, 1)  # number of upsampling blocks, each upsampling by factor 2
+        blocks_up = (
+            1,
+            1,
+            1,
+            1,
+        )  # number of upsampling blocks, each upsampling by factor 2
         target_patch_size = tuple(int(j / 2 ** len(blocks_up)) for j in self.patch_size)
         target_shape = (
             latent_dim,
@@ -148,7 +176,7 @@ class SegmentationUpsampling3D_V2(PatchLevelTaskAdaptor):
         )
 
         # set up decoder
-        decoder_kwargs={
+        decoder_kwargs = {
             "spatial_dims": 3,
             "init_filters": 32,
             "latent_channels": latent_dim,
@@ -158,7 +186,9 @@ class SegmentationUpsampling3D_V2(PatchLevelTaskAdaptor):
             "upsample_mode": "deconv",
             "act": "leakyrelu",
         }
-        logging.info(f"Setting up decoder with: {latent_dim=}, {target_shape=}, {decoder_kwargs=}")
+        logging.info(
+            f"Setting up decoder with: {latent_dim=}, {target_shape=}, {decoder_kwargs=}"
+        )
         decoder = Decoder3D(
             latent_dim=latent_dim,
             target_shape=target_shape,
@@ -174,7 +204,7 @@ class SegmentationUpsampling3D_V2(PatchLevelTaskAdaptor):
             )
         except torch.cuda.OutOfMemoryError as e:
             logging.warning(f"Out of memory error occurred while training decoder: {e}")
-            if self.device.type == 'cuda':
+            if self.device.type == "cuda":
                 logging.info("Retrying using CPU")
                 self.device = torch.device("cpu")
                 decoder.to(self.device)
@@ -190,9 +220,7 @@ class SegmentationUpsampling3D_V2(PatchLevelTaskAdaptor):
         predictions = []
         for case_name in test_cases:
             test_input = process(
-                read_inputs(
-                    input_dir=INPUT_DIRECTORY, case_names=[case_name]
-                )[0]
+                read_inputs(input_dir=INPUT_DIRECTORY, case_names=[case_name])[0]
             )
             case_informations = extract_embeddings(test_input)
 
@@ -226,12 +254,14 @@ class SegmentationUpsampling3D_V2(PatchLevelTaskAdaptor):
             )
             predictions.extend(prediction)
 
-        return predictions
+        return np.array(predictions)
 
     def inference_postprocessor(self, mask: torch.Tensor) -> torch.Tensor:
         # Apply post-processing to the predicted mask
         if not self.return_binary:  # return raw scores
-            assert self.num_classes == 2, f"Scores only implemented for binary segmentation"
+            assert (
+                self.num_classes == 2
+            ), f"Scores only implemented for binary segmentation"
             return mask.softmax(dim=1)[:, 1, ...]  # return the positive class scores
         else:  # return the predicted classes
             return torch.argmax(mask, dim=1)

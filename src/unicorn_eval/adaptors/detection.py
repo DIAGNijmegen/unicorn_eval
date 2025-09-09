@@ -337,9 +337,7 @@ class DensityMap(PatchLevelTaskAdaptor):
         predictions = []
         for case_name in test_cases:
             test_input = process(
-                read_inputs(
-                    input_dir=INPUT_DIRECTORY, case_names=[case_name]
-                )[0]
+                read_inputs(input_dir=INPUT_DIRECTORY, case_names=[case_name])[0]
             )
             case_informations = extract_embeddings(test_input)
             test_data = construct_detection_labels(
@@ -364,7 +362,7 @@ class DensityMap(PatchLevelTaskAdaptor):
             )
             predictions.extend(predicted_points)
 
-        return predictions
+        return np.array(predictions)
 
 
 class ConvStack(nn.Module):
@@ -395,7 +393,9 @@ class ConvDetectionDecoder(nn.Module):
         super().__init__()
         self.heatmap_size = heatmap_size
         output_size = heatmap_size * heatmap_size
-        assert input_dim_flat % (heatmap_size**2) == 0, f"{input_dim_flat=} needs to be divisable by {heatmap_size**2=}"
+        assert (
+            input_dim_flat % (heatmap_size**2) == 0
+        ), f"{input_dim_flat=} needs to be divisable by {heatmap_size**2=}"
         self.spatial_dim = input_dim_flat // (heatmap_size**2)
         logging.info(f"{self.spatial_dim=}, {output_size=}, {heatmap_size=}")
         self.convs = nn.ModuleList(
@@ -426,7 +426,9 @@ class ConvDetector(DensityMap):
     ):
         heatmap_size = 16 if len(patch_sizes) <= 2 else patch_sizes[2]
         assert patch_sizes[0] == patch_sizes[1], f"{patch_sizes[:2]=} must be square."
-        assert patch_sizes[0] % heatmap_size == 0, f"{patch_sizes=} should be divisable by {heatmap_size=}"
+        assert (
+            patch_sizes[0] % heatmap_size == 0
+        ), f"{patch_sizes=} should be divisable by {heatmap_size=}"
         num_epochs = 200
         learning_rate = 0.00001
         super().__init__(

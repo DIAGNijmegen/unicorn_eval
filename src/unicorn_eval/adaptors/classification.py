@@ -48,9 +48,7 @@ def preprocess_features(
         features = features - mean
 
     if normalize_features:
-        features = features / np.linalg.norm(
-            features, axis=-1, keepdims=True
-        )
+        features = features / np.linalg.norm(features, axis=-1, keepdims=True)
 
     return features
 
@@ -104,9 +102,7 @@ class KNN(CaseLevelTaskAdaptor):
         predictions = []
         for case_name in test_cases:
             test_input = process(
-                read_inputs(
-                    input_dir=INPUT_DIRECTORY, case_names=[case_name]
-                )[0]
+                read_inputs(input_dir=INPUT_DIRECTORY, case_names=[case_name])[0]
             )
             case_informations = extract_embeddings(test_input)
             test_feature = case_informations["embeddings"]
@@ -200,9 +196,7 @@ class WeightedKNN(CaseLevelTaskAdaptor):
         predictions, probabilities = [], []
         for case_name in test_cases:
             test_input = process(
-                read_inputs(
-                    input_dir=INPUT_DIRECTORY, case_names=[case_name]
-                )[0]
+                read_inputs(input_dir=INPUT_DIRECTORY, case_names=[case_name])[0]
             )
             case_informations = extract_embeddings(test_input)
             test_feature = case_informations["embeddings"]
@@ -213,10 +207,7 @@ class WeightedKNN(CaseLevelTaskAdaptor):
                 normalize_features=self.normalize_features,
             )
 
-            if (
-                self.shot_features is None
-                or self.similarity_fn is None
-            ):
+            if self.shot_features is None or self.similarity_fn is None:
                 raise ValueError(
                     "Model has not been fitted yet. Call `fit` before `predict`."
                 )
@@ -286,9 +277,7 @@ class LogisticRegression(CaseLevelTaskAdaptor):
         predictions = []
         for case_name in test_cases:
             test_input = process(
-                read_inputs(
-                    input_dir=INPUT_DIRECTORY, case_names=[case_name]
-                )[0]
+                read_inputs(input_dir=INPUT_DIRECTORY, case_names=[case_name])[0]
             )
             case_informations = extract_embeddings(test_input)
             test_feature = case_informations["embeddings"]
@@ -355,12 +344,8 @@ class LinearProbing(CaseLevelTaskAdaptor):
         self.criterion = nn.CrossEntropyLoss()
 
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        shot_features = torch.tensor(shot_features, dtype=torch.float32).to(
-            self.device
-        )
-        shot_labels = torch.tensor(shot_labels, dtype=torch.long).to(
-            self.device
-        )
+        shot_features = torch.tensor(shot_features, dtype=torch.float32).to(self.device)
+        shot_labels = torch.tensor(shot_labels, dtype=torch.long).to(self.device)
 
         self.model = LinearClassifier(input_dim, self.num_classes).to(self.device)
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
@@ -394,9 +379,7 @@ class LinearProbing(CaseLevelTaskAdaptor):
                 logging.info(f"Early stopping at epoch {epoch+1}")
                 break
 
-            logging.info(
-                f"Epoch {epoch+1}/{self.num_epochs} - Loss: {loss.item():.4f}"
-            )
+            logging.info(f"Epoch {epoch+1}/{self.num_epochs} - Loss: {loss.item():.4f}")
 
         self.model.load_state_dict(best_state)
         logging.info(
@@ -409,10 +392,8 @@ class LinearProbing(CaseLevelTaskAdaptor):
         with torch.no_grad():
             for case_name in test_cases:
                 test_input = process(
-                    read_inputs(
-                        input_dir=INPUT_DIRECTORY, case_names=[case_name]
-                )[0]
-            )
+                    read_inputs(input_dir=INPUT_DIRECTORY, case_names=[case_name])[0]
+                )
             case_informations = extract_embeddings(test_input)
             test_feature = case_informations["embeddings"]
             test_features = torch.tensor(test_feature, dtype=torch.float32).to(
@@ -495,12 +476,8 @@ class MultiLayerPerceptron(CaseLevelTaskAdaptor):
         self.criterion = nn.CrossEntropyLoss()
 
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        shot_features = torch.tensor(shot_features, dtype=torch.float32).to(
-            self.device
-        )
-        shot_labels = torch.tensor(shot_labels, dtype=torch.long).to(
-            self.device
-        )
+        shot_features = torch.tensor(shot_features, dtype=torch.float32).to(self.device)
+        shot_labels = torch.tensor(shot_labels, dtype=torch.long).to(self.device)
 
         self.model = MLPClassifier(
             input_dim, self.hidden_dim, self.num_classes, self.num_layers
@@ -536,9 +513,7 @@ class MultiLayerPerceptron(CaseLevelTaskAdaptor):
                 logging.info(f"Early stopping at epoch {epoch+1}")
                 break
 
-            logging.info(
-                f"Epoch {epoch+1}/{self.num_epochs} - Loss: {epoch_loss:.4f}"
-            )
+            logging.info(f"Epoch {epoch+1}/{self.num_epochs} - Loss: {epoch_loss:.4f}")
 
         self.model.load_state_dict(best_state)
         logging.info(
@@ -551,15 +526,13 @@ class MultiLayerPerceptron(CaseLevelTaskAdaptor):
         with torch.no_grad():
             for case_name in test_cases:
                 test_input = process(
-                    read_inputs(
-                        input_dir=INPUT_DIRECTORY, case_names=[case_name]
-                    )[0]
+                    read_inputs(input_dir=INPUT_DIRECTORY, case_names=[case_name])[0]
                 )
                 case_informations = extract_embeddings(test_input)
                 test_feature = case_informations["embeddings"]
-                test_features = torch.tensor(
-                    test_feature, dtype=torch.float32
-                ).to(self.device)
+                test_features = torch.tensor(test_feature, dtype=torch.float32).to(
+                    self.device
+                )
                 logits = self.model(test_features)
                 if self.return_probabilities:
                     prediction = torch.softmax(logits, dim=0)

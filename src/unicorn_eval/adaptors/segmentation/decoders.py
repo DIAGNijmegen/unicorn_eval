@@ -22,8 +22,7 @@ import torch.nn.functional as F
 from monai.networks.blocks.upsample import UpSample
 from monai.networks.layers.factories import Act, Conv, Norm, split_args
 from monai.networks.layers.utils import get_act_layer, get_norm_layer
-from monai.networks.nets.segresnet_ds import (aniso_kernel,
-                                              scales_for_resolution)
+from monai.networks.nets.segresnet_ds import aniso_kernel, scales_for_resolution
 from monai.utils.misc import has_option
 
 
@@ -213,8 +212,10 @@ class SegResNetDecoderOnly(nn.Module):
                             padding=kernel_size // 2,
                             bias=False,
                         ),
-                        get_norm_layer(name=norm, spatial_dims=spatial_dims, channels=filters // 2),
-                        get_act_layer(act)
+                        get_norm_layer(
+                            name=norm, spatial_dims=spatial_dims, channels=filters // 2
+                        ),
+                        get_act_layer(act),
                     )
                 )
             level["blocks"] = nn.Sequential(*lite_blocks)

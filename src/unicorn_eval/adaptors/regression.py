@@ -48,9 +48,7 @@ def preprocess_features(
         features = features - mean
 
     if normalize_features:
-        features = features / np.linalg.norm(
-            features, axis=-1, keepdims=True
-        )
+        features = features / np.linalg.norm(features, axis=-1, keepdims=True)
 
     return features
 
@@ -102,9 +100,7 @@ class KNNRegressor(CaseLevelTaskAdaptor):
         predictions = []
         for case_name in test_cases:
             test_input = process(
-                read_inputs(
-                    input_dir=INPUT_DIRECTORY, case_names=[case_name]
-                )[0]
+                read_inputs(input_dir=INPUT_DIRECTORY, case_names=[case_name])[0]
             )
             case_informations = extract_embeddings(test_input)
             test_feature = case_informations["embeddings"]
@@ -190,9 +186,7 @@ class WeightedKNNRegressor(CaseLevelTaskAdaptor):
         predictions = []
         for case_name in test_cases:
             test_input = process(
-                read_inputs(
-                    input_dir=INPUT_DIRECTORY, case_names=[case_name]
-                )[0]
+                read_inputs(input_dir=INPUT_DIRECTORY, case_names=[case_name])[0]
             )
             case_informations = extract_embeddings(test_input)
             test_feature = case_informations["embeddings"]
@@ -203,10 +197,7 @@ class WeightedKNNRegressor(CaseLevelTaskAdaptor):
                 normalize_features=self.normalize_features,
             )
 
-            if (
-                self.shot_features is None
-                or self.similarity_fn is None
-            ):
+            if self.shot_features is None or self.similarity_fn is None:
                 raise ValueError(
                     "Model has not been fitted yet. Call `fit` before `predict`."
                 )
@@ -292,9 +283,7 @@ class LinearProbingRegressor(CaseLevelTaskAdaptor):
                 q_bins = np.quantile(shot_labels, q=np.linspace(0, 1, nbins + 1))
             q_bins[0] = shot_labels.min() - eps
             q_bins[-1] = shot_labels.max() + eps
-            shot_labels = (
-                np.digitize(shot_labels, bins=q_bins, right=False) - 1
-            )
+            shot_labels = np.digitize(shot_labels, bins=q_bins, right=False) - 1
             censoring = 1 - events
             self.num_classes = nbins  # number of bins
             self.criterion = NLLSurvLoss()
@@ -303,21 +292,13 @@ class LinearProbingRegressor(CaseLevelTaskAdaptor):
             self.criterion = nn.MSELoss()
 
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        shot_features = torch.tensor(shot_features, dtype=torch.float32).to(
-            self.device
-        )
+        shot_features = torch.tensor(shot_features, dtype=torch.float32).to(self.device)
 
         if self.survival:
-            shot_labels = torch.tensor(shot_labels, dtype=torch.long).to(
-                self.device
-            )
-            censoring = torch.tensor(censoring, dtype=torch.long).to(
-                self.device
-            )
+            shot_labels = torch.tensor(shot_labels, dtype=torch.long).to(self.device)
+            censoring = torch.tensor(censoring, dtype=torch.long).to(self.device)
         else:
-            shot_labels = torch.tensor(shot_labels, dtype=torch.float32).to(
-                self.device
-            )
+            shot_labels = torch.tensor(shot_labels, dtype=torch.float32).to(self.device)
 
         self.model = LinearClassifier(input_dim, self.num_classes).to(self.device)
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
@@ -343,9 +324,7 @@ class LinearProbingRegressor(CaseLevelTaskAdaptor):
             if self.survival:
                 hazards = torch.sigmoid(logits)  # [B, nbins]
                 survival = torch.cumprod(1 - hazards, dim=0)  # [B, nbins]
-                loss = self.criterion(
-                    hazards, survival, shot_labels, censoring
-                )
+                loss = self.criterion(hazards, survival, shot_labels, censoring)
             else:
                 loss = self.criterion(logits, shot_labels)
             loss.backward()
@@ -359,9 +338,7 @@ class LinearProbingRegressor(CaseLevelTaskAdaptor):
                 logging.info(f"Early stopping at epoch {epoch+1}")
                 break
 
-            logging.info(
-                f"Epoch {epoch+1}/{self.num_epochs} - Loss: {loss.item():.4f}"
-            )
+            logging.info(f"Epoch {epoch+1}/{self.num_epochs} - Loss: {loss.item():.4f}")
 
         self.model.load_state_dict(best_state)
         logging.info(
@@ -374,9 +351,7 @@ class LinearProbingRegressor(CaseLevelTaskAdaptor):
         with torch.no_grad():
             for case_name in test_cases:
                 test_input = process(
-                    read_inputs(
-                        input_dir=INPUT_DIRECTORY, case_names=[case_name]
-                    )[0]
+                    read_inputs(input_dir=INPUT_DIRECTORY, case_names=[case_name])[0]
                 )
                 case_informations = extract_embeddings(test_input)
                 test_feature = case_informations["embeddings"]
@@ -472,9 +447,7 @@ class MultiLayerPerceptronRegressor(CaseLevelTaskAdaptor):
                 q_bins = np.quantile(shot_labels, q=np.linspace(0, 1, nbins + 1))
             q_bins[0] = shot_labels.min() - eps
             q_bins[-1] = shot_labels.max() + eps
-            shot_labels = (
-                np.digitize(shot_labels, bins=q_bins, right=False) - 1
-            )
+            shot_labels = np.digitize(shot_labels, bins=q_bins, right=False) - 1
             censoring = 1 - events
             self.num_classes = nbins  # number of bins
             self.criterion = NLLSurvLoss()
@@ -483,21 +456,13 @@ class MultiLayerPerceptronRegressor(CaseLevelTaskAdaptor):
             self.criterion = nn.MSELoss()
 
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        shot_features = torch.tensor(shot_features, dtype=torch.float32).to(
-            self.device
-        )
+        shot_features = torch.tensor(shot_features, dtype=torch.float32).to(self.device)
 
         if self.survival:
-            shot_labels = torch.tensor(shot_labels, dtype=torch.long).to(
-                self.device
-            )
-            censoring = torch.tensor(censoring, dtype=torch.long).to(
-                self.device
-            )
+            shot_labels = torch.tensor(shot_labels, dtype=torch.long).to(self.device)
+            censoring = torch.tensor(censoring, dtype=torch.long).to(self.device)
         else:
-            shot_labels = torch.tensor(shot_labels, dtype=torch.float32).to(
-                self.device
-            )
+            shot_labels = torch.tensor(shot_labels, dtype=torch.float32).to(self.device)
 
         self.model = MLPClassifier(
             input_dim, self.hidden_dim, self.num_classes, self.num_layers
@@ -525,9 +490,7 @@ class MultiLayerPerceptronRegressor(CaseLevelTaskAdaptor):
             if self.survival:
                 hazards = torch.sigmoid(logits)  # [B, nbins]
                 survival = torch.cumprod(1 - hazards, dim=0)  # [B, nbins]
-                loss = self.criterion(
-                    hazards, survival, shot_labels, censoring
-                )
+                loss = self.criterion(hazards, survival, shot_labels, censoring)
             else:
                 loss = self.criterion(logits, shot_labels)
             loss.backward()
@@ -541,9 +504,7 @@ class MultiLayerPerceptronRegressor(CaseLevelTaskAdaptor):
                 logging.info(f"Early stopping at epoch {epoch+1}")
                 break
 
-            logging.info(
-                f"Epoch {epoch+1}/{self.num_epochs} - Loss: {epoch_loss:.4f}"
-            )
+            logging.info(f"Epoch {epoch+1}/{self.num_epochs} - Loss: {epoch_loss:.4f}")
 
         self.model.load_state_dict(best_state)
         logging.info(
@@ -556,9 +517,7 @@ class MultiLayerPerceptronRegressor(CaseLevelTaskAdaptor):
         with torch.no_grad():
             for case_name in test_cases:
                 test_input = process(
-                    read_inputs(
-                        input_dir=INPUT_DIRECTORY, case_names=[case_name]
-                    )[0]
+                    read_inputs(input_dir=INPUT_DIRECTORY, case_names=[case_name])[0]
                 )
                 case_informations = extract_embeddings(test_input)
                 test_feature = case_informations["embeddings"]

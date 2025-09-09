@@ -127,16 +127,14 @@ class Spider:
             "DiceScoreSpinalCanal": dice_score_SC,
             "OverallDiceScore": overall_dice_score,
             "DetectionRateVertebrae": detection_rate_vert,
-            "DetectionRateDiscs": detection_rate_discs
+            "DetectionRateDiscs": detection_rate_discs,
         }
 
     def compute_metrics(self):
         metric_accumulator = []
         gts = self.ground_truths
         for i, gt in enumerate(gts):
-            metric = self.score_case(
-                gt, self.inputs[i]
-            )
+            metric = self.score_case(gt, self.inputs[i])
             metric_accumulator.append(metric)
 
         df = pandas.DataFrame(metric_accumulator)

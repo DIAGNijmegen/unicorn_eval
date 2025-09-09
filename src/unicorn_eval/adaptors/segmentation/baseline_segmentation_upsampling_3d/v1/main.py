@@ -22,14 +22,16 @@ from tqdm import tqdm
 
 from unicorn_eval.adaptors.base import PatchLevelTaskAdaptor
 from unicorn_eval.adaptors.segmentation.data_handling import (
-    SegmentationDataset, construct_data_with_labels,
-    construct_segmentation_labels, custom_collate, extract_patch_labels,
-    load_patch_data)
-from unicorn_eval.adaptors.segmentation.decoders import (Decoder3D,
-                                                         SegmentationDecoder)
+    SegmentationDataset,
+    construct_data_with_labels,
+    construct_segmentation_labels,
+    custom_collate,
+    extract_patch_labels,
+    load_patch_data,
+)
+from unicorn_eval.adaptors.segmentation.decoders import Decoder3D, SegmentationDecoder
 from unicorn_eval.adaptors.segmentation.inference import inference, inference3d
-from unicorn_eval.adaptors.segmentation.training import (train_decoder,
-                                                         train_decoder3d)
+from unicorn_eval.adaptors.segmentation.training import train_decoder, train_decoder3d
 from unicorn_eval.io import INPUT_DIRECTORY, process, read_inputs, extract_embeddings
 
 
@@ -74,9 +76,7 @@ class SegmentationUpsampling(PatchLevelTaskAdaptor):
         predictions = []
         for case_name in test_cases:
             test_input = process(
-                read_inputs(
-                    input_dir=INPUT_DIRECTORY, case_names=[case_name]
-                )[0]
+                read_inputs(input_dir=INPUT_DIRECTORY, case_names=[case_name])[0]
             )
             case_informations = extract_embeddings(test_input)
             test_data = construct_segmentation_labels(
@@ -100,7 +100,7 @@ class SegmentationUpsampling(PatchLevelTaskAdaptor):
             )
             predictions.extend(predicted_masks)
 
-        return predictions
+        return np.array(predictions)
 
 
 class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
@@ -147,7 +147,23 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
         self.return_binary = return_binary
         self.balance_bg = balance_bg
 
-    def fit(self, shot_features, shot_labels, shot_coordinates, shot_ids, shot_patch_sizes, shot_patch_spacings, shot_image_sizes, shot_image_origins, shot_image_spacings, shot_image_directions, shot_label_spacings, shot_label_origins, shot_label_directions, **kwargs):
+    def fit(
+        self,
+        shot_features,
+        shot_labels,
+        shot_coordinates,
+        shot_ids,
+        shot_patch_sizes,
+        shot_patch_spacings,
+        shot_image_sizes,
+        shot_image_origins,
+        shot_image_spacings,
+        shot_image_directions,
+        shot_label_spacings,
+        shot_label_origins,
+        shot_label_directions,
+        **kwargs,
+    ):
         label_patch_features = []
         for idx, label in tqdm(enumerate(shot_labels), desc="Extracting patch labels"):
             label_feats = extract_patch_labels(
@@ -176,7 +192,9 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
             labels=label_patch_features,
         )
 
-        train_loader = load_patch_data(train_data, batch_size=10, balance_bg=self.balance_bg)
+        train_loader = load_patch_data(
+            train_data, batch_size=10, balance_bg=self.balance_bg
+        )
         latent_dim = len(shot_features[0][0])
         target_patch_size = tuple(int(j / 16) for j in self.global_patch_size)
         target_shape = (
@@ -207,7 +225,7 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
             self.decoder = train_decoder3d(decoder, train_loader, self.device)
         except torch.cuda.OutOfMemoryError as e:
             logging.warning(f"Out of memory error occurred while training decoder: {e}")
-            if self.device.type == 'cuda':
+            if self.device.type == "cuda":
                 logging.info("Retrying using CPU")
                 self.device = torch.device("cpu")
                 decoder.to(self.device)
@@ -219,9 +237,7 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
         predictions = []
         for case_name in test_cases:
             test_input = process(
-                read_inputs(
-                    input_dir=INPUT_DIRECTORY, case_names=[case_name]
-                )[0]
+                read_inputs(input_dir=INPUT_DIRECTORY, case_names=[case_name])[0]
             )
             case_informations = extract_embeddings(test_input)
 
@@ -250,8 +266,8 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
                 test_label_sizes=[case_informations["label_size"]],
                 test_label_spacing=[case_informations["label_spacing"]],
                 test_label_origins=[case_informations["label_origin"]],
-                test_label_directions=[case_informations["label_direction"]]
+                test_label_directions=[case_informations["label_direction"]],
             )
             predictions.extend(prediction)
 
-        return predictions
+        return np.array(predictions)

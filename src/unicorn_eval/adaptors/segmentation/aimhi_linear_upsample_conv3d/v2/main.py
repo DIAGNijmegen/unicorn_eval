@@ -14,12 +14,16 @@ import torch.optim as optim
 from scipy import ndimage as ndi
 from tqdm import tqdm
 
-from unicorn_eval.adaptors.segmentation.aimhi_linear_upsample_conv3d.v1.main import \
-    dice_loss
-from unicorn_eval.adaptors.segmentation.baseline_segmentation_upsampling_3d.v1 import \
-    SegmentationUpsampling3D
+from unicorn_eval.adaptors.segmentation.aimhi_linear_upsample_conv3d.v1.main import (
+    dice_loss,
+)
+from unicorn_eval.adaptors.segmentation.baseline_segmentation_upsampling_3d.v1 import (
+    SegmentationUpsampling3D,
+)
 from unicorn_eval.adaptors.segmentation.data_handling import (
-    construct_data_with_labels, load_patch_data)
+    construct_data_with_labels,
+    load_patch_data,
+)
 from unicorn_eval.adaptors.segmentation.inference import create_grid
 
 
@@ -34,7 +38,7 @@ class UpsampleConvSegAdaptor(nn.Module):
             nn.ReLU(inplace=True),
             nn.Conv3d(in_channels, in_channels, kernel_size=3, padding=1),
             nn.ReLU(inplace=True),
-            nn.Conv3d(in_channels, num_classes, kernel_size=1)
+            nn.Conv3d(in_channels, num_classes, kernel_size=1),
         )
 
     def forward(self, x):
@@ -42,8 +46,8 @@ class UpsampleConvSegAdaptor(nn.Module):
         B, feat_len = x.shape
         if feat_len % C != 0:
             raise ValueError(
-            f"[Adaptor] Embedding length {feat_len} must be divisible by in_channels={C}."
-        )
+                f"[Adaptor] Embedding length {feat_len} must be divisible by in_channels={C}."
+            )
 
         flat = feat_len // C
 
@@ -57,12 +61,14 @@ class UpsampleConvSegAdaptor(nn.Module):
         D = round(D_ref * k)
         H = round(H_ref * k)
         W = round(W_ref * k)
-        
+
         if D * H * W != flat:
             D, H, W = exact_triplet_from_ref(flat, (D_ref, H_ref, W_ref))
-        
+
         x = x.view(B, C, D, H, W)
-        x = F.interpolate(x, size=self.target_shape, mode="trilinear", align_corners=False)
+        x = F.interpolate(
+            x, size=self.target_shape, mode="trilinear", align_corners=False
+        )
         x = self.conv_blocks(x)
         return x
 
@@ -73,7 +79,7 @@ class ConvUpsampleSegAdaptor(nn.Module):
         self.target_shape = target_shape
         self.in_channels = in_channels
         self.conv_blocks = nn.Sequential(
-            nn.Conv3d(in_channels, num_classes, kernel_size=3, padding=1) 
+            nn.Conv3d(in_channels, num_classes, kernel_size=3, padding=1)
         )
 
     def forward(self, x):
@@ -81,8 +87,8 @@ class ConvUpsampleSegAdaptor(nn.Module):
         B, feat_len = x.shape
         if feat_len % C != 0:
             raise ValueError(
-            f"[Adaptor] Embedding length {feat_len} must be divisible by in_channels={C}."
-        )
+                f"[Adaptor] Embedding length {feat_len} must be divisible by in_channels={C}."
+            )
 
         flat = x.shape[1] // C
 
@@ -103,13 +109,15 @@ class ConvUpsampleSegAdaptor(nn.Module):
 
         x = x.view(B, C, D, H, W)
         x = self.conv_blocks(x)
-        x = F.interpolate(x, size=self.target_shape, mode="trilinear", align_corners=False)
+        x = F.interpolate(
+            x, size=self.target_shape, mode="trilinear", align_corners=False
+        )
         return x
 
 
 class LinearUpsampleConv3D_V2(SegmentationUpsampling3D):
     """
-    Patch-level adaptor that performs segmentation by linearly upsampling 
+    Patch-level adaptor that performs segmentation by linearly upsampling
     3D patch-level features followed by convolutional refinement.
 
     This adaptor takes precomputed patch-level features from 3D medical images
@@ -138,7 +146,10 @@ class LinearUpsampleConv3D_V2(SegmentationUpsampling3D):
         patch_size : Size of each 3D patch.
         return_binary : Whether to threshold predictions into binary segmentation masks.
     """
-    def __init__(self, *args, decoder_cls: Type[nn.Module] = UpsampleConvSegAdaptor, **kwargs):
+
+    def __init__(
+        self, *args, decoder_cls: Type[nn.Module] = UpsampleConvSegAdaptor, **kwargs
+    ):
         super().__init__(*args, **kwargs)
         self.is_task11 = False
         self.is_task06 = False
@@ -155,7 +166,9 @@ class LinearUpsampleConv3D_V2(SegmentationUpsampling3D):
             labels=self.shot_labels,
         )
 
-        train_loader = load_patch_data(train_data, batch_size=1, balance_bg=self.balance_bg)
+        train_loader = load_patch_data(
+            train_data, batch_size=1, balance_bg=self.balance_bg
+        )
 
         max_class = max_class_label_from_labels(self.shot_labels)
         if max_class >= 100:
@@ -177,14 +190,26 @@ class LinearUpsampleConv3D_V2(SegmentationUpsampling3D):
         logging.info(f"Training decoder with {num_classes} classes")
         decoder.to(self.device)
         try:
-            self.decoder = train_seg_adaptor3d(decoder, train_loader, self.device, is_task11=self.is_task11, is_task06=self.is_task06)
+            self.decoder = train_seg_adaptor3d(
+                decoder,
+                train_loader,
+                self.device,
+                is_task11=self.is_task11,
+                is_task06=self.is_task06,
+            )
         except torch.cuda.OutOfMemoryError as e:
             logging.warning(f"Out of memory error occurred while training decoder: {e}")
-            if self.device.type == 'cuda':
+            if self.device.type == "cuda":
                 logging.info("Retrying using CPU")
                 self.device = torch.device("cpu")
                 decoder.to(self.device)
-                self.decoder = train_seg_adaptor3d(decoder, train_loader, self.device, is_task11=self.is_task11, is_task06=self.is_task06)
+                self.decoder = train_seg_adaptor3d(
+                    decoder,
+                    train_loader,
+                    self.device,
+                    is_task11=self.is_task11,
+                    is_task06=self.is_task06,
+                )
             else:
                 raise
 
@@ -204,7 +229,7 @@ class LinearUpsampleConv3D_V2(SegmentationUpsampling3D):
 
         # wrong patch spacing
         for data in test_data:
-            data['patch_spacing'] = data['image_spacing']
+            data["patch_spacing"] = data["image_spacing"]
 
         test_loader = load_patch_data(test_data, batch_size=1)
 
@@ -219,7 +244,7 @@ class LinearUpsampleConv3D_V2(SegmentationUpsampling3D):
             test_label_spacing=self.test_label_spacing,
             test_label_origins=self.test_label_origins,
             test_label_directions=self.test_label_directions,
-            is_task11=self.is_task11
+            is_task11=self.is_task11,
         )
 
 
@@ -246,12 +271,12 @@ def expand_instance_labels(y: np.ndarray) -> np.ndarray:
     structure = np.ones((3,) * y.ndim, dtype=np.uint8)
 
     # --- label==1 ---
-    mask1 = (y == 1)
+    mask1 = y == 1
     if np.any(mask1):
         lbl1, n1 = ndi.label(mask1, structure=structure)
         next_lab = 1
         for cid in range(1, n1 + 1):
-            blob = (lbl1 == cid)
+            blob = lbl1 == cid
             if not np.any(blob):
                 continue
             assign = next_lab if next_lab <= 99 else 99
@@ -262,12 +287,12 @@ def expand_instance_labels(y: np.ndarray) -> np.ndarray:
     out[y == 2] = 100
 
     # --- label==3 ---
-    mask3 = (y == 3)
+    mask3 = y == 3
     if np.any(mask3):
         lbl3, n3 = ndi.label(mask3, structure=structure)
         base = 201
         for cid in range(1, n3 + 1):
-            blob = (lbl3 == cid)
+            blob = lbl3 == cid
             if not np.any(blob):
                 continue
             out[blob] = base
@@ -276,7 +301,19 @@ def expand_instance_labels(y: np.ndarray) -> np.ndarray:
     return out
 
 
-def inference3d_softmax(*, decoder, data_loader, device, return_binary, test_cases, test_label_sizes, test_label_spacing, test_label_origins, test_label_directions, is_task11=False):
+def inference3d_softmax(
+    *,
+    decoder,
+    data_loader,
+    device,
+    return_binary,
+    test_cases,
+    test_label_sizes,
+    test_label_spacing,
+    test_label_origins,
+    test_label_directions,
+    is_task11=False,
+):
     decoder.eval()
     with torch.no_grad():
         grouped_predictions = defaultdict(lambda: defaultdict(list))
@@ -351,7 +388,7 @@ def inference3d_softmax(*, decoder, data_loader, device, return_binary, test_cas
                         "image_direction": patches[0]["image_direction"],
                     }
                 )
-        
+
         grids = create_grid(averaged_patches)
 
         aligned_preds = {}
@@ -370,15 +407,15 @@ def inference3d_softmax(*, decoder, data_loader, device, return_binary, test_cas
                 sitk.sitkNearestNeighbor,
                 gt_origin,
                 gt_spacing,
-                gt_direction
+                gt_direction,
             )
-            
+
             if is_task11:
                 pred_on_gt_arr = sitk.GetArrayFromImage(pred_on_gt)
                 aligned_preds[case_id] = expand_instance_labels(pred_on_gt_arr)
             else:
                 aligned_preds[case_id] = sitk.GetArrayFromImage(pred_on_gt)
-            
+
         return [j for j in aligned_preds.values()]
 
 
@@ -462,8 +499,8 @@ def remap_task11_labels(label_patch_features):
 
             # Build masks for each rule
             mask1 = (mapped > 0) & (mapped < 100)
-            mask2 = (mapped == 100)
-            mask3 = (mapped > 200)
+            mask2 = mapped == 100
+            mask3 = mapped > 200
 
             if mask1.any() or mask2.any() or mask3.any():
                 mapped[mask1] = 1
@@ -495,7 +532,16 @@ def map_labels(y: torch.Tensor) -> torch.Tensor:
     return y_new
 
 
-def train_seg_adaptor3d(decoder, data_loader, device, num_epochs = 3, iterations_per_epoch: int | None = None, is_task11=False, is_task06=False, verbose: bool = True):
+def train_seg_adaptor3d(
+    decoder,
+    data_loader,
+    device,
+    num_epochs=3,
+    iterations_per_epoch: int | None = None,
+    is_task11=False,
+    is_task06=False,
+    verbose: bool = True,
+):
     ce_loss = nn.CrossEntropyLoss()
     optimizer = optim.Adam(decoder.parameters(), lr=1e-3)
 
@@ -505,9 +551,15 @@ def train_seg_adaptor3d(decoder, data_loader, device, num_epochs = 3, iterations
         epoch_loss = 0.0
 
         # batch progress
-        batch_iter = tqdm(data_loader, total=iterations_per_epoch, desc=f"Epoch {epoch+1}/{num_epochs}", leave=False, disable=not verbose)
+        batch_iter = tqdm(
+            data_loader,
+            total=iterations_per_epoch,
+            desc=f"Epoch {epoch+1}/{num_epochs}",
+            leave=False,
+            disable=not verbose,
+        )
         iteration_count = 0
-    
+
         for batch in batch_iter:
             iteration_count += 1
 
@@ -518,9 +570,9 @@ def train_seg_adaptor3d(decoder, data_loader, device, num_epochs = 3, iterations
                 patch_label = map_labels(patch_label)
 
             optimizer.zero_grad()
-            de_output = decoder(patch_emb) 
+            de_output = decoder(patch_emb)
 
-            ce = ce_loss(de_output, patch_label) 
+            ce = ce_loss(de_output, patch_label)
             if is_task06:
                 loss = ce
             else:
@@ -533,17 +585,26 @@ def train_seg_adaptor3d(decoder, data_loader, device, num_epochs = 3, iterations
             epoch_loss += loss.item()
 
             # Update progress bar with current loss and running average
-            batch_iter.set_postfix(loss=f"{loss.item():.4f}", avg=f"{epoch_loss / iteration_count:.4f}")
+            batch_iter.set_postfix(
+                loss=f"{loss.item():.4f}", avg=f"{epoch_loss / iteration_count:.4f}"
+            )
 
-            if iterations_per_epoch is not None and iteration_count >= iterations_per_epoch:
+            if (
+                iterations_per_epoch is not None
+                and iteration_count >= iterations_per_epoch
+            ):
                 break
 
-        logging.info(f"Epoch {epoch+1}: Avg total loss = {epoch_loss / iteration_count:.4f}")
+        logging.info(
+            f"Epoch {epoch+1}: Avg total loss = {epoch_loss / iteration_count:.4f}"
+        )
 
     return decoder
 
 
-def exact_triplet_from_ref(flat: int, ref: tuple[int, int, int]) -> tuple[int, int, int]:
+def exact_triplet_from_ref(
+    flat: int, ref: tuple[int, int, int]
+) -> tuple[int, int, int]:
     """
     Find integers (D,H,W) with D*H*W == flat, close to the heuristic proportions
     implied by 'ref' (D_ref,H_ref,W_ref).
@@ -579,6 +640,8 @@ def exact_triplet_from_ref(flat: int, ref: tuple[int, int, int]) -> tuple[int, i
     H = base // D
 
     # ensure non-zero
-    D = max(1, D); H = max(1, H); W = max(1, W)
+    D = max(1, D)
+    H = max(1, H)
+    W = max(1, W)
     assert D * H * W == flat, f"factorization failed: {D}*{H}*{W} != {flat}"
     return D, H, W

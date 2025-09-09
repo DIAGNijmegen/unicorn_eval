@@ -33,7 +33,12 @@ class CaseLevelTaskAdaptor(ABC):
         pass
 
     @abstractmethod
-    def fit(self, shot_features: np.ndarray, shot_labels: np.ndarray, shot_extra_labels: np.ndarray = None) -> None:
+    def fit(
+        self,
+        shot_features: np.ndarray,
+        shot_labels: np.ndarray,
+        shot_extra_labels: np.ndarray = None,
+    ) -> None:
         """
         Abstract method to fit the model using the few-shot data.
         The implementation should use `shot_features`, `shot_labels` (and potentially `shot_extra_labels`) to fit the model.
@@ -75,7 +80,13 @@ class PatchLevelTaskAdaptor(ABC):
         pass
 
     @abstractmethod
-    def fit(self, shot_features: np.ndarray, shot_coordinates: np.ndarray, shot_labels: np.ndarray, shot_extra_labels: np.ndarray = None) -> None:
+    def fit(
+        self,
+        shot_features: np.ndarray,
+        shot_coordinates: np.ndarray,
+        shot_labels: np.ndarray,
+        shot_extra_labels: np.ndarray = None,
+    ) -> None:
         """
         Abstract method to fit the model using the few-shot data.
         The implementation should use `shot_features`, `shot_coordinates`, `shot_labels` (and potentially `shot_extra_labels`) to fit the model.

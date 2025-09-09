@@ -13,14 +13,16 @@ from tqdm import tqdm
 
 from unicorn_eval.adaptors.base import PatchLevelTaskAdaptor
 from unicorn_eval.adaptors.segmentation.data_handling import (
-    construct_data_with_labels, load_patch_data,
-    make_patch_level_neural_representation)
+    construct_data_with_labels,
+    load_patch_data,
+    make_patch_level_neural_representation,
+)
 from unicorn_eval.adaptors.segmentation.inference import world_to_voxel
 
 
 class LinearUpsampleConv3D_V1(PatchLevelTaskAdaptor):
     """
-    Patch-level adaptor that performs segmentation by linearly upsampling 
+    Patch-level adaptor that performs segmentation by linearly upsampling
     3D patch-level features followed by convolutional refinement.
 
     This adaptor takes precomputed patch-level features from 3D medical images
@@ -152,7 +154,7 @@ class LinearUpsampleConv3D_V1(PatchLevelTaskAdaptor):
             self.decoder = train_seg_adaptor3d(decoder, train_loader, self.device)
         except torch.cuda.OutOfMemoryError as e:
             logging.warning(f"Out of memory error occurred while training decoder: {e}")
-            if self.device.type == 'cuda':
+            if self.device.type == "cuda":
                 logging.info("Retrying using CPU")
                 self.device = torch.device("cpu")
                 decoder.to(self.device)
@@ -177,8 +179,17 @@ class LinearUpsampleConv3D_V1(PatchLevelTaskAdaptor):
         test_loader = load_patch_data(test_data, batch_size=1)
         # run inference using the trained decoder
 
-        return seg_inference3d(self.decoder, test_loader, self.device, self.return_binary, self.test_cases, self.test_label_sizes, self.test_label_spacing, self.test_label_origins, self.test_label_directions)
-
+        return seg_inference3d(
+            self.decoder,
+            test_loader,
+            self.device,
+            self.return_binary,
+            self.test_cases,
+            self.test_label_sizes,
+            self.test_label_spacing,
+            self.test_label_origins,
+            self.test_label_directions,
+        )
 
 
 def extract_patch_labels_no_resample(
@@ -207,7 +218,7 @@ def extract_patch_labels_no_resample(
             ((x_start, x_end), (y_start, y_end), (z_start, z_end)).
         - features (list[float]): List of features extracted from the patch
     """
-    label_array = label.copy()  
+    label_array = label.copy()
     label = sitk.GetImageFromArray(label)
     label.SetOrigin(image_origin)
     label.SetSpacing(image_spacing)
@@ -222,14 +233,13 @@ def extract_patch_labels_no_resample(
     for z in range(0, D - d + 1, d):
         for y in range(0, H - h + 1, h):
             for x in range(0, W - w + 1, w):
-                patch = label_array[z:z + d, y:y + h, x:x + w]
+                patch = label_array[z : z + d, y : y + h, x : x + w]
                 corner_index = (x, y, z)
                 physical_coord = label.TransformIndexToPhysicalPoint(corner_index)
 
-                patch_features.append({
-                "coordinates": list(physical_coord),
-                "features": patch
-            })
+                patch_features.append(
+                    {"coordinates": list(physical_coord), "features": patch}
+                )
 
     if patch_spacing is None:
         patch_spacing = label.GetSpacing()
@@ -248,7 +258,17 @@ def extract_patch_labels_no_resample(
     return patch_labels
 
 
-def seg_inference3d(decoder, data_loader, device, return_binary,  test_cases, test_label_sizes, test_label_spacing, test_label_origins, test_label_directions):
+def seg_inference3d(
+    decoder,
+    data_loader,
+    device,
+    return_binary,
+    test_cases,
+    test_label_sizes,
+    test_label_spacing,
+    test_label_origins,
+    test_label_directions,
+):
     decoder.eval()
     with torch.no_grad():
         grouped_predictions = defaultdict(lambda: defaultdict(list))
@@ -341,10 +361,8 @@ def seg_inference3d(decoder, data_loader, device, return_binary,  test_cases, te
 
                 i, j, k = world_to_voxel(coord, origin, spacing, inv_direction)
 
-         
                 d, h, w = patch["features"].shape
 
-    
                 z_slice = slice(k, k + d)
                 y_slice = slice(j, j + h)
                 x_slice = slice(i, i + w)
@@ -360,7 +378,6 @@ def seg_inference3d(decoder, data_loader, device, return_binary,  test_cases, te
         return final_images
 
 
-
 class LightweightSegAdaptor(nn.Module):
     def __init__(self, target_shape=None, in_channels=32, num_classes=2):
         super().__init__()
@@ -372,10 +389,10 @@ class LightweightSegAdaptor(nn.Module):
             nn.ReLU(inplace=True),
             nn.Conv3d(in_channels, in_channels, kernel_size=3, padding=1),
             nn.ReLU(inplace=True),
-            nn.Conv3d(in_channels, num_classes, kernel_size=1)
-            # nn.Conv3d(mid_channels, num_classes, kernel_size=3, padding=1) 
+            nn.Conv3d(in_channels, num_classes, kernel_size=1),
+            # nn.Conv3d(mid_channels, num_classes, kernel_size=3, padding=1)
         )
-        
+
     def forward(self, x):
         C = self.in_channels
         flat_voxel_count = x.shape[1] // C
@@ -390,7 +407,9 @@ class LightweightSegAdaptor(nn.Module):
         W = round(W_ref * k)
 
         x = x.view(1, C, D, H, W)
-        x = F.interpolate(x, size=self.target_shape, mode="trilinear", align_corners=False)
+        x = F.interpolate(
+            x, size=self.target_shape, mode="trilinear", align_corners=False
+        )
         x = self.conv_blocks(x)
 
         return x
@@ -399,7 +418,9 @@ class LightweightSegAdaptor(nn.Module):
 def dice_loss(pred, target, smooth=1e-5):
     num_classes = pred.shape[1]
     pred = F.softmax(pred, dim=1)
-    one_hot_target = F.one_hot(target, num_classes=num_classes).permute(0, 4, 1, 2, 3).float()
+    one_hot_target = (
+        F.one_hot(target, num_classes=num_classes).permute(0, 4, 1, 2, 3).float()
+    )
 
     intersection = torch.sum(pred * one_hot_target, dim=(2, 3, 4))
     union = torch.sum(pred + one_hot_target, dim=(2, 3, 4))
@@ -408,7 +429,7 @@ def dice_loss(pred, target, smooth=1e-5):
     return 1 - dice.mean()
 
 
-def train_seg_adaptor3d(decoder, data_loader, device, num_epochs = 3):
+def train_seg_adaptor3d(decoder, data_loader, device, num_epochs=3):
     ce_loss = nn.CrossEntropyLoss()
     optimizer = optim.Adam(decoder.parameters(), lr=1e-3)
     # Train decoder
@@ -417,7 +438,9 @@ def train_seg_adaptor3d(decoder, data_loader, device, num_epochs = 3):
         epoch_loss = 0.0
 
         # batch progress
-        batch_iter = tqdm(data_loader, desc=f"Epoch {epoch+1}/{num_epochs}", leave=False)
+        batch_iter = tqdm(
+            data_loader, desc=f"Epoch {epoch+1}/{num_epochs}", leave=False
+        )
         iteration_count = 0
 
         for batch in batch_iter:
@@ -428,7 +451,7 @@ def train_seg_adaptor3d(decoder, data_loader, device, num_epochs = 3):
 
             optimizer.zero_grad()
             de_output = decoder(patch_emb)
-            ce = ce_loss(de_output, patch_label)  
+            ce = ce_loss(de_output, patch_label)
             dice = dice_loss(de_output, patch_label)
             loss = ce + dice
 
@@ -436,7 +459,11 @@ def train_seg_adaptor3d(decoder, data_loader, device, num_epochs = 3):
             optimizer.step()
 
             epoch_loss += loss.item()
-            batch_iter.set_postfix(loss=f"{loss.item():.4f}", avg=f"{epoch_loss / iteration_count:.4f}")
+            batch_iter.set_postfix(
+                loss=f"{loss.item():.4f}", avg=f"{epoch_loss / iteration_count:.4f}"
+            )
 
-        logging.info(f"Epoch {epoch+1}: Avg total loss = {epoch_loss / iteration_count:.4f}")                               
+        logging.info(
+            f"Epoch {epoch+1}: Avg total loss = {epoch_loss / iteration_count:.4f}"
+        )
     return decoder

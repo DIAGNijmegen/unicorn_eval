@@ -12,23 +12,35 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from unicorn_eval.adaptors.classification import (KNN, LinearProbing,
-                                                  LogisticRegression,
-                                                  MultiLayerPerceptron,
-                                                  WeightedKNN)
-from unicorn_eval.adaptors.detection import (ConvDetector, DensityMap,
-                                             PatchNoduleRegressor)
-from unicorn_eval.adaptors.regression import (KNNRegressor,
-                                              LinearProbingRegressor,
-                                              MultiLayerPerceptronRegressor,
-                                              WeightedKNNRegressor)
-from unicorn_eval.adaptors.segmentation import (ConvSegmentation3D,
-                                                SegmentationUpsampling,
-                                                SegmentationUpsampling3D)
-from unicorn_eval.adaptors.segmentation.aimhi_linear_upsample_conv3d.v1 import \
-    LinearUpsampleConv3D_V1
-from unicorn_eval.adaptors.segmentation.aimhi_linear_upsample_conv3d.v2 import \
-    LinearUpsampleConv3D_V2
+from unicorn_eval.adaptors.classification import (
+    KNN,
+    LinearProbing,
+    LogisticRegression,
+    MultiLayerPerceptron,
+    WeightedKNN,
+)
+from unicorn_eval.adaptors.detection import (
+    ConvDetector,
+    DensityMap,
+    PatchNoduleRegressor,
+)
+from unicorn_eval.adaptors.regression import (
+    KNNRegressor,
+    LinearProbingRegressor,
+    MultiLayerPerceptronRegressor,
+    WeightedKNNRegressor,
+)
+from unicorn_eval.adaptors.segmentation import (
+    ConvSegmentation3D,
+    SegmentationUpsampling,
+    SegmentationUpsampling3D,
+)
+from unicorn_eval.adaptors.segmentation.aimhi_linear_upsample_conv3d.v1 import (
+    LinearUpsampleConv3D_V1,
+)
+from unicorn_eval.adaptors.segmentation.aimhi_linear_upsample_conv3d.v2 import (
+    LinearUpsampleConv3D_V2,
+)
 
 __all__ = [
     "KNN",

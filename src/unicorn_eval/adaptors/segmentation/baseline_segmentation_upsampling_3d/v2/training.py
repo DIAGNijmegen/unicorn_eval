@@ -64,7 +64,11 @@ def train_decoder3d_v2(
         optimizer.zero_grad()
         de_output = decoder(patch_emb)
 
-        one_hot_target = F.one_hot(patch_label.long(), num_classes=de_output.shape[1]).permute(0, 4, 1, 2, 3).float()
+        one_hot_target = (
+            F.one_hot(patch_label.long(), num_classes=de_output.shape[1])
+            .permute(0, 4, 1, 2, 3)
+            .float()
+        )
         loss = loss_fn(de_output, one_hot_target)
 
         loss.backward()
@@ -78,7 +82,9 @@ def train_decoder3d_v2(
         epoch_loss += step_loss
 
         # Update progress bar with current loss and running average
-        progress_bar.set_postfix(loss=f"{step_loss:.5e}", avg=f"{epoch_loss / epoch_iterations:.5e}")
+        progress_bar.set_postfix(
+            loss=f"{step_loss:.5e}", avg=f"{epoch_loss / epoch_iterations:.5e}"
+        )
         progress_bar.update(1)
 
         if iteration_count % 100 == 0:

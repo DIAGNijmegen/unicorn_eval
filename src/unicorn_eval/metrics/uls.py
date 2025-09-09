@@ -95,29 +95,28 @@ def long_and_short_axis_diameters(mask):
 
         # use regionprops to fit ellipse & get axis lengths
         props = regionprops(lab)[0]
-        long_diam  = props.major_axis_length
+        long_diam = props.major_axis_length
         short_diam = props.minor_axis_length
 
         # optional: compute the two endpoints along each axis in pixel coords
         cy, cx = props.centroid
         orientation = props.orientation  # radians CCW from the horizontal
-        dy = np.sin(orientation) * (long_diam/2)
-        dx = np.cos(orientation) * (long_diam/2)
+        dy = np.sin(orientation) * (long_diam / 2)
+        dx = np.cos(orientation) * (long_diam / 2)
         long_pts = [(cx - dx, cy - dy, z), (cx + dx, cy + dy, z)]
 
-        dy2 = np.cos(orientation) * (short_diam/2)
-        dx2 = -np.sin(orientation) * (short_diam/2)
+        dy2 = np.cos(orientation) * (short_diam / 2)
+        dx2 = -np.sin(orientation) * (short_diam / 2)
         short_pts = [(cx - dx2, cy - dy2, z), (cx + dx2, cy + dy2, z)]
 
         # keep the slice with the maximum long axis
         if long_diam > best_long:
-            best_long   = long_diam
-            best_short  = short_diam
-            best_long_pts  = long_pts
+            best_long = long_diam
+            best_short = short_diam
+            best_long_pts = long_pts
             best_short_pts = short_pts
 
     return best_long, best_short, best_long_pts, best_short_pts
-
 
 
 def dice_coefficient(mask1, mask2):

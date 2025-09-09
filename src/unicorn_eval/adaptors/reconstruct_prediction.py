@@ -21,7 +21,7 @@ def _patch_corners_world(start_phys, size_xyz, spacing_xyz, direction_flat):
     # axis extents in world space
     ext_cols = [Dmat[:, i] * (size_xyz[i] * spacing_xyz[i]) for i in range(D)]
     corners = []
-    for bits in product([0,1], repeat=D):
+    for bits in product([0, 1], repeat=D):
         p = np.array(start_phys, dtype=float)
         for i, b in enumerate(bits):
             if b:
@@ -43,23 +43,27 @@ def stitch_patches_fast(patches: list[dict]):
     if not patches:
         raise ValueError("No patches provided.")
 
-    ref_spacing = tuple(map(float, patches[0]['patch_spacing']))
-    ref_direction = tuple(map(float, patches[0]['image_direction']))
+    ref_spacing = tuple(map(float, patches[0]["patch_spacing"]))
+    ref_direction = tuple(map(float, patches[0]["image_direction"]))
     D = len(ref_spacing)
 
     # Validate patches
     for i, p in enumerate(patches):
-        if tuple(map(float, p['patch_spacing'])) != ref_spacing:
-            raise ValueError(f"Patch {i} has different spacing: {p['patch_spacing']} vs {ref_spacing}")
-        if tuple(map(float, p['image_direction'])) != ref_direction:
+        if tuple(map(float, p["patch_spacing"])) != ref_spacing:
+            raise ValueError(
+                f"Patch {i} has different spacing: {p['patch_spacing']} vs {ref_spacing}"
+            )
+        if tuple(map(float, p["image_direction"])) != ref_direction:
             raise ValueError(f"Patch {i} has different direction.")
 
     # Compute bounding box in index space
     all_corners_world = []
     for p in patches:
-        size_xyz = tuple(int(v) for v in p['patch_size'])
-        start_world = tuple(float(v) for v in p['coord'])
-        corners = _patch_corners_world(start_world, size_xyz, ref_spacing, ref_direction)
+        size_xyz = tuple(int(v) for v in p["patch_size"])
+        start_world = tuple(float(v) for v in p["coord"])
+        corners = _patch_corners_world(
+            start_world, size_xyz, ref_spacing, ref_direction
+        )
         all_corners_world.extend(corners)
 
     corners_dircoords = _project_to_dir_coords(all_corners_world, ref_direction)
@@ -98,7 +102,9 @@ def stitch_patches_fast(patches: list[dict]):
         dest_idx = dest_index.TransformPhysicalPointToIndex(src.GetOrigin())
 
         # Compute numpy slices
-        slices = tuple(slice(dest_idx[::-1][d], dest_idx[::-1][d] + arr.shape[d]) for d in range(D))
+        slices = tuple(
+            slice(dest_idx[::-1][d], dest_idx[::-1][d] + arr.shape[d]) for d in range(D)
+        )
 
         sum_arr[slices] += arr
         count_arr[slices] += 1
