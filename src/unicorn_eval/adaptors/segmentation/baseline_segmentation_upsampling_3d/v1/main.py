@@ -76,7 +76,7 @@ class SegmentationUpsampling(PatchLevelTaskAdaptor):
             test_input = process(
                 read_inputs(
                     input_dir=INPUT_DIRECTORY, case_names=[case_name]
-                )
+                )[0]
             )
             case_informations = extract_embeddings(test_input)
             test_data = construct_segmentation_labels(
@@ -221,7 +221,7 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
             test_input = process(
                 read_inputs(
                     input_dir=INPUT_DIRECTORY, case_names=[case_name]
-                )
+                )[0]
             )
             case_informations = extract_embeddings(test_input)
 

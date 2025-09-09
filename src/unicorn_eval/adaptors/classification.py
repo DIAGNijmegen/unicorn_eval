@@ -106,7 +106,7 @@ class KNN(CaseLevelTaskAdaptor):
             test_input = process(
                 read_inputs(
                     input_dir=INPUT_DIRECTORY, case_names=[case_name]
-                )
+                )[0]
             )
             case_informations = extract_embeddings(test_input)
             test_feature = case_informations["embeddings"]
@@ -202,7 +202,7 @@ class WeightedKNN(CaseLevelTaskAdaptor):
             test_input = process(
                 read_inputs(
                     input_dir=INPUT_DIRECTORY, case_names=[case_name]
-                )
+                )[0]
             )
             case_informations = extract_embeddings(test_input)
             test_feature = case_informations["embeddings"]
@@ -288,7 +288,7 @@ class LogisticRegression(CaseLevelTaskAdaptor):
             test_input = process(
                 read_inputs(
                     input_dir=INPUT_DIRECTORY, case_names=[case_name]
-                )
+                )[0]
             )
             case_informations = extract_embeddings(test_input)
             test_feature = case_informations["embeddings"]
@@ -411,7 +411,7 @@ class LinearProbing(CaseLevelTaskAdaptor):
                 test_input = process(
                     read_inputs(
                         input_dir=INPUT_DIRECTORY, case_names=[case_name]
-                )
+                )[0]
             )
             case_informations = extract_embeddings(test_input)
             test_feature = case_informations["embeddings"]
@@ -421,10 +421,10 @@ class LinearProbing(CaseLevelTaskAdaptor):
 
             logits = self.model(test_features)
             if self.return_probabilities:
-                prediction = torch.softmax(logits, dim=1)
+                prediction = torch.softmax(logits, dim=0)
                 predictions.append(prediction.cpu().numpy())
             else:
-                _, prediction = torch.max(logits, 1)
+                _, prediction = torch.max(logits, 0)
                 predictions.append(prediction.cpu().numpy())
 
         return np.array(predictions)
@@ -553,7 +553,7 @@ class MultiLayerPerceptron(CaseLevelTaskAdaptor):
                 test_input = process(
                     read_inputs(
                         input_dir=INPUT_DIRECTORY, case_names=[case_name]
-                    )
+                    )[0]
                 )
                 case_informations = extract_embeddings(test_input)
                 test_feature = case_informations["embeddings"]
@@ -562,10 +562,10 @@ class MultiLayerPerceptron(CaseLevelTaskAdaptor):
                 ).to(self.device)
                 logits = self.model(test_features)
                 if self.return_probabilities:
-                    prediction = torch.softmax(logits, dim=1)
+                    prediction = torch.softmax(logits, dim=0)
                     predictions.append(prediction.cpu().numpy())
                 else:
-                    _, prediction = torch.max(logits, 1)
+                    _, prediction = torch.max(logits, 0)
                     predictions.append(prediction.cpu().numpy())
 
         return np.array(predictions)

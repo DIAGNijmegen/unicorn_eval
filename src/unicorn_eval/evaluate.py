@@ -37,6 +37,7 @@ from unicorn_eval.io import (
 from unicorn_eval.utils import (
     get_adaptor,
     evaluate_predictions,
+    extract_labels,
     extract_embeddings_and_labels,
     normalize_metric,
 )
@@ -353,37 +354,34 @@ def process_task_in_subprocess(
 ):
     logging.info(f"Processing task in subprocess: {task_name}")
 
-    task_cases = mapping[mapping.task_name == task_name & mapping.split == "case"]["case_id"].tolist()
-    task_shots = mapping[mapping.task_name == task_name & mapping.split == "shot"]["case_id"].tolist()
+    modality = mapping[(mapping.task_name == task_name)]["modality"].values[0]
 
-    # only load few shots for the given task
-    shot_inputs = read_inputs(
-        input_dir=INPUT_DIRECTORY, case_names=task_shots
-    )
+    if modality == "vision":
 
-    max_workers = get_max_workers()
-    pool = multiprocessing.Pool(processes=max_workers)
-    shots = pool.map(process, shot_inputs)
-    pool.close()
-    pool.join()
+        task_cases = mapping[(mapping.task_name == task_name) & (mapping.split == "case")]["case_id"].tolist()
+        task_shots = mapping[(mapping.task_name == task_name) & (mapping.split == "shot")]["case_id"].tolist()
 
-    shot_informations = extract_embeddings_and_labels(shots, task_name)
-    del shot_inputs
-    del shots
-    gc.collect()
+        # only load few shots for the given task
+        shot_inputs = read_inputs(
+            input_dir=INPUT_DIRECTORY, case_names=task_shots
+        )
 
-    if shot_informations is None:
-        logging.info(f"No shots found for task {task_name}, skipping.")
-        logging.info("=+=" * 10)
+        max_workers = get_max_workers()
+        pool = multiprocessing.Pool(processes=max_workers)
+        shots = pool.map(process, shot_inputs)
+        pool.close()
+        pool.join()
 
-    else:
+        shot_informations = extract_embeddings_and_labels(shots, task_name)
+        del shot_inputs
+        del shots
+        gc.collect()
 
-        modality = shot_informations["modality"]
-        shot_labels = shot_informations["case_labels"]
-        shot_ids = shot_informations["case_ids"]
-        task_type = shot_informations["task_type"]
+        if shot_informations is None:
+            logging.info(f"No shots found for task {task_name}, skipping.")
+            logging.info("=+=" * 10)
 
-        if modality == "vision":
+        else:
 
             # ensure we have an adaptor for this task
             if task_name not in adaptors:
@@ -396,20 +394,22 @@ def process_task_in_subprocess(
             global_patch_spacing = shot_informations["global_patch_spacing"]
             feature_grid_resolution = shot_informations["feature_grid_resolution"]
 
-            shot_embeddings = shot_informations["shot_embeddings"]
-            shot_labels = shot_informations["shot_labels"]
-            shot_extra_labels = shot_informations["shot_extra_labels"]
-            shot_ids = shot_informations["shot_ids"]
-            shot_image_sizes = shot_informations["shot_image_sizes"]
-            shot_image_spacings = shot_informations["shot_image_spacings"]
-            shot_image_origins = shot_informations["shot_image_origins"]
-            shot_image_directions = shot_informations["shot_image_directions"]
-            shot_patch_sizes = shot_informations["shot_patch_sizes"]
-            shot_patch_spacings = shot_informations["shot_patch_spacings"]
-            shot_label_spacings = shot_informations["shot_label_spacings"]
-            shot_label_origins = shot_informations["shot_label_origins"]
-            shot_label_directions = shot_informations["shot_label_directions"]
+            shot_embeddings = shot_informations["embeddings"]
+            shot_coordinates = shot_informations["coordinates"]
+            shot_labels = shot_informations["labels"]
+            shot_extra_labels = shot_informations["extra_labels"]
+            shot_ids = shot_informations["ids"]
+            shot_image_sizes = shot_informations["image_sizes"]
+            shot_image_spacings = shot_informations["image_spacings"]
+            shot_image_origins = shot_informations["image_origins"]
+            shot_image_directions = shot_informations["image_directions"]
+            shot_patch_sizes = shot_informations["patch_sizes"]
+            shot_patch_spacings = shot_informations["patch_spacings"]
+            shot_label_spacings = shot_informations["label_spacings"]
+            shot_label_origins = shot_informations["label_origins"]
+            shot_label_directions = shot_informations["label_directions"]
 
+            task_type = shot_informations["task_type"]
             if task_type in ["classification", "regression"]:
                 save_predictions = True
                 if len(shot_embeddings.shape) > 2:
@@ -421,6 +421,9 @@ def process_task_in_subprocess(
                 adaptor_name=adaptor_name,
                 task_type=task_type,
                 num_shots=num_shots,
+                feature_grid_resolution=feature_grid_resolution,
+                global_patch_size=global_patch_size,
+                global_patch_spacing=global_patch_spacing,
                 return_probabilities=return_probabilities,
             )
 
@@ -428,9 +431,7 @@ def process_task_in_subprocess(
                 shot_features=shot_embeddings,
                 shot_labels=shot_labels,
                 shot_ids=shot_ids,
-                shot_coordinates=task_results["shot_coordinates"],
-                global_patch_size=global_patch_size,
-                global_patch_spacing=global_patch_spacing,
+                shot_coordinates=shot_coordinates,
                 shot_patch_sizes=shot_patch_sizes,
                 shot_patch_spacings=shot_patch_spacings,
                 shot_extra_labels=shot_extra_labels,
@@ -441,7 +442,6 @@ def process_task_in_subprocess(
                 shot_label_spacing=shot_label_spacings,
                 shot_label_origins=shot_label_origins,
                 shot_label_directions=shot_label_directions,
-                feature_grid_resolution=feature_grid_resolution,
             )
             predictions = adaptor.predict(task_cases)
 
@@ -459,35 +459,58 @@ def process_task_in_subprocess(
                 shot_label_spacings,
                 shot_label_origins,
                 shot_label_directions,
+                shot_informations,
             )
             gc.collect()
 
-        elif modality == "vision-language":
-            predictions = [pred["text"] for pred in task_results["prediction"]]
-            case_labels = [
-                label["text"] for case in task_results["case_labels"] for label in case
-            ]
-            case_extra_labels = None
+            case_inputs = read_inputs(
+                input_dir=INPUT_DIRECTORY, case_names=task_shots
+            )
+            pool = multiprocessing.Pool(processes=max_workers)
+            cases = pool.map(process, case_inputs)
+            pool.close()
+            pool.join()
 
-        else:
-            raise ValueError(f"Unsupported modality: {modality}")
+            case_informations = extract_labels(cases, task_name)
+            case_ids, case_labels, case_extra_labels = case_informations["ids"], case_informations["labels"], case_informations["extra_labels"]
 
-        metrics = evaluate_predictions(
-            task_name=task_name,
-            case_ids=case_ids,
-            test_predictions=predictions,
-            test_labels=case_labels,
-            test_extra_labels=case_extra_labels,
-            save_predictions=save_predictions,
+    elif modality == "vision-language":
+
+        case_inputs = read_inputs(
+            input_dir=INPUT_DIRECTORY, case_names=task_shots
         )
+        pool = multiprocessing.Pool(processes=max_workers)
+        cases = pool.map(process, case_inputs)
+        pool.close()
+        pool.join()
 
-        # save metrics
-        write_json_file(location=metrics_path, content=metrics)
+        case_informations = extract_embeddings_and_labels(cases, task_name)
 
-        del task_results, predictions, case_labels, case_ids
-        if "case_extra_labels" in locals():
-            del case_extra_labels
-        gc.collect()
+        predictions = [pred["text"] for pred in case_informations["prediction"]]
+        case_labels = [
+            label["text"] for case in case_informations["case_labels"] for label in case
+        ]
+        case_extra_labels = None
+
+    else:
+        raise ValueError(f"Unsupported modality: {modality}")
+
+    metrics = evaluate_predictions(
+        task_name=task_name,
+        case_ids=case_ids,
+        test_predictions=predictions,
+        test_labels=case_labels,
+        test_extra_labels=case_extra_labels,
+        save_predictions=save_predictions,
+    )
+
+    # save metrics
+    write_json_file(location=metrics_path, content=metrics)
+
+    del case_informations, predictions, case_labels, case_ids
+    if "case_extra_labels" in locals():
+        del case_extra_labels
+    gc.collect()
 
 
 def main():

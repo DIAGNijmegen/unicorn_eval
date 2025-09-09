@@ -104,7 +104,7 @@ class KNNRegressor(CaseLevelTaskAdaptor):
             test_input = process(
                 read_inputs(
                     input_dir=INPUT_DIRECTORY, case_names=[case_name]
-                )
+                )[0]
             )
             case_informations = extract_embeddings(test_input)
             test_feature = case_informations["embeddings"]
@@ -192,7 +192,7 @@ class WeightedKNNRegressor(CaseLevelTaskAdaptor):
             test_input = process(
                 read_inputs(
                     input_dir=INPUT_DIRECTORY, case_names=[case_name]
-                )
+                )[0]
             )
             case_informations = extract_embeddings(test_input)
             test_feature = case_informations["embeddings"]
@@ -376,7 +376,7 @@ class LinearProbingRegressor(CaseLevelTaskAdaptor):
                 test_input = process(
                     read_inputs(
                         input_dir=INPUT_DIRECTORY, case_names=[case_name]
-                    )
+                    )[0]
                 )
                 case_informations = extract_embeddings(test_input)
                 test_feature = case_informations["embeddings"]
@@ -558,7 +558,7 @@ class MultiLayerPerceptronRegressor(CaseLevelTaskAdaptor):
                 test_input = process(
                     read_inputs(
                         input_dir=INPUT_DIRECTORY, case_names=[case_name]
-                    )
+                    )[0]
                 )
                 case_informations = extract_embeddings(test_input)
                 test_feature = case_informations["embeddings"]

@@ -14,7 +14,7 @@
 
 import logging
 from functools import partial
-from typing import Any
+from collections import defaultdict
 
 import numpy as np
 from sklearn.metrics import cohen_kappa_score, roc_auc_score
@@ -453,19 +453,15 @@ def evaluate_predictions(
 
 def process_image_representation(data):
     # stack embeddings
-    data["shot_embeddings"] = np.vstack(data["shot_embeddings"])
-    data["case_embeddings"] = np.vstack(data["case_embeddings"])
+    if "embeddings" in data:
+        data["embeddings"] = np.vstack(data["embeddings"])
     # convert labels to numpy arrays
-    data["shot_labels"] = np.array(data["shot_labels"])
-    data["case_labels"] = np.array(data["case_labels"])
-    if data["shot_extra_labels"] and data["shot_extra_labels"][0] is not None:
-        data["shot_extra_labels"] = np.concatenate(data["shot_extra_labels"], axis=0)
+    if "labels" in data:
+        data["labels"] = np.array(data["labels"])
+    if data["extra_labels"] and data["extra_labels"][0] is not None:
+        data["extra_labels"] = np.concatenate(data["extra_labels"], axis=0)
     else:
-        data["shot_extra_labels"] = None
-    if data["case_extra_labels"] and data["case_extra_labels"][0] is not None:
-        data["case_extra_labels"] = np.concatenate(data["case_extra_labels"], axis=0)
-    else:
-        data["case_extra_labels"] = None
+        data["extra_labels"] = None
     return data
 
 
@@ -495,15 +491,14 @@ def process_detection_pathology(
             pts_all.append(case_pts)
         return pts_all
 
-    data["shot_labels"] = extract_points(data["shot_labels"])
-    data["case_labels"] = extract_points(data["case_labels"])
+    data["labels"] = extract_points(data["labels"])
 
-    extra_list = data.get("case_extra_labels")
+    extra_list = data.get("extra_labels")
     if not extra_list or extra_list[0] is None:
-        data["case_extra_labels"] = None
+        data["extra_labels"] = None
         return data
 
-    data["case_extra_labels"] = np.concatenate(extra_list, axis=0)
+    data["extra_labels"] = np.concatenate(extra_list, axis=0)
 
     return data
 
@@ -533,12 +528,11 @@ def process_detection_radiology(data, task_name: str | None = None):
             pts_all.append(case_pts)
         return pts_all
 
-    data["shot_labels"] = extract_points(data["shot_labels"])
-    data["case_labels"] = extract_points(data["case_labels"])
+    data["labels"] = extract_points(data["labels"])
 
-    extra_list = data.get("case_extra_labels")
+    extra_list = data.get("extra_labels")
     if not extra_list or extra_list[0] is None:
-        data["case_extra_labels"] = None
+        data["extra_labels"] = None
         return data
 
     if task_name == "Task07_detecting_lung_nodules_in_thoracic_ct":
@@ -586,10 +580,47 @@ def process_detection_radiology(data, task_name: str | None = None):
             else:
                 raise ValueError(f"Unsupported extra_label type: {type(case_extra)}")
 
-        data["case_extra_labels"] = diameter_records
+        data["extra_labels"] = diameter_records
 
     else:
-        data["case_extra_labels"] = np.concatenate(extra_list, axis=0)
+        data["extra_labels"] = np.concatenate(extra_list, axis=0)
+
+    return data
+
+
+def extract_labels(processed_results, task_name):
+    """Extract labels for a given task."""
+    data = defaultdict(list)
+    valid_results_found = False
+
+    for result in processed_results:
+
+        task_type = result["task_type"]
+        domain = result["domain"]
+
+        # only process results for this specific task
+        if result["task_name"] != task_name:
+            continue
+
+        valid_results_found = True
+
+        data["labels"].append(result["label"])
+        data["extra_labels"].append(result.get("extra_labels"))
+        data["ids"].append(result["case_id"])
+
+    if not valid_results_found:
+        return None
+
+    if task_type in ["classification", "regression"]:
+        data = process_image_representation(data)
+    elif task_type == "detection":
+        if domain == "pathology":
+            data = process_detection_pathology(data)
+        elif domain in ["CT", "MR"]:
+            if task_name != "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams":
+                data = process_detection_radiology(data, task_name)
+        else:
+            raise ValueError(f"Unknown task domain: {domain}")
 
     return data
 
@@ -604,36 +635,21 @@ def extract_embeddings_and_labels(processed_results, task_name):
         "global_patch_spacing": None,
         "feature_grid_resolution": None,
         "prediction": [],
-        "shot_embeddings": [],
-        "shot_coordinates": [],
-        "shot_image_spacings": {},
-        "shot_image_origins": {},
-        "shot_image_directions": {},
-        "shot_image_sizes": {},
-        "shot_patch_sizes": {},
-        "shot_patch_spacings": {},
-        "shot_label_sizes": {},
-        "shot_label_spacings": {},
-        "shot_label_origins": {},
-        "shot_label_directions": {},
-        "shot_labels": [],
-        "shot_extra_labels": [],
-        "shot_ids": [],
-        "case_embeddings": [],
-        "cases_coordinates": [],
-        "case_labels": [],
-        "case_extra_labels": [],
-        "case_ids": [],
-        "cases_image_sizes": {},
-        "cases_image_spacings": {},
-        "cases_image_origins": {},
-        "cases_image_directions": {},
-        "cases_patch_sizes": {},
-        "cases_patch_spacings": {},
-        "cases_label_sizes": {},
-        "cases_label_spacings": {},
-        "cases_label_origins": {},
-        "cases_label_directions": {},
+        "embeddings": [],
+        "coordinates": [],
+        "image_spacings": {},
+        "image_origins": {},
+        "image_directions": {},
+        "image_sizes": {},
+        "patch_sizes": {},
+        "patch_spacings": {},
+        "label_sizes": {},
+        "label_spacings": {},
+        "label_origins": {},
+        "label_directions": {},
+        "labels": [],
+        "extra_labels": [],
+        "ids": [],
     }
 
     valid_results_found = False
@@ -656,50 +672,30 @@ def extract_embeddings_and_labels(processed_results, task_name):
             task_data["domain"] = result["domain"]
             task_data["feature_grid_resolution"] = result["feature_grid_resolution"]
 
-            # Check if all cases have the same patch size and spacing
-            all_patch_sizes = [result["patch_size"] for result in processed_results]
-            all_patch_spacings = [result["patch_spacing"] for result in processed_results]
+        # Check if all cases have the same patch size and spacing
+        all_patch_sizes = [result["patch_size"] for result in processed_results]
+        all_patch_spacings = [result["patch_spacing"] for result in processed_results]
 
-            # Set global values if all are the same, otherwise None
-            task_data["global_patch_size"] = all_patch_sizes[0] if all_patch_sizes and all(ps == all_patch_sizes[0] for ps in all_patch_sizes) else None
-            task_data["global_patch_spacing"] = all_patch_spacings[0] if all_patch_spacings and all(ps == all_patch_spacings[0] for ps in all_patch_spacings) else None
+        # Set global values if all are the same, otherwise None
+        task_data["global_patch_size"] = all_patch_sizes[0] if all_patch_sizes and all(ps == all_patch_sizes[0] for ps in all_patch_sizes) else None
+        task_data["global_patch_spacing"] = all_patch_spacings[0] if all_patch_spacings and all(ps == all_patch_spacings[0] for ps in all_patch_spacings) else None
 
-
-        if result["split"] == "shot":
-            task_data["shot_embeddings"].append(result["embeddings"])
-            task_data["shot_labels"].append(result["label"])
-            task_data["shot_extra_labels"].append(result.get("extra_labels"))
-            task_data["shot_ids"].append(result["case_id"])
-            task_data["shot_coordinates"].append(result["coordinates"])
-            shot_id = result["case_id"]
-            task_data["shot_image_sizes"][shot_id] = result["image_size"]
-            task_data["shot_image_spacings"][shot_id] = result["image_spacing"]
-            task_data["shot_image_origins"][shot_id] = result["image_origin"]
-            task_data["shot_image_directions"][shot_id] = result["image_direction"]
-            task_data["shot_patch_spacings"][shot_id] = result["patch_spacing"]
-            task_data["shot_patch_sizes"][shot_id] = result["patch_size"]
-            task_data["shot_label_spacings"][shot_id] = result["label_spacing"]
-            task_data["shot_label_sizes"][shot_id] = result["label_size"]
-            task_data["shot_label_origins"][shot_id] = result["label_origin"]
-            task_data["shot_label_directions"][shot_id] = result["label_direction"]
-        elif result["split"] == "case":
-            task_data["case_embeddings"].append(result["embeddings"])
-            task_data["case_labels"].append(result["label"])
-            task_data["case_extra_labels"].append(result.get("extra_labels"))
-            task_data["prediction"].append(result.get("prediction"))
-            task_data["case_ids"].append(result["case_id"])
-            task_data["cases_coordinates"].append(result["coordinates"])
-            case_id = result["case_id"]
-            task_data["cases_image_spacings"][case_id] = result["image_spacing"]
-            task_data["cases_image_sizes"][case_id] = result["image_size"]
-            task_data["cases_image_origins"][case_id] = result["image_origin"]
-            task_data["cases_image_directions"][case_id] = result["image_direction"]
-            task_data["cases_patch_sizes"][case_id] = result["patch_size"]
-            task_data["cases_patch_spacings"][case_id] = result["patch_spacing"]
-            task_data["cases_label_spacings"][case_id] = result["label_spacing"]
-            task_data["cases_label_sizes"][case_id] = result["label_size"]
-            task_data["cases_label_origins"][case_id] = result["label_origin"]
-            task_data["cases_label_directions"][case_id] = result["label_direction"]
+        task_data["embeddings"].append(result["embeddings"])
+        task_data["labels"].append(result["label"])
+        task_data["extra_labels"].append(result.get("extra_labels"))
+        task_data["ids"].append(result["case_id"])
+        task_data["coordinates"].append(result["coordinates"])
+        case_id = result["case_id"]
+        task_data["image_sizes"][case_id] = result["image_size"]
+        task_data["image_spacings"][case_id] = result["image_spacing"]
+        task_data["image_origins"][case_id] = result["image_origin"]
+        task_data["image_directions"][case_id] = result["image_direction"]
+        task_data["patch_spacings"][case_id] = result["patch_spacing"]
+        task_data["patch_sizes"][case_id] = result["patch_size"]
+        task_data["label_spacings"][case_id] = result["label_spacing"]
+        task_data["label_sizes"][case_id] = result["label_size"]
+        task_data["label_origins"][case_id] = result["label_origin"]
+        task_data["label_directions"][case_id] = result["label_direction"]
 
     if not valid_results_found:
         return None
@@ -720,39 +716,6 @@ def extract_embeddings_and_labels(processed_results, task_name):
             raise ValueError(f"Unknown task domain: {task_domain}")
 
     return task_data
-
-
-def extract_data(patch_neural_representation):
-    # Extract metadata
-    metadata: dict[str, Any] = patch_neural_representation["meta"]
-    spacing = metadata["patch-spacing"]
-    patch_size = metadata["patch-size"]
-    patch_spacing = metadata["patch-spacing"]
-    feature_grid_resolution = metadata.get("feature-grid-resolution", [1]*len(patch_size))
-    image_size = metadata["image-size"]
-    image_spacing = metadata["image-spacing"]
-    image_origin = metadata["image-origin"]
-    image_direction = metadata["image-direction"]
-
-    # Extract patches
-    patches = patch_neural_representation["patches"]
-
-    # Extract features and coordinates
-    features = np.array([p["features"] for p in patches]).astype(np.float32)
-    coordinates = np.array([p["coordinates"] for p in patches])
-
-    return (
-        features,
-        coordinates,
-        spacing,
-        patch_size,
-        patch_spacing,
-        feature_grid_resolution,
-        image_size,
-        image_spacing,
-        image_origin,
-        image_direction,
-    )
 
 
 def normalize_metric(task_name, metric_value):

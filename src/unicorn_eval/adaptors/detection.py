@@ -305,13 +305,13 @@ class DensityMap(PatchLevelTaskAdaptor):
         self.learning_rate = learning_rate
         self.decoder = None
 
-    def fit(self, shot_features, shot_coordinates, shot_labels, shot_names, **kwargs):
+    def fit(self, shot_features, shot_coordinates, shot_labels, shot_ids, **kwargs):
         input_dim = shot_features[0].shape[1]
 
         shot_data = construct_detection_labels(
             shot_coordinates,
             shot_features,
-            shot_names,
+            shot_ids,
             labels=shot_labels,
             patch_size=self.patch_size,
             heatmap_size=self.heatmap_size,
@@ -329,7 +329,6 @@ class DensityMap(PatchLevelTaskAdaptor):
         self.decoder = train_decoder(
             self.decoder,
             dataloader,
-            heatmap_size=self.heatmap_size,
             num_epochs=self.num_epochs,
             lr=self.learning_rate,
         )
@@ -340,13 +339,13 @@ class DensityMap(PatchLevelTaskAdaptor):
             test_input = process(
                 read_inputs(
                     input_dir=INPUT_DIRECTORY, case_names=[case_name]
-                )
+                )[0]
             )
             case_informations = extract_embeddings(test_input)
             test_data = construct_detection_labels(
                 [case_informations["coordinates"]],
                 [case_informations["embeddings"]],
-                [case_informations["names"]],
+                [case_informations["case_id"]],
                 patch_size=self.patch_size,
                 heatmap_size=self.heatmap_size,
                 is_train=False,
@@ -437,13 +436,13 @@ class ConvDetector(DensityMap):
             learning_rate,
         )
 
-    def fit(self, shot_features, shot_coordinates, shot_labels, shot_names, **kwargs):
+    def fit(self, shot_features, shot_coordinates, shot_labels, shot_ids, **kwargs):
         input_dim = shot_features[0].shape[1]
 
         shot_data = construct_detection_labels(
             shot_coordinates,
             shot_features,
-            shot_names,
+            shot_ids,
             labels=shot_labels,
             patch_size=self.patch_size,
             heatmap_size=self.heatmap_size,

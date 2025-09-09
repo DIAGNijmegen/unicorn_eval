@@ -277,8 +277,8 @@ def process(job):
 
     case_name = Path(image_name).stem
 
-    # remove suffixes "_adc", "_t2w", and "_hbv" from the case name if present
-    for suffix in ["_adc", "_t2w", "_hbv"]:
+    # remove suffixes "_adc", "_t2w", "_hbv" and "_tissue" from the case name if present
+    for suffix in ["_adc", "_t2w", "_hbv", "_tissue"]:
         if case_name.endswith(suffix):
             case_name = case_name[: -len(suffix)]
 
@@ -315,9 +315,6 @@ def process(job):
             embeddings = np.concatenate(features)
 
         elif slug_embedding == "patch-neural-representation":
-            # TODO: better handle the case when there are multiple encoded inputs for a case
-            # right now we concatenate the features
-            # and use the first coordinates, spacing, patch_size, image_size, and image_spacing
             first = True
             for neural_representation in neural_representations:
                 (
@@ -456,7 +453,7 @@ def extract_embeddings(result):
     }
 
     data["embeddings"] = result["embeddings"]
-    data["name"] = result["case_id"]
+    data["case_id"] = result["case_id"]
     data["coordinates"] = result["coordinates"]
     data["image_size"] = result["image_size"]
     data["image_spacing"] = result["image_spacing"]
@@ -466,3 +463,36 @@ def extract_embeddings(result):
     data["patch_size"] = result["patch_size"]
 
     return data
+
+
+def extract_data(patch_neural_representation):
+    # Extract metadata
+    metadata: dict[str] = patch_neural_representation["meta"]
+    spacing = metadata["patch-spacing"]
+    patch_size = metadata["patch-size"]
+    patch_spacing = metadata["patch-spacing"]
+    feature_grid_resolution = metadata.get("feature-grid-resolution", [1]*len(patch_size))
+    image_size = metadata["image-size"]
+    image_spacing = metadata["image-spacing"]
+    image_origin = metadata["image-origin"]
+    image_direction = metadata["image-direction"]
+
+    # Extract patches
+    patches = patch_neural_representation["patches"]
+
+    # Extract features and coordinates
+    features = np.array([p["features"] for p in patches]).astype(np.float32)
+    coordinates = np.array([p["coordinates"] for p in patches])
+
+    return (
+        features,
+        coordinates,
+        spacing,
+        patch_size,
+        patch_spacing,
+        feature_grid_resolution,
+        image_size,
+        image_spacing,
+        image_origin,
+        image_direction,
+    )
