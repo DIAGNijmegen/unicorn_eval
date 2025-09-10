@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import math
 from collections import defaultdict
+from pathlib import Path
 from typing import Type
 
 import numpy as np
@@ -19,8 +20,9 @@ from unicorn_eval.adaptors.segmentation.aimhi_linear_upsample_conv3d.v1.main imp
 from unicorn_eval.adaptors.segmentation.baseline_segmentation_upsampling_3d.v1 import \
     SegmentationUpsampling3D
 from unicorn_eval.adaptors.segmentation.data_handling import (
-    construct_data_with_labels, load_patch_data)
+    construct_data_with_labels, extract_patch_labels, load_patch_data)
 from unicorn_eval.adaptors.segmentation.inference import create_grid
+from unicorn_eval.io import INPUT_DIRECTORY, process, read_inputs
 
 
 class UpsampleConvSegAdaptor(nn.Module):
@@ -131,7 +133,7 @@ class LinearUpsampleConv3D_V2(SegmentationUpsampling3D):
         shot_features : Patch-level feature embeddings of few-shot labeled volumes.
         shot_labels : Full-resolution segmentation labels (used to supervise the decoder).
         shot_coordinates : Patch coordinates corresponding to shot_features.
-        shot_names : Case identifiers for few-shot examples.
+        shot_ids : Case identifiers for few-shot examples.
         test_features : Patch-level feature embeddings for testing.
         test_coordinates : Patch coordinates corresponding to test_features.
         test_names : Case identifiers for testing examples.
@@ -151,22 +153,62 @@ class LinearUpsampleConv3D_V2(SegmentationUpsampling3D):
         self.is_task06 = False
         self.decoder_cls = decoder_cls
 
-    def fit(self):
+    def fit(
+        self,
+        *,
+        shot_features,
+        shot_labels,
+        shot_coordinates,
+        shot_ids,
+        shot_patch_sizes,
+        shot_patch_spacings,
+        shot_image_sizes,
+        shot_image_origins,
+        shot_image_spacings,
+        shot_image_directions,
+        shot_label_spacings,
+        shot_label_origins,
+        shot_label_directions,
+        **kwargs,
+    ):
+        patch_labels = []
+        for idx, label in tqdm(enumerate(shot_labels), desc="Extracting patch labels"):
+            case_patch_labels = extract_patch_labels(
+                label=label,
+                label_spacing=shot_label_spacings[shot_ids[idx]],
+                label_origin=shot_label_origins[shot_ids[idx]],
+                label_direction=shot_label_directions[shot_ids[idx]],
+                image_size=shot_image_sizes[shot_ids[idx]],
+                image_origin=shot_image_origins[shot_ids[idx]],
+                image_spacing=shot_image_spacings[shot_ids[idx]],
+                image_direction=shot_image_directions[shot_ids[idx]],
+                start_coordinates=shot_coordinates[idx],
+                patch_size=self.global_patch_size,
+                patch_spacing=self.global_patch_spacing,
+            )
+            patch_labels.append(case_patch_labels)
+
+        patch_labels = np.array(patch_labels, dtype=object)
+
         # build training data and loader
         train_data = construct_data_with_labels(
-            coordinates=self.shot_coordinates,
-            embeddings=self.shot_features,
-            case_ids=self.shot_names,
-            patch_sizes=self.shot_patch_sizes,
-            patch_spacings=self.shot_patch_spacings,
-            labels=self.shot_labels,
+            coordinates=shot_coordinates,
+            embeddings=shot_features,
+            case_ids=shot_ids,
+            patch_sizes=shot_patch_sizes,
+            patch_spacings=shot_patch_spacings,
+            labels=patch_labels,
+            image_sizes=shot_image_sizes,
+            image_origins=shot_image_origins,
+            image_spacings=shot_image_spacings,
+            image_directions=shot_image_directions,
         )
 
         train_loader = load_patch_data(
             train_data, batch_size=1, balance_bg=self.balance_bg
         )
 
-        max_class = max_class_label_from_labels(self.shot_labels)
+        max_class = max_class_label_from_labels(patch_labels)
         if max_class >= 100:
             self.is_task11 = True
             num_classes = 4
@@ -209,39 +251,61 @@ class LinearUpsampleConv3D_V2(SegmentationUpsampling3D):
             else:
                 raise
 
-    def predict(self) -> list:
-        # build test data and loader
-        test_data = construct_data_with_labels(
-            coordinates=self.test_coordinates,
-            embeddings=self.test_features,
-            case_ids=self.test_cases,
-            patch_sizes=self.test_patch_sizes,
-            patch_spacings=self.test_patch_spacings,
-            image_sizes=self.test_image_sizes,
-            image_origins=self.test_image_origins,
-            image_spacings=self.test_image_spacings,
-            image_directions=self.test_image_directions,
-        )
+    def predict(self, test_case_ids) -> list:
+        predictions = []
+        for case_id in test_case_ids:
+            logging.info(f"Running inference for case {case_id}")
+            test_input = process(
+                read_inputs(input_dir=INPUT_DIRECTORY, case_names=[case_id])[0]
+            )
 
-        # wrong patch spacing
-        for data in test_data:
-            data["patch_spacing"] = data["image_spacing"]
+            # build test data and loader
+            test_data = construct_data_with_labels(
+                coordinates=[test_input["coordinates"]],
+                embeddings=[test_input["embeddings"]],
+                case_ids=[case_id],
+                patch_sizes={case_id: test_input["patch_size"]},
+                patch_spacings={case_id: test_input["patch_spacing"]},
+                image_sizes={case_id: test_input["image_size"]},
+                image_origins={case_id: test_input["image_origin"]},
+                image_spacings={case_id: test_input["image_spacing"]},
+                image_directions={case_id: test_input["image_direction"]},
+            )
 
-        test_loader = load_patch_data(test_data, batch_size=1)
+            # wrong patch spacing
+            for data in test_data:
+                data["patch_spacing"] = data["image_spacing"]
 
-        # run inference using the trained decoder
-        return inference3d_softmax(
-            decoder=self.decoder,
-            data_loader=test_loader,
-            device=self.device,
-            return_binary=self.return_binary,
-            test_cases=self.test_cases,
-            test_label_sizes=self.test_label_sizes,
-            test_label_spacing=self.test_label_spacing,
-            test_label_origins=self.test_label_origins,
-            test_label_directions=self.test_label_directions,
-            is_task11=self.is_task11,
-        )
+            test_loader = load_patch_data(test_data, batch_size=1)
+
+            # run inference using the trained decoder
+            prediction = inference3d_softmax(
+                decoder=self.decoder,
+                data_loader=test_loader,
+                device=self.device,
+                return_binary=self.return_binary,
+                test_cases=[case_id],
+                test_label_sizes={case_id: test_input["label_size"]},
+                test_label_spacing={case_id: test_input["label_spacing"]},
+                test_label_origins={case_id: test_input["label_origin"]},
+                test_label_directions={case_id: test_input["label_direction"]},
+                is_task11=self.is_task11,
+            )
+            assert len(prediction) == 1
+            prediction = prediction[0]
+
+            workdir = (
+                Path("/opt/app/predictions")
+                if Path("/opt/app/predictions").exists()
+                else Path("unicorn/workdir")
+            )
+            path = workdir / f"vision/{case_id}_pred.npy"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            np.save(path, prediction)
+
+            predictions.append(path)
+
+        return predictions
 
 
 def expand_instance_labels(y: np.ndarray) -> np.ndarray:
