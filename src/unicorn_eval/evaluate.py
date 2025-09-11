@@ -360,6 +360,13 @@ def process_task_in_subprocess(
 
     if modality == "vision":
 
+        # ensure we have an adaptor for this task
+        if task_name not in adaptors:
+            raise Exception(f"No adaptor found for task {task_name}")
+
+        adaptor_name = adaptors[task_name]
+        return_probabilities = REQUIRES_PROBABILITIES_DICT[task_name]
+
         num_run = 5
         if adaptor_name in DETERMINISTIC_ADAPTORS:
             num_run = 1
@@ -394,12 +401,6 @@ def process_task_in_subprocess(
                 return 0
 
             else:
-                # ensure we have an adaptor for this task
-                if task_name not in adaptors:
-                    raise Exception(f"No adaptor found for task {task_name}")
-
-                adaptor_name = adaptors[task_name]
-                return_probabilities = REQUIRES_PROBABILITIES_DICT[task_name]
 
                 global_patch_size = shot_informations["global_patch_size"]
                 global_patch_spacing = shot_informations["global_patch_spacing"]
