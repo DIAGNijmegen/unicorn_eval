@@ -360,73 +360,73 @@ def process_task_in_subprocess(
 
     if modality == "vision":
 
-        # only load few shots for the given task
-        task_shots = mapping[(mapping.task_name == task_name) & (mapping.split == "shot")]["case_id"].tolist()
-        shot_inputs = read_inputs(
-            input_dir=INPUT_DIRECTORY, case_names=task_shots
-        )
+        num_run = 5
+        if adaptor_name in DETERMINISTIC_ADAPTORS:
+            num_run = 1
 
-        max_workers = get_max_workers()
-        pool = multiprocessing.Pool(processes=max_workers)
-        shots = pool.map(process, shot_inputs)
-        pool.close()
-        pool.join()
+        first_metric, first_additional_metric = True, True
+        metrics = {}
+        running_metrics = {"metrics": {}, "additional_metrics": {}}
+        for seed in range(num_run):
 
-        shot_informations = extract_embeddings_and_labels(shots, task_name)
-        del shot_inputs
-        del shots
-        gc.collect()
+            set_all_seeds(seed)
 
-        if shot_informations is None:
-            logging.info(f"No shots found for task {task_name}, skipping.")
-            logging.info("=+=" * 10)
-            return 0
+            # only load few shots for the given task
+            task_shots = mapping[(mapping.task_name == task_name) & (mapping.split == "shot")]["case_id"].tolist()
+            shot_inputs = read_inputs(
+                input_dir=INPUT_DIRECTORY, case_names=task_shots
+            )
 
-        else:
-            # ensure we have an adaptor for this task
-            if task_name not in adaptors:
-                raise Exception(f"No adaptor found for task {task_name}")
+            max_workers = get_max_workers()
+            pool = multiprocessing.Pool(processes=max_workers)
+            shots = pool.map(process, shot_inputs)
+            pool.close()
+            pool.join()
 
-            adaptor_name = adaptors[task_name]
-            return_probabilities = REQUIRES_PROBABILITIES_DICT[task_name]
+            shot_informations = extract_embeddings_and_labels(shots, task_name)
+            del shot_inputs
+            del shots
+            gc.collect()
 
-            global_patch_size = shot_informations["global_patch_size"]
-            global_patch_spacing = shot_informations["global_patch_spacing"]
-            feature_grid_resolution = shot_informations["feature_grid_resolution"]
+            if shot_informations is None:
+                logging.info(f"No shots found for task {task_name}, skipping.")
+                logging.info("=+=" * 10)
+                return 0
 
-            shot_embeddings = shot_informations["embeddings"]
-            shot_coordinates = shot_informations["coordinates"]
-            shot_labels = shot_informations["labels"]
-            shot_extra_labels = shot_informations["extra_labels"]
-            shot_ids = shot_informations["ids"]
-            shot_image_sizes = shot_informations["image_sizes"]
-            shot_image_spacings = shot_informations["image_spacings"]
-            shot_image_origins = shot_informations["image_origins"]
-            shot_image_directions = shot_informations["image_directions"]
-            shot_patch_sizes = shot_informations["patch_sizes"]
-            shot_patch_spacings = shot_informations["patch_spacings"]
-            shot_label_spacings = shot_informations["label_spacings"]
-            shot_label_origins = shot_informations["label_origins"]
-            shot_label_directions = shot_informations["label_directions"]
+            else:
+                # ensure we have an adaptor for this task
+                if task_name not in adaptors:
+                    raise Exception(f"No adaptor found for task {task_name}")
 
-            task_type = shot_informations["task_type"]
-            if task_type in ["classification", "regression"]:
-                save_predictions = True
-                if len(shot_embeddings.shape) > 2:
-                    shot_embeddings = shot_embeddings.squeeze(1)
+                adaptor_name = adaptors[task_name]
+                return_probabilities = REQUIRES_PROBABILITIES_DICT[task_name]
 
-            num_shots = len(shot_ids)
+                global_patch_size = shot_informations["global_patch_size"]
+                global_patch_spacing = shot_informations["global_patch_spacing"]
+                feature_grid_resolution = shot_informations["feature_grid_resolution"]
 
-            num_run = 5
-            if adaptor_name in DETERMINISTIC_ADAPTORS:
-                num_run = 1
+                shot_embeddings = shot_informations["embeddings"]
+                shot_coordinates = shot_informations["coordinates"]
+                shot_labels = shot_informations["labels"]
+                shot_extra_labels = shot_informations["extra_labels"]
+                shot_ids = shot_informations["ids"]
+                shot_image_sizes = shot_informations["image_sizes"]
+                shot_image_spacings = shot_informations["image_spacings"]
+                shot_image_origins = shot_informations["image_origins"]
+                shot_image_directions = shot_informations["image_directions"]
+                shot_patch_sizes = shot_informations["patch_sizes"]
+                shot_patch_spacings = shot_informations["patch_spacings"]
+                shot_label_spacings = shot_informations["label_spacings"]
+                shot_label_origins = shot_informations["label_origins"]
+                shot_label_directions = shot_informations["label_directions"]
 
-            first_metric, first_additional_metric = True, True
-            metrics = {}
-            running_metrics = {"metrics": {}, "additional_metrics": {}}
-            for seed in range(num_run):
+                task_type = shot_informations["task_type"]
+                if task_type in ["classification", "regression"]:
+                    save_predictions = True
+                    if len(shot_embeddings.shape) > 2:
+                        shot_embeddings = shot_embeddings.squeeze(1)
 
-                set_all_seeds(seed)
+                num_shots = len(shot_ids)
 
                 adaptor = get_adaptor(
                     adaptor_name=adaptor_name,
@@ -509,11 +509,11 @@ def process_task_in_subprocess(
                     else:
                         running_metrics["additional_metrics"][metric_name] += metric_value
 
-            # average metrics
-            metrics = {
-                "metrics": {k: v / num_run for k, v in running_metrics["metrics"].items()},
-                "additional_metrics": {k: v / num_run for k, v in running_metrics["additional_metrics"].items()}
-            }
+        # average metrics
+        metrics = {
+            "metrics": {k: v / num_run for k, v in running_metrics["metrics"].items()},
+            "additional_metrics": {k: v / num_run for k, v in running_metrics["additional_metrics"].items()}
+        }
 
     elif modality == "vision-language":
 
