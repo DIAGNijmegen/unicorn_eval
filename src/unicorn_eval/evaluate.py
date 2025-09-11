@@ -32,7 +32,7 @@ from unicorn_eval.io import (GROUNDTRUTH_DIRECTORY, INPUT_DIRECTORY,
 from unicorn_eval.memory_profiler import (finalize_memory_profiler,
                                           init_memory_profiler, log_memory,
                                           start_continuous_logging)
-from unicorn_eval.utils import (evaluate_predictions,
+from unicorn_eval.utils import (set_all_seeds, evaluate_predictions,
                                 extract_embeddings_and_labels, extract_labels,
                                 get_adaptor, normalize_metric)
 
@@ -49,6 +49,15 @@ ADAPTOR_SLUGS_DICT = {
     "Task10_segmenting_lesions_within_vois_in_ct": "adaptor-radiology-segmentation",
     "Task11_segmenting_three_anatomical_structures_in_lumbar_spine_mri": "adaptor-radiology-segmentation",
 }
+
+DETERMINISTIC_ADAPTORS = [
+    "1-nn",
+    "5-nn",
+    "20-nn",
+    "1-nn-weighted",
+    "5-nn-weighted",
+    "20-nn-weighted",
+]
 
 REQUIRES_PROBABILITIES_DICT = {
     "Task01_classifying_he_prostate_biopsies_into_isup_scores": False,
@@ -408,63 +417,103 @@ def process_task_in_subprocess(
 
             num_shots = len(shot_ids)
 
-            adaptor = get_adaptor(
-                adaptor_name=adaptor_name,
-                task_type=task_type,
-                num_shots=num_shots,
-                feature_grid_resolution=feature_grid_resolution,
-                global_patch_size=global_patch_size,
-                global_patch_spacing=global_patch_spacing,
-                return_probabilities=return_probabilities,
-            )
+            num_run = 5
+            if adaptor_name in DETERMINISTIC_ADAPTORS:
+                num_run = 1
 
-            adaptor.fit(
-                shot_features=shot_embeddings,
-                shot_labels=shot_labels,
-                shot_ids=shot_ids,
-                shot_coordinates=shot_coordinates,
-                shot_patch_sizes=shot_patch_sizes,
-                shot_patch_spacings=shot_patch_spacings,
-                shot_extra_labels=shot_extra_labels,
-                shot_image_sizes=shot_image_sizes,
-                shot_image_spacings=shot_image_spacings,
-                shot_image_origins=shot_image_origins,
-                shot_image_directions=shot_image_directions,
-                shot_label_spacings=shot_label_spacings,
-                shot_label_origins=shot_label_origins,
-                shot_label_directions=shot_label_directions,
-            )
+            first_metric, first_additional_metric = True, True
+            metrics = {}
+            running_metrics = {"metrics": {}, "additional_metrics": {}}
+            for seed in range(num_run):
 
-            del (
-                shot_embeddings,
-                shot_labels,
-                shot_extra_labels,
-                shot_ids,
-                shot_image_sizes,
-                shot_image_spacings,
-                shot_image_origins,
-                shot_image_directions,
-                shot_patch_sizes,
-                shot_patch_spacings,
-                shot_label_spacings,
-                shot_label_origins,
-                shot_label_directions,
-                shot_informations,
-            )
-            gc.collect()
+                set_all_seeds(seed)
 
-            case_inputs = read_inputs(
-                input_dir=INPUT_DIRECTORY, case_names=task_shots
-            )
-            pool = multiprocessing.Pool(processes=max_workers)
-            cases = pool.map(process, case_inputs)
-            pool.close()
-            pool.join()
+                adaptor = get_adaptor(
+                    adaptor_name=adaptor_name,
+                    task_type=task_type,
+                    num_shots=num_shots,
+                    feature_grid_resolution=feature_grid_resolution,
+                    global_patch_size=global_patch_size,
+                    global_patch_spacing=global_patch_spacing,
+                    return_probabilities=return_probabilities,
+                )
 
-            case_informations = extract_labels(cases, task_name)
-            case_ids, case_labels, case_extra_labels = case_informations["ids"], case_informations["labels"], case_informations["extra_labels"]
+                adaptor.fit(
+                    shot_features=shot_embeddings,
+                    shot_labels=shot_labels,
+                    shot_ids=shot_ids,
+                    shot_coordinates=shot_coordinates,
+                    shot_patch_sizes=shot_patch_sizes,
+                    shot_patch_spacings=shot_patch_spacings,
+                    shot_extra_labels=shot_extra_labels,
+                    shot_image_sizes=shot_image_sizes,
+                    shot_image_spacings=shot_image_spacings,
+                    shot_image_origins=shot_image_origins,
+                    shot_image_directions=shot_image_directions,
+                    shot_label_spacings=shot_label_spacings,
+                    shot_label_origins=shot_label_origins,
+                    shot_label_directions=shot_label_directions,
+                )
 
-            predictions = adaptor.predict(case_ids)
+                del (
+                    shot_embeddings,
+                    shot_labels,
+                    shot_extra_labels,
+                    shot_ids,
+                    shot_image_sizes,
+                    shot_image_spacings,
+                    shot_image_origins,
+                    shot_image_directions,
+                    shot_patch_sizes,
+                    shot_patch_spacings,
+                    shot_label_spacings,
+                    shot_label_origins,
+                    shot_label_directions,
+                    shot_informations,
+                )
+                gc.collect()
+
+                case_inputs = read_inputs(
+                    input_dir=INPUT_DIRECTORY, case_names=task_shots
+                )
+                pool = multiprocessing.Pool(processes=max_workers)
+                cases = pool.map(process, case_inputs)
+                pool.close()
+                pool.join()
+
+                case_informations = extract_labels(cases, task_name)
+                case_ids, case_labels, case_extra_labels = case_informations["ids"], case_informations["labels"], case_informations["extra_labels"]
+
+                predictions = adaptor.predict(case_ids)
+
+                run_metrics = evaluate_predictions(
+                    task_name=task_name,
+                    case_ids=case_ids,
+                    test_predictions=predictions,
+                    test_labels=case_labels,
+                    test_extra_labels=case_extra_labels,
+                    save_predictions=save_predictions,
+                )
+
+                # store metrics
+                for metric_name, metric_value in run_metrics["metrics"].items():
+                    if first_metric:
+                        first_metric = False
+                        running_metrics["metrics"][metric_name] = metric_value
+                    else:
+                        running_metrics["metrics"][metric_name] += metric_value
+                for metric_name, metric_value in run_metrics["additional_metrics"].items():
+                    if first_additional_metric:
+                        first_additional_metric = False
+                        running_metrics["additional_metrics"][metric_name] = metric_value
+                    else:
+                        running_metrics["additional_metrics"][metric_name] += metric_value
+
+            # average metrics
+            metrics = {
+                "metrics": {k: v / num_run for k, v in running_metrics["metrics"].items()},
+                "additional_metrics": {k: v / num_run for k, v in running_metrics["additional_metrics"].items()}
+            }
 
     elif modality == "vision-language":
 
@@ -485,17 +534,17 @@ def process_task_in_subprocess(
         ]
         case_extra_labels = None
 
+        metrics = evaluate_predictions(
+            task_name=task_name,
+            case_ids=case_ids,
+            test_predictions=predictions,
+            test_labels=case_labels,
+            test_extra_labels=case_extra_labels,
+            save_predictions=save_predictions,
+        )
+
     else:
         raise ValueError(f"Unsupported modality: {modality}")
-
-    metrics = evaluate_predictions(
-        task_name=task_name,
-        case_ids=case_ids,
-        test_predictions=predictions,
-        test_labels=case_labels,
-        test_extra_labels=case_extra_labels,
-        save_predictions=save_predictions,
-    )
 
     # save metrics
     write_json_file(location=metrics_path, content=metrics)
