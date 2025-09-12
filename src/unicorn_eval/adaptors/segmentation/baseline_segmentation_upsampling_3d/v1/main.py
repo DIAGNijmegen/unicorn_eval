@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
 import numpy as np
 import torch
@@ -231,7 +232,7 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
             else:
                 raise
 
-    def predict(self, test_cases) -> list:
+    def predict(self, test_cases) -> list[Path]:
         predictions = []
         for case_id in test_cases:
             test_input = process(
@@ -265,6 +266,18 @@ class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
                 test_label_origins={case_id: test_input["label_origin"]},
                 test_label_directions={case_id: test_input["label_direction"]},
             )
-            predictions.extend(prediction)
+            assert len(prediction) == 1
+            prediction = prediction[0]
 
-        return np.array(predictions)
+            workdir = (
+                Path("/opt/app/predictions")
+                if Path("/opt/app/predictions").exists()
+                else Path("unicorn/workdir")
+            )
+            path = workdir / f"vision/{case_id}_pred.npy"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            np.save(path, prediction)
+
+            predictions.append(path)
+
+        return predictions

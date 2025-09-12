@@ -214,7 +214,7 @@ class SegmentationUpsampling3D_V2(PatchLevelTaskAdaptor):
             else:
                 raise
 
-    def predict(self, test_case_ids) -> list:
+    def predict(self, test_case_ids) -> list[Path]:
         predictions = []
         for case_id in test_case_ids:
             logging.info(f"Running inference for case {case_id}")
