@@ -27,6 +27,7 @@ logging.set_verbosity_error()
 _WS = re.compile(r"\s+")
 _CTRL = re.compile(r"[\x00-\x1f\x7f]")
 
+
 def sanitize_text(s: str) -> str:
     """Sanitize a string to remove special characters."""
     if s is None:
@@ -39,11 +40,13 @@ def sanitize_text(s: str) -> str:
     s = _WS.sub(" ", s).strip()
     return s
 
+
 def sanitize_list(lst):
     """Sanitize a list of strings, allowing for nested lists (per-image multi-refs)."""
     if isinstance(lst, str):
         return [sanitize_text(lst)]
     return [sanitize_text(x) for x in lst]
+
 
 def prepare_pycoco_inputs(reports_true, reports_pred):
     """
@@ -54,7 +57,8 @@ def prepare_pycoco_inputs(reports_true, reports_pred):
     gts = {i: sanitize_list(refs) for i, refs in enumerate(reports_true)}
     res = {i: [sanitize_text(pred)] for i, pred in enumerate(reports_pred)}
     return gts, res
-    
+
+
 def compute_cider_score(reports_true, reports_pred):
     """
     Compute CIDEr score for generated captions.
@@ -72,6 +76,7 @@ def compute_cider_score(reports_true, reports_pred):
     score, _ = scorer.compute_score(gts, res)
     return score
 
+
 def compute_bleu_score(reports_true, reports_pred):
     """
     Compute the average BLEU score between reference and predicted reports.
@@ -88,6 +93,7 @@ def compute_bleu_score(reports_true, reports_pred):
     bleu_scores, _ = scorer.compute_score(gts, res)
     return bleu_scores[3]  # BLEU-4
 
+
 def compute_rouge_score(reports_true, reports_pred):
     """
     Compute the average ROUGE-L score between reference and predicted reports.
@@ -103,6 +109,7 @@ def compute_rouge_score(reports_true, reports_pred):
     gts, res = prepare_pycoco_inputs(reports_true, reports_pred)
     rouge_l, _ = scorer.compute_score(gts, res)
     return rouge_l
+
 
 def compute_meteor_score(reports_true, reports_pred):
     """
@@ -137,17 +144,16 @@ def compute_bert_score(reports_true, reports_pred):
     cands = [sanitize_text(p) for p in reports_pred]
 
     model_directory = "/opt/app/unicorn_eval/models/dragon-bert-base-mixed-domain"
-    assert Path(model_directory).exists(), f"Model directory {model_directory} does not exist."
+    assert Path(
+        model_directory
+    ).exists(), f"Model directory {model_directory} does not exist."
 
     # Load scorer once
     scorer = BERTScorer(
-        model_type=model_directory,
-        num_layers=12,
-        lang="nl",
-        device="cpu"
+        model_type=model_directory, num_layers=12, lang="nl", device="cpu"
     )
 
-    # Vectorized scoring 
+    # Vectorized scoring
     _, _, F1 = scorer.score(cands, refs)
 
     # Convert to numpy arrays
@@ -167,7 +173,7 @@ def compute_average_language_metric(reports_true, reports_pred):
     Returns:
         dict: Dictionary containing averaged scores for CIDEr, BLEU, ROUGE-L, METEOR, and BERTScore F1.
     """
-    
+
     metrics, normalized_metrics = {}, {}
 
     metric_info = {

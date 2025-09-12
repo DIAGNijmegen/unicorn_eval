@@ -13,24 +13,26 @@
 #  limitations under the License.
 
 import logging
-import tqdm
+
 import numpy as np
+import sklearn
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import sklearn
-from sklearn.neighbors import KNeighborsClassifier
+import tqdm
 from sklearn.metrics.pairwise import cosine_similarity, euclidean_distances
+from sklearn.neighbors import KNeighborsClassifier
 
 from unicorn_eval.adaptors.base import CaseLevelTaskAdaptor
+from unicorn_eval.io import INPUT_DIRECTORY, process, read_inputs
 
 
 def preprocess_features(
-    shot_features: np.ndarray,
-    test_features: np.ndarray,
+    features: np.ndarray,
     center: bool = True,
+    mean: np.ndarray = None,
     normalize_features: bool = True,
-) -> tuple[np.ndarray, np.ndarray]:
+) -> np.ndarray:
     """
     Preprocess feature vectors by centering and normalizing, optionally converting to NumPy.
 
@@ -44,19 +46,12 @@ def preprocess_features(
         Preprocessed (shot_features, test_features) as torch.Tensor or np.ndarray
     """
     if center:
-        mean_feature = shot_features.mean(dim=0, keepdims=True)
-        shot_features = shot_features - mean_feature
-        test_features = test_features - mean_feature
+        features = features - mean
 
     if normalize_features:
-        shot_features = shot_features / np.linalg.norm(
-            shot_features, axis=-1, keepdims=True
-        )
-        test_features = test_features / np.linalg.norm(
-            test_features, axis=-1, keepdims=True
-        )
+        features = features / np.linalg.norm(features, axis=-1, keepdims=True)
 
-    return shot_features, test_features
+    return features
 
 
 class KNN(CaseLevelTaskAdaptor):
@@ -79,16 +74,12 @@ class KNN(CaseLevelTaskAdaptor):
 
     def __init__(
         self,
-        shot_features,
-        shot_labels,
-        test_features,
         k,
         num_workers=8,
         center_features=False,
         normalize_features=False,
         return_probabilities=False,
     ):
-        super().__init__(shot_features, shot_labels, test_features)
         self.k = k
         self.num_workers = num_workers
         self.center_features = center_features
@@ -96,33 +87,45 @@ class KNN(CaseLevelTaskAdaptor):
         self.return_probabilities = return_probabilities
         self.model = None
 
-    def fit(self):
-        processed_shot_features, _ = preprocess_features(
-            self.shot_features,
-            self.test_features,
+    def fit(self, shot_features, shot_labels, **kwargs):
+        self.mean_feature = shot_features.mean(dim=0, keepdims=True)
+        processed_shot_features = preprocess_features(
+            shot_features,
             center=self.center_features,
+            mean=self.mean_feature,
             normalize_features=self.normalize_features,
         )
 
         self.model = KNeighborsClassifier(n_neighbors=self.k, n_jobs=self.num_workers)
-        self.model.fit(processed_shot_features, self.shot_labels)
+        self.model.fit(processed_shot_features, shot_labels)
 
-    def predict(self) -> np.ndarray:
-        _, processed_test_features = preprocess_features(
-            self.shot_features,
-            self.test_features,
-            center=self.center_features,
-            normalize_features=self.normalize_features,
-        )
-
-        if self.model is None:
-            raise ValueError(
-                "Model has not been fitted yet. Call `fit` before `predict`."
+    def predict(self, test_cases) -> np.ndarray:
+        predictions = []
+        for case_name in test_cases:
+            test_input = process(
+                read_inputs(input_dir=INPUT_DIRECTORY, case_names=[case_name])[0]
+            )
+            test_feature = test_input["embeddings"]
+            processed_test_feature = preprocess_features(
+                test_feature,
+                mean=self.mean_feature,
+                center=self.center_features,
+                normalize_features=self.normalize_features,
             )
 
-        if self.return_probabilities:
-            return self.model.predict_proba(processed_test_features)
-        return self.model.predict(processed_test_features)
+            if self.model is None:
+                raise ValueError(
+                    "Model has not been fitted yet. Call `fit` before `predict`."
+                )
+
+            if self.return_probabilities:
+                prediction = self.model.predict_proba(processed_test_feature)
+                predictions.append(prediction)
+            else:
+                prediction = self.model.predict(processed_test_feature)
+                predictions.append(prediction)
+
+        return np.array(predictions).squeeze()
 
 
 class WeightedKNN(CaseLevelTaskAdaptor):
@@ -149,16 +152,12 @@ class WeightedKNN(CaseLevelTaskAdaptor):
 
     def __init__(
         self,
-        shot_features,
-        shot_labels,
-        test_features,
         k,
         metric="cosine",
         center_features=False,
         normalize_features=False,
         return_probabilities=False,
     ):
-        super().__init__(shot_features, shot_labels, test_features)
         self.k = k
         self.metric = metric
         self.center_features = center_features
@@ -169,11 +168,12 @@ class WeightedKNN(CaseLevelTaskAdaptor):
         self.class_to_idx = None
         self.num_classes = None
 
-    def fit(self):
-        self.shot_features, self.test_features = preprocess_features(
-            self.shot_features,
-            self.test_features,
+    def fit(self, shot_features, shot_labels, **kwargs):
+        self.mean_feature = shot_features.mean(dim=0, keepdims=True)
+        self.shot_features = preprocess_features(
+            shot_features,
             center=self.center_features,
+            mean=self.mean_feature,
             normalize_features=self.normalize_features,
         )
 
@@ -187,26 +187,32 @@ class WeightedKNN(CaseLevelTaskAdaptor):
         else:
             raise ValueError(f"Unsupported metric: {self.metric}")
 
-        self.unique_classes = np.unique(self.shot_labels)
+        self.shot_labels = shot_labels
+        self.unique_classes = np.unique(shot_labels)
         self.class_to_idx = {cls: idx for idx, cls in enumerate(self.unique_classes)}
-        self.num_classes = int(self.shot_labels.max()) + 1
+        self.num_classes = int(shot_labels.max()) + 1
 
-    def predict(self) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
-        if (
-            self.shot_features is None
-            or self.test_features is None
-            or self.similarity_fn is None
-        ):
-            raise ValueError(
-                "Model has not been fitted yet. Call `fit` before `predict`."
+    def predict(self, test_cases) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
+        predictions, probabilities = [], []
+        for case_name in test_cases:
+            test_input = process(
+                read_inputs(input_dir=INPUT_DIRECTORY, case_names=[case_name])[0]
+            )
+            test_feature = test_input["embeddings"]
+            processed_test_feature = preprocess_features(
+                test_feature,
+                mean=self.mean_feature,
+                center=self.center_features,
+                normalize_features=self.normalize_features,
             )
 
-        test_predictions = []
-        test_probabilities = []
+            if self.shot_features is None or self.similarity_fn is None:
+                raise ValueError(
+                    "Model has not been fitted yet. Call `fit` before `predict`."
+                )
 
-        for test_point in self.test_features:
             similarities = self.similarity_fn(
-                test_point.reshape(1, -1), self.shot_features
+                processed_test_feature.reshape(1, -1), self.shot_features
             ).flatten()
             k_indices = np.argsort(-similarities)[: self.k]
             k_labels = self.shot_labels[k_indices]
@@ -217,15 +223,15 @@ class WeightedKNN(CaseLevelTaskAdaptor):
                 class_weights[self.class_to_idx[label]] += similarity
 
             class_probabilities = class_weights / (np.sum(class_weights) + 1e-8)
-            test_probabilities.append(class_probabilities)
+            probabilities.append(class_probabilities)
 
             predicted_class = self.unique_classes[np.argmax(class_probabilities)]
-            test_predictions.append(predicted_class)
+            predictions.append(predicted_class)
 
-        test_predictions = np.array(test_predictions)
         if self.return_probabilities:
-            return np.vstack(test_probabilities)
-        return test_predictions
+            return np.array(probabilities).squeeze()
+        else:
+            return np.array(predictions).squeeze()
 
 
 class LogisticRegression(CaseLevelTaskAdaptor):
@@ -250,30 +256,40 @@ class LogisticRegression(CaseLevelTaskAdaptor):
 
     def __init__(
         self,
-        shot_features,
-        shot_labels,
-        test_features,
-        max_iterations=1000,
-        C=1.0,
-        solver="lbfgs",
-        return_probabilities=False,
+        max_iterations: int = 1000,
+        C: float = 1.0,
+        solver: str = "lbfgs",
+        return_probabilities: bool = False,
+        seed: int = 0,
     ):
-        super().__init__(shot_features, shot_labels, test_features)
         self.max_iterations = max_iterations
         self.C = C
         self.solver = solver
         self.return_probabilities = return_probabilities
+        self.seed = seed
 
-    def fit(self):
+    def fit(self, shot_features, shot_labels, **kwargs):
         self.model = sklearn.linear_model.LogisticRegression(
-            C=self.C, max_iter=self.max_iterations, solver=self.solver, random_state=0
+            C=self.C, max_iter=self.max_iterations, solver=self.solver, random_state=self.seed
         )
-        self.model.fit(self.shot_features, self.shot_labels)
+        self.model.fit(shot_features, shot_labels)
 
-    def predict(self) -> np.ndarray:
-        if self.return_probabilities:
-            return self.model.predict_proba(self.test_features)
-        return self.model.predict(self.test_features)
+    def predict(self, test_cases) -> np.ndarray:
+        predictions = []
+        for case_name in test_cases:
+            test_input = process(
+                read_inputs(input_dir=INPUT_DIRECTORY, case_names=[case_name])[0]
+            )
+            test_feature = test_input["embeddings"]
+
+            if self.return_probabilities:
+                prediction = self.model.predict_proba(test_feature)
+                predictions.append(prediction)
+            else:
+                prediction = self.model.predict(test_feature)
+                predictions.append(prediction)
+
+        return np.array(predictions).squeeze()
 
 
 class LinearClassifier(nn.Module):
@@ -312,36 +328,24 @@ class LinearProbing(CaseLevelTaskAdaptor):
 
     def __init__(
         self,
-        shot_features,
-        shot_labels,
-        test_features,
         num_epochs=100,
         learning_rate=0.001,
         patience=10,
-        shot_extra_labels=None,
         return_probabilities=False,
     ):
-        super().__init__(shot_features, shot_labels, test_features, shot_extra_labels)
         self.num_epochs = num_epochs
         self.learning_rate = learning_rate
         self.patience = patience
         self.return_probabilities = return_probabilities
 
-    def fit(self):
-        input_dim = self.shot_features.shape[1]
-        self.num_classes = int(self.shot_labels.max()) + 1
+    def fit(self, shot_features, shot_labels, **kwargs):
+        input_dim = shot_features.shape[1]
+        self.num_classes = int(shot_labels.max()) + 1
         self.criterion = nn.CrossEntropyLoss()
 
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.shot_features = torch.tensor(self.shot_features, dtype=torch.float32).to(
-            self.device
-        )
-        self.shot_labels = torch.tensor(self.shot_labels, dtype=torch.long).to(
-            self.device
-        )
-        self.test_features = torch.tensor(self.test_features, dtype=torch.float32).to(
-            self.device
-        )
+        shot_features = torch.tensor(shot_features, dtype=torch.float32).to(self.device)
+        shot_labels = torch.tensor(shot_labels, dtype=torch.long).to(self.device)
 
         self.model = LinearClassifier(input_dim, self.num_classes).to(self.device)
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
@@ -362,8 +366,8 @@ class LinearProbing(CaseLevelTaskAdaptor):
         ):
             self.model.train()
             self.optimizer.zero_grad()
-            logits = self.model(self.shot_features)
-            loss = self.criterion(logits, self.shot_labels)
+            logits = self.model(shot_features)
+            loss = self.criterion(logits, shot_labels)
             loss.backward()
             self.optimizer.step()
             epoch_loss = loss.item()
@@ -375,25 +379,36 @@ class LinearProbing(CaseLevelTaskAdaptor):
                 logging.info(f"Early stopping at epoch {epoch+1}")
                 break
 
-            logging.info(
-                f"Epoch {epoch+1}/{self.num_epochs} - Loss: {loss.item():.4f}"
-            )
+            logging.info(f"Epoch {epoch+1}/{self.num_epochs} - Loss: {loss.item():.4f}")
 
         self.model.load_state_dict(best_state)
         logging.info(
             f"Restored best model from epoch {best_epoch+1} with loss {best_loss:.4f}"
         )
 
-    def predict(self) -> np.ndarray:
+    def predict(self, test_cases) -> np.ndarray:
+        predictions = []
         self.model.eval()
         with torch.no_grad():
-            logits = self.model(self.test_features)
-            if self.return_probabilities:
-                probabilities = torch.softmax(logits, dim=1)
-                return probabilities.cpu().numpy()
-            else:
-                _, test_predictions = torch.max(logits, 1)
-                return test_predictions.cpu().numpy()
+            for case_name in test_cases:
+                test_input = process(
+                    read_inputs(input_dir=INPUT_DIRECTORY, case_names=[case_name])[0]
+                )
+
+                test_feature = test_input["embeddings"]
+                test_features = torch.tensor(test_feature, dtype=torch.float32).to(
+                    self.device
+                )
+
+                logits = self.model(test_features)
+                if self.return_probabilities:
+                    prediction = torch.softmax(logits, dim=0)
+                    predictions.append(prediction.cpu().numpy())
+                else:
+                    _, prediction = torch.max(logits, dim=0)
+                    predictions.append(prediction.cpu().numpy())
+
+        return np.array(predictions).squeeze()
 
 
 class MLPClassifier(nn.Module):
@@ -441,18 +456,13 @@ class MultiLayerPerceptron(CaseLevelTaskAdaptor):
 
     def __init__(
         self,
-        shot_features,
-        shot_labels,
-        test_features,
         hidden_dim=256,
         num_layers=3,
         num_epochs=100,
         learning_rate=0.001,
         patience=10,
-        shot_extra_labels=None,
         return_probabilities=False,
     ):
-        super().__init__(shot_features, shot_labels, test_features, shot_extra_labels)
         self.hidden_dim = hidden_dim
         self.num_layers = num_layers
         self.num_epochs = num_epochs
@@ -460,21 +470,14 @@ class MultiLayerPerceptron(CaseLevelTaskAdaptor):
         self.patience = patience
         self.return_probabilities = return_probabilities
 
-    def fit(self):
-        input_dim = self.shot_features.shape[1]
-        self.num_classes = int(self.shot_labels.max()) + 1
+    def fit(self, shot_features, shot_labels, **kwargs):
+        input_dim = shot_features.shape[1]
+        self.num_classes = int(shot_labels.max()) + 1
         self.criterion = nn.CrossEntropyLoss()
 
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.shot_features = torch.tensor(self.shot_features, dtype=torch.float32).to(
-            self.device
-        )
-        self.shot_labels = torch.tensor(self.shot_labels, dtype=torch.long).to(
-            self.device
-        )
-        self.test_features = torch.tensor(self.test_features, dtype=torch.float32).to(
-            self.device
-        )
+        shot_features = torch.tensor(shot_features, dtype=torch.float32).to(self.device)
+        shot_labels = torch.tensor(shot_labels, dtype=torch.long).to(self.device)
 
         self.model = MLPClassifier(
             input_dim, self.hidden_dim, self.num_classes, self.num_layers
@@ -497,8 +500,8 @@ class MultiLayerPerceptron(CaseLevelTaskAdaptor):
         ):
             self.model.train()
             self.optimizer.zero_grad()
-            logits = self.model(self.shot_features)
-            loss = self.criterion(logits, self.shot_labels)
+            logits = self.model(shot_features)
+            loss = self.criterion(logits, shot_labels)
             loss.backward()
             self.optimizer.step()
             epoch_loss = loss.item()
@@ -510,23 +513,31 @@ class MultiLayerPerceptron(CaseLevelTaskAdaptor):
                 logging.info(f"Early stopping at epoch {epoch+1}")
                 break
 
-            logging.info(
-                f"Epoch {epoch+1}/{self.num_epochs} - Loss: {epoch_loss:.4f}"
-            )
+            logging.info(f"Epoch {epoch+1}/{self.num_epochs} - Loss: {epoch_loss:.4f}")
 
         self.model.load_state_dict(best_state)
         logging.info(
             f"Restored best model from epoch {best_epoch+1} with loss {best_loss:.4f}"
         )
 
-    def predict(self) -> np.ndarray:
+    def predict(self, test_cases) -> np.ndarray:
+        predictions = []
         self.model.eval()
         with torch.no_grad():
-            logits = self.model(self.test_features)
-            if self.return_probabilities:
-                probabilities = torch.softmax(logits, dim=1)
-                return probabilities.cpu().numpy()
-            else:
-                _, test_predictions = torch.max(logits, 1)
-                return test_predictions.cpu().numpy()
-        return test_predictions.cpu().numpy()
+            for case_name in test_cases:
+                test_input = process(
+                    read_inputs(input_dir=INPUT_DIRECTORY, case_names=[case_name])[0]
+                )
+                test_feature = test_input["embeddings"]
+                test_features = torch.tensor(test_feature, dtype=torch.float32).to(
+                    self.device
+                )
+                logits = self.model(test_features)
+                if self.return_probabilities:
+                    prediction = torch.softmax(logits, dim=0)
+                    predictions.append(prediction.cpu().numpy())
+                else:
+                    _, prediction = torch.max(logits, 0)
+                    predictions.append(prediction.cpu().numpy())
+
+        return np.array(predictions).squeeze()

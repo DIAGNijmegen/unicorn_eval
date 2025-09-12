@@ -4,7 +4,12 @@ import SimpleITK as sitk
 from picai_prep.preprocessing import resample_img
 
 
-def safe_region_of_interest(image: sitk.Image, patch_size: Iterable[int], start_index: Iterable[int], pad_value: int = 0) -> sitk.Image:
+def safe_region_of_interest(
+    image: sitk.Image,
+    patch_size: Iterable[int],
+    start_index: Iterable[int],
+    pad_value: int = 0,
+) -> sitk.Image:
     size = image.GetSize()
 
     # Convert to mutable lists
@@ -13,7 +18,9 @@ def safe_region_of_interest(image: sitk.Image, patch_size: Iterable[int], start_
 
     # Calculate how much padding is needed
     lower_pad = [max(0, -s) for s in start_index]
-    upper_pad = [max(0, (s + p) - sz) for s, p, sz in zip(start_index, patch_size, size)]
+    upper_pad = [
+        max(0, (s + p) - sz) for s, p, sz in zip(start_index, patch_size, size)
+    ]
 
     # Apply padding if needed
     if any(lower_pad) or any(upper_pad):
@@ -35,7 +42,7 @@ def extract_patches(
 ) -> list[sitk.Image]:
     """
     Extracts uniformly sized patches from a 3D SimpleITK image, optionally resampling it to a specified voxel spacing before extraction.
-    
+
     If `spacing` is provided, the image is first resampled using linear interpolation to achieve the specified spacing. The image is then padded so that its dimensions become exactly divisible by the given patch size. Patches are extracted systematically, covering the entire image volume without overlap or gaps.
 
     Args:
@@ -46,7 +53,7 @@ def extract_patches(
 
     Returns:
         - patches (list[sitk.Image]): List of extracted image patches.
-     """
+    """
     if spacing is not None and tuple(spacing) != image.GetSpacing():
         # resample image to specified spacing
         image = resample_img(

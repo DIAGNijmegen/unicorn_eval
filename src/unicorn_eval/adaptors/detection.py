@@ -12,9 +12,9 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import logging
 from typing import Sequence
 
-import logging
 import numpy as np
 import scipy.ndimage as ndimage
 import torch
@@ -25,6 +25,7 @@ from torch.utils.data import DataLoader, Dataset
 from torch.utils.data._utils.collate import default_collate
 
 from unicorn_eval.adaptors.base import PatchLevelTaskAdaptor
+from unicorn_eval.io import INPUT_DIRECTORY, process, read_inputs
 
 
 class DetectionDecoder(nn.Module):
@@ -126,7 +127,7 @@ def heatmap_to_cells_using_maxima(heatmap, neighborhood_size=5, threshold=0.01):
     return x, y
 
 
-def train_decoder(decoder, dataloader, heatmap_size=16, num_epochs=200, lr=1e-5):
+def train_decoder(decoder, dataloader, num_epochs=200, lr=1e-5):
     """Trains the decoder using the given data."""
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -248,7 +249,7 @@ def coordinates_to_heatmap(
 def construct_detection_labels(
     coordinates,
     embeddings,
-    names,
+    ids,
     labels=None,
     patch_size=224,
     heatmap_size=16,
@@ -258,7 +259,7 @@ def construct_detection_labels(
 
     processed_data = []
 
-    for case_idx, case_name in enumerate(names):
+    for case_idx, case_id in enumerate(ids):
         patch_coordinates = coordinates[case_idx]
         case_embeddings = embeddings[case_idx]
 
@@ -284,7 +285,7 @@ def construct_detection_labels(
                 heatmap = None
 
             processed_data.append(
-                (patch_emb, heatmap, (x_patch, y_patch), f"{case_name}")
+                (patch_emb, heatmap, (x_patch, y_patch), f"{case_id}")
             )
 
     return processed_data
@@ -293,41 +294,25 @@ def construct_detection_labels(
 class DensityMap(PatchLevelTaskAdaptor):
     def __init__(
         self,
-        shot_features,
-        shot_labels,
-        shot_coordinates,
-        shot_names,
-        test_features,
-        test_coordinates,
-        test_names,
         global_patch_size=224,
         heatmap_size=16,
         num_epochs=200,
         learning_rate=1e-5,
     ):
-        super().__init__(
-            shot_features,
-            shot_labels,
-            shot_coordinates,
-            test_features,
-            test_coordinates,
-        )
-        self.shot_names = shot_names
-        self.test_names = test_names
         self.patch_size = global_patch_size
         self.heatmap_size = heatmap_size
         self.num_epochs = num_epochs
         self.learning_rate = learning_rate
         self.decoder = None
 
-    def fit(self):
-        input_dim = self.shot_features[0].shape[1]
+    def fit(self, shot_features, shot_coordinates, shot_labels, shot_ids, **kwargs):
+        input_dim = shot_features[0].shape[1]
 
         shot_data = construct_detection_labels(
-            self.shot_coordinates,
-            self.shot_features,
-            self.shot_names,
-            labels=self.shot_labels,
+            shot_coordinates,
+            shot_features,
+            shot_ids,
+            labels=shot_labels,
             patch_size=self.patch_size,
             heatmap_size=self.heatmap_size,
         )
@@ -344,33 +329,39 @@ class DensityMap(PatchLevelTaskAdaptor):
         self.decoder = train_decoder(
             self.decoder,
             dataloader,
-            heatmap_size=self.heatmap_size,
             num_epochs=self.num_epochs,
             lr=self.learning_rate,
         )
 
-    def predict(self) -> list:
-        test_data = construct_detection_labels(
-            self.test_coordinates,
-            self.test_features,
-            self.test_names,
-            patch_size=self.patch_size,
-            heatmap_size=self.heatmap_size,
-            is_train=False,
-        )
-        test_dataset = DetectionDataset(preprocessed_data=test_data)
-        test_dataloader = DataLoader(
-            test_dataset, batch_size=1, shuffle=False, collate_fn=custom_collate
-        )
+    def predict(self, test_cases) -> list:
+        predictions = []
+        for case_name in test_cases:
+            test_input = process(
+                read_inputs(input_dir=INPUT_DIRECTORY, case_names=[case_name])[0]
+            )
+            test_data = construct_detection_labels(
+                [test_input["coordinates"]],
+                [test_input["embeddings"]],
+                [test_input["case_id"]],
+                patch_size=self.patch_size,
+                heatmap_size=self.heatmap_size,
+                is_train=False,
+            )
 
-        predicted_points = inference(
-            self.decoder,
-            test_dataloader,
-            heatmap_size=self.heatmap_size,
-            patch_size=self.patch_size,
-        )
+            test_dataset = DetectionDataset(preprocessed_data=test_data)
+            test_dataloader = DataLoader(
+                test_dataset, batch_size=1, shuffle=False, collate_fn=custom_collate
+            )
 
-        return predicted_points
+            predicted_points = inference(
+                self.decoder,
+                test_dataloader,
+                heatmap_size=self.heatmap_size,
+                patch_size=self.patch_size,
+            )
+            predictions.extend(predicted_points)
+
+        return predictions
 
 
 class ConvStack(nn.Module):
@@ -401,7 +392,9 @@ class ConvDetectionDecoder(nn.Module):
         super().__init__()
         self.heatmap_size = heatmap_size
         output_size = heatmap_size * heatmap_size
-        assert input_dim_flat % (heatmap_size**2) == 0, f"{input_dim_flat=} needs to be divisable by {heatmap_size**2=}"
+        assert (
+            input_dim_flat % (heatmap_size**2) == 0
+        ), f"{input_dim_flat=} needs to be divisable by {heatmap_size**2=}"
         self.spatial_dim = input_dim_flat // (heatmap_size**2)
         logging.info(f"{self.spatial_dim=}, {output_size=}, {heatmap_size=}")
         self.convs = nn.ModuleList(
@@ -428,42 +421,30 @@ class ConvDetector(DensityMap):
 
     def __init__(
         self,
-        shot_features,
-        shot_labels,
-        shot_coordinates,
-        shot_names,
-        test_features,
-        test_coordinates,
-        test_names,
         patch_sizes: list[int],
     ):
         heatmap_size = 16 if len(patch_sizes) <= 2 else patch_sizes[2]
         assert patch_sizes[0] == patch_sizes[1], f"{patch_sizes[:2]=} must be square."
-        assert patch_sizes[0] % heatmap_size == 0, f"{patch_sizes=} should be divisable by {heatmap_size=}"
+        assert (
+            patch_sizes[0] % heatmap_size == 0
+        ), f"{patch_sizes=} should be divisable by {heatmap_size=}"
         num_epochs = 200
         learning_rate = 0.00001
         super().__init__(
-            shot_features,
-            shot_labels,
-            shot_coordinates,
-            shot_names,
-            test_features,
-            test_coordinates,
-            test_names,
             patch_sizes[0],
             heatmap_size,
             num_epochs,
             learning_rate,
         )
 
-    def fit(self):
-        input_dim = self.shot_features[0].shape[1]
+    def fit(self, shot_features, shot_coordinates, shot_labels, shot_ids, **kwargs):
+        input_dim = shot_features[0].shape[1]
 
         shot_data = construct_detection_labels(
-            self.shot_coordinates,
-            self.shot_features,
-            self.shot_names,
-            labels=self.shot_labels,
+            shot_coordinates,
+            shot_features,
+            shot_ids,
+            labels=shot_labels,
             patch_size=self.patch_size,
             heatmap_size=self.heatmap_size,
             sigma=None,  # Scale heatmap values to [0, 1] for better training stability with BCEWithLogitsLoss
@@ -483,7 +464,7 @@ class ConvDetector(DensityMap):
 
         for epoch in range(self.num_epochs):
             total_loss = 0
-            for patch_emb, target_heatmap, patch_coordinates, case in dataloader:
+            for patch_emb, target_heatmap, _, _ in dataloader:
                 patch_emb = patch_emb.to(device)
                 target_heatmap = target_heatmap.to(device)
                 optimizer.zero_grad()
@@ -532,47 +513,15 @@ class PatchNoduleRegressor(PatchLevelTaskAdaptor):
 
     def __init__(
         self,
-        shot_features: list[np.ndarray],
-        shot_labels: list[list[Sequence[float]]],
-        shot_coordinates: list[np.ndarray],
-        shot_ids: list[str],
-        test_features: list[np.ndarray],
-        test_coordinates: list[np.ndarray],
-        test_ids: list[str],
-        shot_image_origins: dict[str, Sequence[float]],
-        shot_image_spacings: dict[str, Sequence[float]],
-        shot_image_directions: dict[str, Sequence[float]],
-        test_image_origins: dict[str, Sequence[float]],
-        test_image_spacings: dict[str, Sequence[float]],
-        test_image_directions: dict[str, Sequence[float]],
         hidden_dim: int = 64,
         num_epochs: int = 50,
         lr: float = 1e-3,
         shot_extra_labels: np.ndarray | None = None,
     ):
-        super().__init__(
-            shot_features,
-            shot_labels,
-            shot_coordinates,
-            test_features,
-            test_coordinates,
-            shot_extra_labels,
-        )
-        self.shot_ids = shot_ids
-        self.test_ids = test_ids
-        self.shot_image_origins = shot_image_origins
-        self.shot_image_spacings = shot_image_spacings
-        self.shot_image_directions = shot_image_directions
-        self.test_image_origins = test_image_origins
-        self.test_image_spacings = test_image_spacings
-        self.test_image_directions = test_image_directions
         self.hidden_dim = hidden_dim
         self.num_epochs = num_epochs
         self.lr = lr
-        input_dim = shot_features[0].shape[1]
-        self.fc1 = nn.Linear(input_dim, hidden_dim)
-        self.relu = nn.ReLU()
-        self.fc2 = nn.Linear(hidden_dim, 4)
+        self.shot_extra_labels = shot_extra_labels
 
     def compute_patch_center_3d(self, patch_idx, spacing, origin, direction):
         """
@@ -616,8 +565,8 @@ class PatchNoduleRegressor(PatchLevelTaskAdaptor):
             cls_labels.append(label)
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         x = torch.tensor(feats, dtype=torch.float32, device=device)
-        y_off = torch.tensor(offsets, dtype=torch.float32, device=device)
-        y_cls = torch.tensor(cls_labels, dtype=torch.float32, device=device)
+        y_off = torch.tensor(np.array(offsets), dtype=torch.float32, device=device)
+        y_cls = torch.tensor(np.array(cls_labels), dtype=torch.float32, device=device)
         self.model = TwoLayerPerceptron(input_dim=x.shape[1], hidden_dim=hidden_dim).to(
             device
         )
@@ -657,18 +606,34 @@ class PatchNoduleRegressor(PatchLevelTaskAdaptor):
         probs = 1 / (1 + np.exp(-logits))
         return np.concatenate([world_centres, probs[:, None]], axis=1)
 
-    def fit(self):
+    def fit(
+        self,
+        *,
+        shot_features: list[np.ndarray],
+        shot_labels: list[list[Sequence[float]]],
+        shot_coordinates: list[np.ndarray],
+        shot_ids: list[str],
+        shot_image_origins: dict[str, Sequence[float]],
+        shot_image_spacings: dict[str, Sequence[float]],
+        shot_image_directions: dict[str, Sequence[float]],
+        **kwargs,
+    ) -> None:
+        input_dim = shot_features[0].shape[1]
+        self.fc1 = nn.Linear(input_dim, self.hidden_dim)
+        self.relu = nn.ReLU()
+        self.fc2 = nn.Linear(self.hidden_dim, 4)
+
         # build a *flat* list of per-patch dicts for training
         patch_dicts: list[dict] = []
         for feats_case, idxs_case, nods_case, case_id in zip(
-            self.shot_features,
-            self.shot_coordinates,
-            self.shot_labels,
-            self.shot_ids,
+            shot_features,
+            shot_coordinates,
+            shot_labels,
+            shot_ids,
         ):
-            origin = self.shot_image_origins[case_id]
-            spacing = self.shot_image_spacings[case_id]
-            direction = self.shot_image_directions[case_id]
+            origin = shot_image_origins[case_id]
+            spacing = shot_image_spacings[case_id]
+            direction = shot_image_directions[case_id]
             for feat, idx in zip(feats_case, idxs_case):
                 patch_dicts.append(
                     {
@@ -687,31 +652,31 @@ class PatchNoduleRegressor(PatchLevelTaskAdaptor):
             lr=self.lr,
         )
 
-    def predict(self) -> np.ndarray:
-
+    def predict(self, test_case_ids: list[str]) -> np.ndarray:
         test_dicts: list[dict] = []
-        case_ids: list[str] = []
+        per_patch_case_ids = []
 
-        for feats_case, idxs_case, case_id in zip(
-            self.test_features,
-            self.test_coordinates,
-            self.test_ids,
-        ):
-            origin = self.test_image_origins[case_id]
-            spacing = self.test_image_spacings[case_id]
-            direction = self.test_image_directions[case_id]
-            for feat, idx in zip(feats_case, idxs_case):
+        for case_id in test_case_ids:
+            logging.info(f"Running inference for case {case_id}")
+            test_input = process(
+                read_inputs(input_dir=INPUT_DIRECTORY, case_names=[case_id])[0]
+            )
+
+            case_features = test_input["embeddings"]
+            case_coordinates = test_input["coordinates"]
+
+            for feat, coord in zip(case_features, case_coordinates):
                 test_dicts.append(
                     {
                         "feature": feat,
-                        "patch_idx": idx,
-                        "image_origin": origin,
-                        "image_spacing": spacing,
-                        "image_direction": direction,
+                        "patch_idx": coord,
+                        "image_origin": test_input["image_origin"],
+                        "image_spacing": test_input["image_spacing"],
+                        "image_direction": test_input["image_direction"],
                         "patch_nodules": [],  # no GT here
                     }
                 )
-                case_ids.append(case_id)  # keep alignment with test_dicts
+                per_patch_case_ids.append(case_id)  # keep alignment with test_dicts
 
         # raw predictions [x,y,z,p] for every patch
         raw_preds = self.infer_from_patches(test_dicts)
@@ -720,10 +685,10 @@ class PatchNoduleRegressor(PatchLevelTaskAdaptor):
         # ------- ONLY KEEP p > 0.9 -------- #
         mask = probs > 0.9
         raw_preds = raw_preds[mask]
-        case_ids = np.array(case_ids, dtype=object)[mask]
+        per_patch_case_ids = np.array(per_patch_case_ids, dtype=object)[mask]
 
         # prepend test_id to each prediction row
-        rows = [[cid, *pred] for cid, pred in zip(case_ids, raw_preds)]
+        rows = [[cid, *pred] for cid, pred in zip(per_patch_case_ids, raw_preds)]
         preds = np.array(rows, dtype=object)
 
         # Nodule count printout

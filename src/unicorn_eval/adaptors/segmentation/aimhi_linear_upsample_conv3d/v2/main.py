@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import math
 from collections import defaultdict
+from pathlib import Path
 from typing import Type
 
 import numpy as np
@@ -19,8 +20,9 @@ from unicorn_eval.adaptors.segmentation.aimhi_linear_upsample_conv3d.v1.main imp
 from unicorn_eval.adaptors.segmentation.baseline_segmentation_upsampling_3d.v1 import \
     SegmentationUpsampling3D
 from unicorn_eval.adaptors.segmentation.data_handling import (
-    construct_data_with_labels, load_patch_data)
+    construct_data_with_labels, extract_patch_labels, load_patch_data)
 from unicorn_eval.adaptors.segmentation.inference import create_grid
+from unicorn_eval.io import INPUT_DIRECTORY, process, read_inputs
 
 
 class UpsampleConvSegAdaptor(nn.Module):
@@ -34,7 +36,7 @@ class UpsampleConvSegAdaptor(nn.Module):
             nn.ReLU(inplace=True),
             nn.Conv3d(in_channels, in_channels, kernel_size=3, padding=1),
             nn.ReLU(inplace=True),
-            nn.Conv3d(in_channels, num_classes, kernel_size=1)
+            nn.Conv3d(in_channels, num_classes, kernel_size=1),
         )
 
     def forward(self, x):
@@ -42,8 +44,8 @@ class UpsampleConvSegAdaptor(nn.Module):
         B, feat_len = x.shape
         if feat_len % C != 0:
             raise ValueError(
-            f"[Adaptor] Embedding length {feat_len} must be divisible by in_channels={C}."
-        )
+                f"[Adaptor] Embedding length {feat_len} must be divisible by in_channels={C}."
+            )
 
         flat = feat_len // C
 
@@ -57,12 +59,14 @@ class UpsampleConvSegAdaptor(nn.Module):
         D = round(D_ref * k)
         H = round(H_ref * k)
         W = round(W_ref * k)
-        
+
         if D * H * W != flat:
             D, H, W = exact_triplet_from_ref(flat, (D_ref, H_ref, W_ref))
-        
+
         x = x.view(B, C, D, H, W)
-        x = F.interpolate(x, size=self.target_shape, mode="trilinear", align_corners=False)
+        x = F.interpolate(
+            x, size=self.target_shape, mode="trilinear", align_corners=False
+        )
         x = self.conv_blocks(x)
         return x
 
@@ -73,7 +77,7 @@ class ConvUpsampleSegAdaptor(nn.Module):
         self.target_shape = target_shape
         self.in_channels = in_channels
         self.conv_blocks = nn.Sequential(
-            nn.Conv3d(in_channels, num_classes, kernel_size=3, padding=1) 
+            nn.Conv3d(in_channels, num_classes, kernel_size=3, padding=1)
         )
 
     def forward(self, x):
@@ -81,8 +85,8 @@ class ConvUpsampleSegAdaptor(nn.Module):
         B, feat_len = x.shape
         if feat_len % C != 0:
             raise ValueError(
-            f"[Adaptor] Embedding length {feat_len} must be divisible by in_channels={C}."
-        )
+                f"[Adaptor] Embedding length {feat_len} must be divisible by in_channels={C}."
+            )
 
         flat = x.shape[1] // C
 
@@ -103,13 +107,15 @@ class ConvUpsampleSegAdaptor(nn.Module):
 
         x = x.view(B, C, D, H, W)
         x = self.conv_blocks(x)
-        x = F.interpolate(x, size=self.target_shape, mode="trilinear", align_corners=False)
+        x = F.interpolate(
+            x, size=self.target_shape, mode="trilinear", align_corners=False
+        )
         return x
 
 
 class LinearUpsampleConv3D_V2(SegmentationUpsampling3D):
     """
-    Patch-level adaptor that performs segmentation by linearly upsampling 
+    Patch-level adaptor that performs segmentation by linearly upsampling
     3D patch-level features followed by convolutional refinement.
 
     This adaptor takes precomputed patch-level features from 3D medical images
@@ -127,7 +133,7 @@ class LinearUpsampleConv3D_V2(SegmentationUpsampling3D):
         shot_features : Patch-level feature embeddings of few-shot labeled volumes.
         shot_labels : Full-resolution segmentation labels (used to supervise the decoder).
         shot_coordinates : Patch coordinates corresponding to shot_features.
-        shot_names : Case identifiers for few-shot examples.
+        shot_ids : Case identifiers for few-shot examples.
         test_features : Patch-level feature embeddings for testing.
         test_coordinates : Patch coordinates corresponding to test_features.
         test_names : Case identifiers for testing examples.
@@ -138,26 +144,71 @@ class LinearUpsampleConv3D_V2(SegmentationUpsampling3D):
         patch_size : Size of each 3D patch.
         return_binary : Whether to threshold predictions into binary segmentation masks.
     """
-    def __init__(self, *args, decoder_cls: Type[nn.Module] = UpsampleConvSegAdaptor, **kwargs):
+
+    def __init__(
+        self, *args, decoder_cls: Type[nn.Module] = UpsampleConvSegAdaptor, **kwargs
+    ):
         super().__init__(*args, **kwargs)
         self.is_task11 = False
         self.is_task06 = False
         self.decoder_cls = decoder_cls
 
-    def fit(self):
+    def fit(
+        self,
+        *,
+        shot_features,
+        shot_labels,
+        shot_coordinates,
+        shot_ids,
+        shot_patch_sizes,
+        shot_patch_spacings,
+        shot_image_sizes,
+        shot_image_origins,
+        shot_image_spacings,
+        shot_image_directions,
+        shot_label_spacings,
+        shot_label_origins,
+        shot_label_directions,
+        **kwargs,
+    ):
+        patch_labels = []
+        for idx, label in tqdm(enumerate(shot_labels), desc="Extracting patch labels"):
+            case_patch_labels = extract_patch_labels(
+                label=label,
+                label_spacing=shot_label_spacings[shot_ids[idx]],
+                label_origin=shot_label_origins[shot_ids[idx]],
+                label_direction=shot_label_directions[shot_ids[idx]],
+                image_size=shot_image_sizes[shot_ids[idx]],
+                image_origin=shot_image_origins[shot_ids[idx]],
+                image_spacing=shot_image_spacings[shot_ids[idx]],
+                image_direction=shot_image_directions[shot_ids[idx]],
+                start_coordinates=shot_coordinates[idx],
+                patch_size=self.global_patch_size,
+                patch_spacing=self.global_patch_spacing,
+            )
+            patch_labels.append(case_patch_labels)
+
+        patch_labels = np.array(patch_labels, dtype=object)
+
         # build training data and loader
         train_data = construct_data_with_labels(
-            coordinates=self.shot_coordinates,
-            embeddings=self.shot_features,
-            case_names=self.shot_names,
-            patch_sizes=self.shot_patch_sizes,
-            patch_spacings=self.shot_patch_spacings,
-            labels=self.shot_labels,
+            coordinates=shot_coordinates,
+            embeddings=shot_features,
+            case_ids=shot_ids,
+            patch_sizes=shot_patch_sizes,
+            patch_spacings=shot_patch_spacings,
+            labels=patch_labels,
+            image_sizes=shot_image_sizes,
+            image_origins=shot_image_origins,
+            image_spacings=shot_image_spacings,
+            image_directions=shot_image_directions,
         )
 
-        train_loader = load_patch_data(train_data, batch_size=1, balance_bg=self.balance_bg)
+        train_loader = load_patch_data(
+            train_data, batch_size=1, balance_bg=self.balance_bg
+        )
 
-        max_class = max_class_label_from_labels(self.shot_labels)
+        max_class = max_class_label_from_labels(patch_labels)
         if max_class >= 100:
             self.is_task11 = True
             num_classes = 4
@@ -177,50 +228,84 @@ class LinearUpsampleConv3D_V2(SegmentationUpsampling3D):
         logging.info(f"Training decoder with {num_classes} classes")
         decoder.to(self.device)
         try:
-            self.decoder = train_seg_adaptor3d(decoder, train_loader, self.device, is_task11=self.is_task11, is_task06=self.is_task06)
+            self.decoder = train_seg_adaptor3d(
+                decoder,
+                train_loader,
+                self.device,
+                is_task11=self.is_task11,
+                is_task06=self.is_task06,
+            )
         except torch.cuda.OutOfMemoryError as e:
             logging.warning(f"Out of memory error occurred while training decoder: {e}")
-            if self.device.type == 'cuda':
+            if self.device.type == "cuda":
                 logging.info("Retrying using CPU")
                 self.device = torch.device("cpu")
                 decoder.to(self.device)
-                self.decoder = train_seg_adaptor3d(decoder, train_loader, self.device, is_task11=self.is_task11, is_task06=self.is_task06)
+                self.decoder = train_seg_adaptor3d(
+                    decoder,
+                    train_loader,
+                    self.device,
+                    is_task11=self.is_task11,
+                    is_task06=self.is_task06,
+                )
             else:
                 raise
 
-    def predict(self) -> list:
-        # build test data and loader
-        test_data = construct_data_with_labels(
-            coordinates=self.test_coordinates,
-            embeddings=self.test_features,
-            case_names=self.test_cases,
-            patch_sizes=self.test_patch_sizes,
-            patch_spacings=self.test_patch_spacings,
-            image_sizes=self.test_image_sizes,
-            image_origins=self.test_image_origins,
-            image_spacings=self.test_image_spacings,
-            image_directions=self.test_image_directions,
-        )
+    def predict(self, test_case_ids) -> list:
+        predictions = []
+        for case_id in test_case_ids:
+            logging.info(f"Running inference for case {case_id}")
+            test_input = process(
+                read_inputs(input_dir=INPUT_DIRECTORY, case_names=[case_id])[0]
+            )
 
-        # wrong patch spacing
-        for data in test_data:
-            data['patch_spacing'] = data['image_spacing']
+            # build test data and loader
+            test_data = construct_data_with_labels(
+                coordinates=[test_input["coordinates"]],
+                embeddings=[test_input["embeddings"]],
+                case_ids=[case_id],
+                patch_sizes={case_id: test_input["patch_size"]},
+                patch_spacings={case_id: test_input["patch_spacing"]},
+                image_sizes={case_id: test_input["image_size"]},
+                image_origins={case_id: test_input["image_origin"]},
+                image_spacings={case_id: test_input["image_spacing"]},
+                image_directions={case_id: test_input["image_direction"]},
+            )
 
-        test_loader = load_patch_data(test_data, batch_size=1)
+            # wrong patch spacing
+            for data in test_data:
+                data["patch_spacing"] = data["image_spacing"]
 
-        # run inference using the trained decoder
-        return inference3d_softmax(
-            decoder=self.decoder,
-            data_loader=test_loader,
-            device=self.device,
-            return_binary=self.return_binary,
-            test_cases=self.test_cases,
-            test_label_sizes=self.test_label_sizes,
-            test_label_spacing=self.test_label_spacing,
-            test_label_origins=self.test_label_origins,
-            test_label_directions=self.test_label_directions,
-            is_task11=self.is_task11
-        )
+            test_loader = load_patch_data(test_data, batch_size=1)
+
+            # run inference using the trained decoder
+            prediction = inference3d_softmax(
+                decoder=self.decoder,
+                data_loader=test_loader,
+                device=self.device,
+                return_binary=self.return_binary,
+                test_cases=[case_id],
+                test_label_sizes={case_id: test_input["label_size"]},
+                test_label_spacing={case_id: test_input["label_spacing"]},
+                test_label_origins={case_id: test_input["label_origin"]},
+                test_label_directions={case_id: test_input["label_direction"]},
+                is_task11=self.is_task11,
+            )
+            assert len(prediction) == 1
+            prediction = prediction[0]
+
+            workdir = (
+                Path("/opt/app/predictions")
+                if Path("/opt/app/predictions").exists()
+                else Path("unicorn/workdir")
+            )
+            path = workdir / f"vision/{case_id}_pred.npy"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            np.save(path, prediction)
+
+            predictions.append(path)
+
+        return predictions
 
 
 def expand_instance_labels(y: np.ndarray) -> np.ndarray:
@@ -246,12 +331,12 @@ def expand_instance_labels(y: np.ndarray) -> np.ndarray:
     structure = np.ones((3,) * y.ndim, dtype=np.uint8)
 
     # --- label==1 ---
-    mask1 = (y == 1)
+    mask1 = y == 1
     if np.any(mask1):
         lbl1, n1 = ndi.label(mask1, structure=structure)
         next_lab = 1
         for cid in range(1, n1 + 1):
-            blob = (lbl1 == cid)
+            blob = lbl1 == cid
             if not np.any(blob):
                 continue
             assign = next_lab if next_lab <= 99 else 99
@@ -262,12 +347,12 @@ def expand_instance_labels(y: np.ndarray) -> np.ndarray:
     out[y == 2] = 100
 
     # --- label==3 ---
-    mask3 = (y == 3)
+    mask3 = y == 3
     if np.any(mask3):
         lbl3, n3 = ndi.label(mask3, structure=structure)
         base = 201
         for cid in range(1, n3 + 1):
-            blob = (lbl3 == cid)
+            blob = lbl3 == cid
             if not np.any(blob):
                 continue
             out[blob] = base
@@ -276,12 +361,24 @@ def expand_instance_labels(y: np.ndarray) -> np.ndarray:
     return out
 
 
-def inference3d_softmax(*, decoder, data_loader, device, return_binary, test_cases, test_label_sizes, test_label_spacing, test_label_origins, test_label_directions, is_task11=False):
+def inference3d_softmax(
+    *,
+    decoder,
+    data_loader,
+    device,
+    return_binary,
+    test_cases,
+    test_label_sizes,
+    test_label_spacing,
+    test_label_origins,
+    test_label_directions,
+    is_task11=False,
+):
     decoder.eval()
     with torch.no_grad():
         grouped_predictions = defaultdict(lambda: defaultdict(list))
 
-        for batch in tqdm(data_loader, desc="Inference"):
+        for batch in data_loader:
             inputs = batch["patch"].to(device)  # shape: [B, ...]
             coords = batch["coordinates"]  # list of 3 tensors
             image_idxs = batch["case_number"]
@@ -351,7 +448,7 @@ def inference3d_softmax(*, decoder, data_loader, device, return_binary, test_cas
                         "image_direction": patches[0]["image_direction"],
                     }
                 )
-        
+
         grids = create_grid(averaged_patches)
 
         aligned_preds = {}
@@ -370,15 +467,15 @@ def inference3d_softmax(*, decoder, data_loader, device, return_binary, test_cas
                 sitk.sitkNearestNeighbor,
                 gt_origin,
                 gt_spacing,
-                gt_direction
+                gt_direction,
             )
-            
+
             if is_task11:
                 pred_on_gt_arr = sitk.GetArrayFromImage(pred_on_gt)
                 aligned_preds[case_id] = expand_instance_labels(pred_on_gt_arr)
             else:
                 aligned_preds[case_id] = sitk.GetArrayFromImage(pred_on_gt)
-            
+
         return [j for j in aligned_preds.values()]
 
 
@@ -462,8 +559,8 @@ def remap_task11_labels(label_patch_features):
 
             # Build masks for each rule
             mask1 = (mapped > 0) & (mapped < 100)
-            mask2 = (mapped == 100)
-            mask3 = (mapped > 200)
+            mask2 = mapped == 100
+            mask3 = mapped > 200
 
             if mask1.any() or mask2.any() or mask3.any():
                 mapped[mask1] = 1
@@ -495,7 +592,16 @@ def map_labels(y: torch.Tensor) -> torch.Tensor:
     return y_new
 
 
-def train_seg_adaptor3d(decoder, data_loader, device, num_epochs = 3, iterations_per_epoch: int | None = None, is_task11=False, is_task06=False, verbose: bool = True):
+def train_seg_adaptor3d(
+    decoder,
+    data_loader,
+    device,
+    num_epochs=3,
+    iterations_per_epoch: int | None = None,
+    is_task11=False,
+    is_task06=False,
+    verbose: bool = True,
+):
     ce_loss = nn.CrossEntropyLoss()
     optimizer = optim.Adam(decoder.parameters(), lr=1e-3)
 
@@ -505,9 +611,15 @@ def train_seg_adaptor3d(decoder, data_loader, device, num_epochs = 3, iterations
         epoch_loss = 0.0
 
         # batch progress
-        batch_iter = tqdm(data_loader, total=iterations_per_epoch, desc=f"Epoch {epoch+1}/{num_epochs}", leave=False, disable=not verbose)
+        batch_iter = tqdm(
+            data_loader,
+            total=iterations_per_epoch,
+            desc=f"Epoch {epoch+1}/{num_epochs}",
+            leave=False,
+            disable=not verbose,
+        )
         iteration_count = 0
-    
+
         for batch in batch_iter:
             iteration_count += 1
 
@@ -518,9 +630,9 @@ def train_seg_adaptor3d(decoder, data_loader, device, num_epochs = 3, iterations
                 patch_label = map_labels(patch_label)
 
             optimizer.zero_grad()
-            de_output = decoder(patch_emb) 
+            de_output = decoder(patch_emb)
 
-            ce = ce_loss(de_output, patch_label) 
+            ce = ce_loss(de_output, patch_label)
             if is_task06:
                 loss = ce
             else:
@@ -533,17 +645,26 @@ def train_seg_adaptor3d(decoder, data_loader, device, num_epochs = 3, iterations
             epoch_loss += loss.item()
 
             # Update progress bar with current loss and running average
-            batch_iter.set_postfix(loss=f"{loss.item():.4f}", avg=f"{epoch_loss / iteration_count:.4f}")
+            batch_iter.set_postfix(
+                loss=f"{loss.item():.4f}", avg=f"{epoch_loss / iteration_count:.4f}"
+            )
 
-            if iterations_per_epoch is not None and iteration_count >= iterations_per_epoch:
+            if (
+                iterations_per_epoch is not None
+                and iteration_count >= iterations_per_epoch
+            ):
                 break
 
-        logging.info(f"Epoch {epoch+1}: Avg total loss = {epoch_loss / iteration_count:.4f}")
+        logging.info(
+            f"Epoch {epoch+1}: Avg total loss = {epoch_loss / iteration_count:.4f}"
+        )
 
     return decoder
 
 
-def exact_triplet_from_ref(flat: int, ref: tuple[int, int, int]) -> tuple[int, int, int]:
+def exact_triplet_from_ref(
+    flat: int, ref: tuple[int, int, int]
+) -> tuple[int, int, int]:
     """
     Find integers (D,H,W) with D*H*W == flat, close to the heuristic proportions
     implied by 'ref' (D_ref,H_ref,W_ref).
@@ -579,6 +700,8 @@ def exact_triplet_from_ref(flat: int, ref: tuple[int, int, int]) -> tuple[int, i
     H = base // D
 
     # ensure non-zero
-    D = max(1, D); H = max(1, H); W = max(1, W)
+    D = max(1, D)
+    H = max(1, H)
+    W = max(1, W)
     assert D * H * W == flat, f"factorization failed: {D}*{H}*{W} != {flat}"
     return D, H, W

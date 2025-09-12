@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
+from pathlib import Path
 
 import numpy as np
 import SimpleITK as sitk
@@ -16,11 +17,12 @@ from unicorn_eval.adaptors.segmentation.data_handling import (
     construct_data_with_labels, load_patch_data,
     make_patch_level_neural_representation)
 from unicorn_eval.adaptors.segmentation.inference import world_to_voxel
+from unicorn_eval.io import INPUT_DIRECTORY, process, read_inputs
 
 
 class LinearUpsampleConv3D_V1(PatchLevelTaskAdaptor):
     """
-    Patch-level adaptor that performs segmentation by linearly upsampling 
+    Patch-level adaptor that performs segmentation by linearly upsampling
     3D patch-level features followed by convolutional refinement.
 
     This adaptor takes precomputed patch-level features from 3D medical images
@@ -38,7 +40,7 @@ class LinearUpsampleConv3D_V1(PatchLevelTaskAdaptor):
         shot_features : Patch-level feature embeddings of few-shot labeled volumes.
         shot_labels : Full-resolution segmentation labels (used to supervise the decoder).
         shot_coordinates : Patch coordinates corresponding to shot_features.
-        shot_names : Case identifiers for few-shot examples.
+        shot_ids : Case identifiers for few-shot examples.
         test_features : Patch-level feature embeddings for testing.
         test_coordinates : Patch coordinates corresponding to test_features.
         test_names : Case identifiers for testing examples.
@@ -52,99 +54,66 @@ class LinearUpsampleConv3D_V1(PatchLevelTaskAdaptor):
 
     def __init__(
         self,
-        shot_features,
-        shot_coordinates,
-        shot_names,
-        shot_labels,
-        shot_image_spacing,
-        shot_image_origins,
-        shot_image_directions,
-        shot_image_sizes,
-        shot_label_spacing,
-        shot_label_origins,
-        shot_label_directions,
-        test_features,
-        test_coordinates,
-        test_names,
-        test_image_sizes,
-        test_image_origins,
-        test_image_spacings,
-        test_image_directions,
-        test_label_sizes,
-        test_label_spacing,
-        test_label_origins,
-        test_label_directions,
         global_patch_size,
         global_patch_spacing,
-        shot_patch_sizes=None,
-        test_patch_sizes=None,
-        shot_patch_spacings=None,
-        test_patch_spacings=None,
         return_binary=True,
     ):
-        label_patch_features = []
-        for idx, label in enumerate(shot_labels):
-            label_feats = extract_patch_labels_no_resample(
-                label=label,
-                label_spacing=shot_label_spacing[shot_names[idx]],
-                label_origin=shot_label_origins[shot_names[idx]],
-                label_direction=shot_label_directions[shot_names[idx]],
-                image_size=shot_image_sizes[shot_names[idx]],
-                image_origin=shot_image_origins[shot_names[idx]],
-                image_spacing=shot_image_spacing[shot_names[idx]],
-                image_direction=shot_image_directions[shot_names[idx]],
-                patch_size=global_patch_size,
-            )
-            label_patch_features.append(label_feats)
-        label_patch_features = np.array(label_patch_features, dtype=object)
 
-        super().__init__(
-            shot_features=shot_features,
-            shot_labels=label_patch_features,
-            shot_coordinates=shot_coordinates,
-            test_features=test_features,
-            test_coordinates=test_coordinates,
-            shot_extra_labels=None,  # not used here
-        )
-
-        self.shot_names = shot_names
-        self.test_cases = test_names
-        self.test_image_sizes = test_image_sizes
-        self.test_image_origins = test_image_origins
-        self.test_image_spacings = test_image_spacings
-        self.test_image_directions = test_image_directions
-        self.shot_image_spacing = shot_image_spacing
-        self.shot_image_origins = shot_image_origins
-        self.shot_image_directions = shot_image_directions
-        self.test_label_sizes = test_label_sizes
-        self.test_label_spacing = test_label_spacing
-        self.test_label_origins = test_label_origins
-        self.test_label_directions = test_label_directions
-        self.patch_size = global_patch_size
-        self.patch_spacing = global_patch_spacing
-        self.shot_patch_sizes = shot_patch_sizes
-        self.test_patch_sizes = test_patch_sizes
-        self.shot_patch_spacings = shot_patch_spacings
-        self.test_patch_spacings = test_patch_spacings
+        self.global_patch_size = global_patch_size
+        self.global_patch_spacing = global_patch_spacing
         self.decoder = None
         self.return_binary = return_binary
 
-    def fit(self):
+    def fit(
+        self,
+        *,
+        shot_features,
+        shot_labels,
+        shot_coordinates,
+        shot_ids,
+        shot_patch_sizes,
+        shot_patch_spacings,
+        shot_image_sizes,
+        shot_image_origins,
+        shot_image_spacings,
+        shot_image_directions,
+        shot_label_spacings,
+        shot_label_origins,
+        shot_label_directions,
+        **kwargs,
+    ):
+        
+        patch_labels = []
+        for idx, label in enumerate(shot_labels):
+            case_patch_labels = extract_patch_labels_no_resample(
+                label=label,
+                label_spacing=shot_label_spacings[shot_ids[idx]],
+                label_origin=shot_label_origins[shot_ids[idx]],
+                label_direction=shot_label_directions[shot_ids[idx]],
+                image_size=shot_image_sizes[shot_ids[idx]],
+                image_origin=shot_image_origins[shot_ids[idx]],
+                image_spacing=shot_image_spacings[shot_ids[idx]],
+                image_direction=shot_image_directions[shot_ids[idx]],
+                patch_size=self.global_patch_size,
+            )
+            patch_labels.append(case_patch_labels)
+        patch_labels = np.array(patch_labels, dtype=object)
+        
         # build training data and loader
         train_data = construct_data_with_labels(
-            coordinates=self.shot_coordinates,
-            embeddings=self.shot_features,
-            case_names=self.shot_names,
-            patch_sizes=self.shot_patch_sizes,
-            patch_spacings=self.shot_patch_spacings,
-            labels=self.shot_labels,
+            coordinates=shot_coordinates,
+            embeddings=shot_features,
+            case_ids=shot_ids,
+            patch_sizes=shot_patch_sizes,
+            patch_spacings=shot_patch_spacings,
+            labels=patch_labels,
         )
         train_loader = load_patch_data(train_data, batch_size=1)
 
         # set up device and model
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         decoder = LightweightSegAdaptor(
-            target_shape=self.patch_size,
+            target_shape=self.global_patch_size,
         )
 
         decoder.to(self.device)
@@ -152,7 +121,7 @@ class LinearUpsampleConv3D_V1(PatchLevelTaskAdaptor):
             self.decoder = train_seg_adaptor3d(decoder, train_loader, self.device)
         except torch.cuda.OutOfMemoryError as e:
             logging.warning(f"Out of memory error occurred while training decoder: {e}")
-            if self.device.type == 'cuda':
+            if self.device.type == "cuda":
                 logging.info("Retrying using CPU")
                 self.device = torch.device("cpu")
                 decoder.to(self.device)
@@ -160,25 +129,56 @@ class LinearUpsampleConv3D_V1(PatchLevelTaskAdaptor):
             else:
                 raise
 
-    def predict(self) -> np.ndarray:
-        # build test data and loader
-        test_data = construct_data_with_labels(
-            coordinates=self.test_coordinates,
-            embeddings=self.test_features,
-            case_names=self.test_cases,
-            patch_sizes=self.test_patch_sizes,
-            patch_spacings=self.test_patch_spacings,
-            image_sizes=self.test_image_sizes,
-            image_origins=self.test_image_origins,
-            image_spacings=self.test_image_spacings,
-            image_directions=self.test_image_directions,
-        )
+    def predict(self, test_case_ids) -> list[Path]:
+        predictions = []
+        for case_id in test_case_ids:
+            logging.info(f"Running inference for case {case_id}")
+            test_input = process(
+                read_inputs(input_dir=INPUT_DIRECTORY, case_names=[case_id])[0]
+            )
+            
+            # build test data and loader
+            test_data = construct_data_with_labels(
+                coordinates=[test_input["coordinates"]],
+                embeddings=[test_input["embeddings"]],
+                case_ids=[case_id],
+                patch_sizes={case_id: test_input["patch_size"]},
+                patch_spacings={case_id: test_input["patch_spacing"]},
+                image_sizes={case_id: test_input["image_size"]},
+                image_origins={case_id: test_input["image_origin"]},
+                image_spacings={case_id: test_input["image_spacing"]},
+                image_directions={case_id: test_input["image_direction"]},
+            )
 
-        test_loader = load_patch_data(test_data, batch_size=1)
-        # run inference using the trained decoder
+            test_loader = load_patch_data(test_data, batch_size=1)
+            # run inference using the trained decoder
 
-        return seg_inference3d(self.decoder, test_loader, self.device, self.return_binary, self.test_cases, self.test_label_sizes, self.test_label_spacing, self.test_label_origins, self.test_label_directions)
+            prediction =  seg_inference3d(
+                decoder=self.decoder,
+                data_loader=test_loader,
+                device=self.device,
+                return_binary=self.return_binary,
+                test_cases=[case_id],
+                test_label_sizes={case_id: test_input["label_size"]},
+                test_label_spacing={case_id: test_input["label_spacing"]},
+                test_label_origins={case_id: test_input["label_origin"]},
+                test_label_directions={case_id: test_input["label_direction"]},
+            )
+            assert len(prediction) == 1
+            prediction = prediction[0]
 
+            workdir = (
+                Path("/opt/app/predictions")
+                if Path("/opt/app/predictions").exists()
+                else Path("unicorn/workdir")
+            )
+            path = workdir / f"vision/{case_id}_pred.npy"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            np.save(path, prediction)
+
+            predictions.append(path)
+
+        return predictions
 
 
 def extract_patch_labels_no_resample(
@@ -207,7 +207,7 @@ def extract_patch_labels_no_resample(
             ((x_start, x_end), (y_start, y_end), (z_start, z_end)).
         - features (list[float]): List of features extracted from the patch
     """
-    label_array = label.copy()  
+    label_array = label.copy()
     label = sitk.GetImageFromArray(label)
     label.SetOrigin(image_origin)
     label.SetSpacing(image_spacing)
@@ -222,14 +222,13 @@ def extract_patch_labels_no_resample(
     for z in range(0, D - d + 1, d):
         for y in range(0, H - h + 1, h):
             for x in range(0, W - w + 1, w):
-                patch = label_array[z:z + d, y:y + h, x:x + w]
+                patch = label_array[z : z + d, y : y + h, x : x + w]
                 corner_index = (x, y, z)
                 physical_coord = label.TransformIndexToPhysicalPoint(corner_index)
 
-                patch_features.append({
-                "coordinates": list(physical_coord),
-                "features": patch
-            })
+                patch_features.append(
+                    {"coordinates": list(physical_coord), "features": patch}
+                )
 
     if patch_spacing is None:
         patch_spacing = label.GetSpacing()
@@ -248,7 +247,17 @@ def extract_patch_labels_no_resample(
     return patch_labels
 
 
-def seg_inference3d(decoder, data_loader, device, return_binary,  test_cases, test_label_sizes, test_label_spacing, test_label_origins, test_label_directions):
+def seg_inference3d(
+    decoder,
+    data_loader,
+    device,
+    return_binary,
+    test_cases,
+    test_label_sizes,
+    test_label_spacing,
+    test_label_origins,
+    test_label_directions,
+):
     decoder.eval()
     with torch.no_grad():
         grouped_predictions = defaultdict(lambda: defaultdict(list))
@@ -341,10 +350,8 @@ def seg_inference3d(decoder, data_loader, device, return_binary,  test_cases, te
 
                 i, j, k = world_to_voxel(coord, origin, spacing, inv_direction)
 
-         
                 d, h, w = patch["features"].shape
 
-    
                 z_slice = slice(k, k + d)
                 y_slice = slice(j, j + h)
                 x_slice = slice(i, i + w)
@@ -360,7 +367,6 @@ def seg_inference3d(decoder, data_loader, device, return_binary,  test_cases, te
         return final_images
 
 
-
 class LightweightSegAdaptor(nn.Module):
     def __init__(self, target_shape=None, in_channels=32, num_classes=2):
         super().__init__()
@@ -372,10 +378,10 @@ class LightweightSegAdaptor(nn.Module):
             nn.ReLU(inplace=True),
             nn.Conv3d(in_channels, in_channels, kernel_size=3, padding=1),
             nn.ReLU(inplace=True),
-            nn.Conv3d(in_channels, num_classes, kernel_size=1)
-            # nn.Conv3d(mid_channels, num_classes, kernel_size=3, padding=1) 
+            nn.Conv3d(in_channels, num_classes, kernel_size=1),
+            # nn.Conv3d(mid_channels, num_classes, kernel_size=3, padding=1)
         )
-        
+
     def forward(self, x):
         C = self.in_channels
         flat_voxel_count = x.shape[1] // C
@@ -390,7 +396,9 @@ class LightweightSegAdaptor(nn.Module):
         W = round(W_ref * k)
 
         x = x.view(1, C, D, H, W)
-        x = F.interpolate(x, size=self.target_shape, mode="trilinear", align_corners=False)
+        x = F.interpolate(
+            x, size=self.target_shape, mode="trilinear", align_corners=False
+        )
         x = self.conv_blocks(x)
 
         return x
@@ -399,7 +407,9 @@ class LightweightSegAdaptor(nn.Module):
 def dice_loss(pred, target, smooth=1e-5):
     num_classes = pred.shape[1]
     pred = F.softmax(pred, dim=1)
-    one_hot_target = F.one_hot(target, num_classes=num_classes).permute(0, 4, 1, 2, 3).float()
+    one_hot_target = (
+        F.one_hot(target, num_classes=num_classes).permute(0, 4, 1, 2, 3).float()
+    )
 
     intersection = torch.sum(pred * one_hot_target, dim=(2, 3, 4))
     union = torch.sum(pred + one_hot_target, dim=(2, 3, 4))
@@ -408,7 +418,7 @@ def dice_loss(pred, target, smooth=1e-5):
     return 1 - dice.mean()
 
 
-def train_seg_adaptor3d(decoder, data_loader, device, num_epochs = 3):
+def train_seg_adaptor3d(decoder, data_loader, device, num_epochs=3):
     ce_loss = nn.CrossEntropyLoss()
     optimizer = optim.Adam(decoder.parameters(), lr=1e-3)
     # Train decoder
@@ -417,7 +427,9 @@ def train_seg_adaptor3d(decoder, data_loader, device, num_epochs = 3):
         epoch_loss = 0.0
 
         # batch progress
-        batch_iter = tqdm(data_loader, desc=f"Epoch {epoch+1}/{num_epochs}", leave=False)
+        batch_iter = tqdm(
+            data_loader, desc=f"Epoch {epoch+1}/{num_epochs}", leave=False
+        )
         iteration_count = 0
 
         for batch in batch_iter:
@@ -428,7 +440,7 @@ def train_seg_adaptor3d(decoder, data_loader, device, num_epochs = 3):
 
             optimizer.zero_grad()
             de_output = decoder(patch_emb)
-            ce = ce_loss(de_output, patch_label)  
+            ce = ce_loss(de_output, patch_label)
             dice = dice_loss(de_output, patch_label)
             loss = ce + dice
 
@@ -436,7 +448,11 @@ def train_seg_adaptor3d(decoder, data_loader, device, num_epochs = 3):
             optimizer.step()
 
             epoch_loss += loss.item()
-            batch_iter.set_postfix(loss=f"{loss.item():.4f}", avg=f"{epoch_loss / iteration_count:.4f}")
+            batch_iter.set_postfix(
+                loss=f"{loss.item():.4f}", avg=f"{epoch_loss / iteration_count:.4f}"
+            )
 
-        logging.info(f"Epoch {epoch+1}: Avg total loss = {epoch_loss / iteration_count:.4f}")                               
+        logging.info(
+            f"Epoch {epoch+1}: Avg total loss = {epoch_loss / iteration_count:.4f}"
+        )
     return decoder

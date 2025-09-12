@@ -1,7 +1,8 @@
+import logging
 from collections import OrderedDict, defaultdict
+from pathlib import Path
 from typing import Iterable
 
-import logging
 import numpy as np
 import pandas
 
@@ -29,6 +30,10 @@ class Spider:
         self.case_ids = case_ids
 
     def score_case(self, gt, pred):
+        if isinstance(gt, (Path, str)):
+            gt = np.load(gt)
+        if isinstance(pred, (Path, str)):
+            pred = np.load(pred)
 
         mask_manual = gt.astype(np.int64)
         mask_automatic = pred.astype(np.int64)
@@ -127,16 +132,14 @@ class Spider:
             "DiceScoreSpinalCanal": dice_score_SC,
             "OverallDiceScore": overall_dice_score,
             "DetectionRateVertebrae": detection_rate_vert,
-            "DetectionRateDiscs": detection_rate_discs
+            "DetectionRateDiscs": detection_rate_discs,
         }
 
     def compute_metrics(self):
         metric_accumulator = []
         gts = self.ground_truths
         for i, gt in enumerate(gts):
-            metric = self.score_case(
-                gt, self.inputs[i]
-            )
+            metric = self.score_case(gt, self.inputs[i])
             metric_accumulator.append(metric)
 
         df = pandas.DataFrame(metric_accumulator)

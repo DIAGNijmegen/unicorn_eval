@@ -55,7 +55,17 @@ def train_decoder(decoder, dataloader, num_epochs=200, lr=0.001):
     return decoder
 
 
-def train_decoder3d(decoder, data_loader, device, num_epochs: int = 3, iterations_per_epoch: int | None = None, loss_fn=None, optimizer=None, label_mapper=None, verbose: bool = True):
+def train_decoder3d(
+    decoder,
+    data_loader,
+    device,
+    num_epochs: int = 3,
+    iterations_per_epoch: int | None = None,
+    loss_fn=None,
+    optimizer=None,
+    label_mapper=None,
+    verbose: bool = True,
+):
     if loss_fn is None:
         loss_fn = DiceLoss(sigmoid=True)
     if optimizer is None:
@@ -66,7 +76,13 @@ def train_decoder3d(decoder, data_loader, device, num_epochs: int = 3, iteration
         epoch_loss = 0
 
         iteration_count = 0
-        batch_iter = tqdm(data_loader, total=iterations_per_epoch, desc=f"Epoch {epoch+1}/{num_epochs}", leave=False, disable=not verbose)
+        batch_iter = tqdm(
+            data_loader,
+            total=iterations_per_epoch,
+            desc=f"Epoch {epoch+1}/{num_epochs}",
+            leave=False,
+            disable=not verbose,
+        )
         for batch in batch_iter:
             iteration_count += 1
 
@@ -86,11 +102,18 @@ def train_decoder3d(decoder, data_loader, device, num_epochs: int = 3, iteration
             epoch_loss += loss.item()
 
             # Update progress bar with current loss and running average
-            batch_iter.set_postfix(loss=f"{loss.item():.4f}", avg=f"{epoch_loss / iteration_count:.4f}")
+            batch_iter.set_postfix(
+                loss=f"{loss.item():.4f}", avg=f"{epoch_loss / iteration_count:.4f}"
+            )
 
-            if iterations_per_epoch is not None and iteration_count >= iterations_per_epoch:
+            if (
+                iterations_per_epoch is not None
+                and iteration_count >= iterations_per_epoch
+            ):
                 break
 
-        logging.info(f"Epoch {epoch+1}: Avg total loss = {epoch_loss / iteration_count:.4f}")
+        logging.info(
+            f"Epoch {epoch+1}: Avg total loss = {epoch_loss / iteration_count:.4f}"
+        )
 
     return decoder

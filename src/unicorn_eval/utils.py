@@ -12,8 +12,11 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-import json
+import os
+import random
+import torch
 import logging
+from collections import defaultdict
 from functools import partial
 from typing import Any
 
@@ -27,6 +30,7 @@ from unicorn_eval.adaptors import (KNN, ConvDetector, DensityMap, KNNRegressor,
                                    MultiLayerPerceptronRegressor,
                                    PatchNoduleRegressor, WeightedKNN,
                                    WeightedKNNRegressor)
+from unicorn_eval.adaptors.base import Adaptor
 from unicorn_eval.adaptors.segmentation.aimhi_linear_upsample_conv3d.v1 import \
     LinearUpsampleConv3D_V1
 from unicorn_eval.adaptors.segmentation.aimhi_linear_upsample_conv3d.v2 import (
@@ -142,43 +146,26 @@ METRIC_DICT = {
 }
 
 
-def adapt_features(
+def set_all_seeds(seed: int):
+    os.environ["PYTHONHASHSEED"] = str(seed)
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.benchmark = False
+
+
+def get_adaptor(
     *,
     adaptor_name: str,
     task_type: str,
-    shot_features: np.ndarray,
-    shot_labels: np.ndarray,
-    test_features: np.ndarray,
-    shot_coordinates: list[np.ndarray] | None = None,
-    test_coordinates: list[np.ndarray] | None = None,
-    shot_names: list[str] | None = None,
-    test_names: list[str] | None = None,
+    num_shots: int,
     global_patch_size: list[int] | int | None = 224,
     global_patch_spacing: list[float] | float | None = None,
-    shot_patch_sizes: dict[str, list[int] | int] | None = None,
-    test_patch_sizes: dict[str, list[int] | int] | None = None,
-    shot_patch_spacings: dict[str, list[float] | float] | None = None,
-    test_patch_spacings: dict[str, list[float] | float] | None = None,
     feature_grid_resolution: list[int] | None = None,
-    test_image_sizes: dict[str, list[int]] | None = None,
-    test_image_spacing: dict[str, list[float]] | None = None,
-    test_image_origins: dict[str, list[float]] | None = None,
-    test_image_directions: dict[str, list[float]] | None = None,
-    test_label_sizes: dict[str, list[int]] | None = None,
-    test_label_spacing: dict[str, list[float]] | None = None,
-    test_label_origins: dict[str, list[float]] | None = None,
-    test_label_directions: dict[str, list[float]] | None = None,
-    shot_image_sizes: dict[str, list[int]] | None = None,
-    shot_image_spacing: dict[str, list[float]] | None = None,
-    shot_image_origins: dict[str, list[float]] | None = None,
-    shot_image_directions: dict[str, list[float]] | None = None,
-    shot_label_spacing: dict[str, list[float]] | None = None,
-    shot_label_origins: dict[str, list[float]] | None = None,
-    shot_label_directions: dict[str, list[float]] | None = None,
-    shot_extra_labels: np.ndarray | None = None,
     return_probabilities: bool = False,
-) -> np.ndarray:
-    num_shots = len(shot_features)
+    seed: int = 0,
+) -> Adaptor:
 
     if "-nn" in adaptor_name:
         k = int(adaptor_name.split("-")[0])
@@ -186,55 +173,33 @@ def adapt_features(
         if "weighted" in adaptor_name:
             if task_type == "classification":
                 adaptor = WeightedKNN(
-                    shot_features=shot_features,
-                    shot_labels=shot_labels,
-                    test_features=test_features,
                     k=k,
                     return_probabilities=return_probabilities,
                 )
             elif task_type == "regression":
-                adaptor = WeightedKNNRegressor(
-                    shot_features=shot_features,
-                    shot_labels=shot_labels,
-                    test_features=test_features,
-                    k=k,
-                )
+                adaptor = WeightedKNNRegressor(k=k)
         else:
             if task_type == "classification":
                 adaptor = KNN(
-                    shot_features=shot_features,
-                    shot_labels=shot_labels,
-                    test_features=test_features,
                     k=k,
                     return_probabilities=return_probabilities,
                 )
             elif task_type == "regression":
-                adaptor = KNNRegressor(
-                    shot_features=shot_features,
-                    shot_labels=shot_labels,
-                    test_features=test_features,
-                    k=k,
-                )
+                adaptor = KNNRegressor(k=k)
 
     elif adaptor_name == "logistic-regression":
         assert task_type == "classification"
         adaptor = LogisticRegression(
-            shot_features=shot_features,
-            shot_labels=shot_labels,
-            test_features=test_features,
             max_iterations=1000,
             C=1.0,
             solver="lbfgs",
             return_probabilities=return_probabilities,
+            seed=seed,
         )
 
     elif "linear-probing" in adaptor_name:
         if task_type == "classification":
             adaptor = LinearProbing(
-                shot_features=shot_features,
-                shot_labels=shot_labels,
-                shot_extra_labels=shot_extra_labels,
-                test_features=test_features,
                 num_epochs=100,
                 learning_rate=0.001,
                 return_probabilities=return_probabilities,
@@ -244,10 +209,6 @@ def adapt_features(
             if "survival" in adaptor_name:
                 survival = True
             adaptor = LinearProbingRegressor(
-                shot_features=shot_features,
-                shot_labels=shot_labels,
-                shot_extra_labels=shot_extra_labels,
-                test_features=test_features,
                 survival=survival,
                 num_epochs=100,
                 learning_rate=0.001,
@@ -256,10 +217,6 @@ def adapt_features(
     elif "linear-classification" in adaptor_name:
         assert task_type == "classification", "Linear classification is only supported for classification tasks."
         adaptor = LinearProbing(
-            shot_features=shot_features,
-            shot_labels=shot_labels,
-            shot_extra_labels=shot_extra_labels,
-            test_features=test_features,
             num_epochs=100,
             learning_rate=0.001,
             return_probabilities=return_probabilities,
@@ -268,10 +225,6 @@ def adapt_features(
     elif "mlp" in adaptor_name:
         if task_type == "classification":
             adaptor = MultiLayerPerceptron(
-                shot_features=shot_features,
-                shot_labels=shot_labels,
-                shot_extra_labels=shot_extra_labels,
-                test_features=test_features,
                 hidden_dim=256,
                 num_epochs=100,
                 learning_rate=0.001,
@@ -282,10 +235,6 @@ def adapt_features(
             if "survival" in adaptor_name:
                 survival = True
             adaptor = MultiLayerPerceptronRegressor(
-                shot_features=shot_features,
-                shot_labels=shot_labels,
-                shot_extra_labels=shot_extra_labels,
-                test_features=test_features,
                 survival=survival,
                 hidden_dim=256,
                 num_epochs=100,
@@ -294,19 +243,6 @@ def adapt_features(
 
     elif adaptor_name == "patch-nodule-regressor":
         adaptor = PatchNoduleRegressor(
-            shot_features=shot_features,
-            shot_labels=shot_labels,
-            shot_coordinates=shot_coordinates,
-            shot_ids=shot_names,
-            test_features=test_features,
-            test_coordinates=test_coordinates,
-            test_ids=test_names,
-            test_image_origins=test_image_origins,
-            test_image_spacings=test_image_spacing,
-            test_image_directions=test_image_directions,
-            shot_image_spacings=shot_image_spacing,
-            shot_image_origins=shot_image_origins,
-            shot_image_directions=shot_image_directions,
             hidden_dim=64,
             num_epochs=50,
             lr=0.001,
@@ -315,13 +251,6 @@ def adapt_features(
     elif adaptor_name == "density-map":
         assert global_patch_size is not None, f"Global patch size must be specified for {adaptor_name} adaptor."
         adaptor = DensityMap(
-            shot_features=shot_features,
-            shot_labels=shot_labels,
-            shot_coordinates=shot_coordinates,
-            shot_names=shot_names,
-            test_features=test_features,
-            test_coordinates=test_coordinates,
-            test_names=test_names,
             global_patch_size=global_patch_size[0],
             heatmap_size=16,
         )
@@ -329,395 +258,92 @@ def adapt_features(
     elif adaptor_name == "conv-detector":
         assert global_patch_size is not None, f"Global patch size must be specified for {adaptor_name} adaptor."
         adaptor = ConvDetector(
-            shot_features=shot_features,
-            shot_labels=shot_labels,
-            shot_coordinates=shot_coordinates,
-            shot_names=shot_names,
-            test_features=test_features,
-            test_coordinates=test_coordinates,
-            test_names=test_names,
             patch_sizes=global_patch_size,
         )
 
     elif adaptor_name == "segmentation-upsampling":
         assert global_patch_size is not None, f"Global patch size must be specified for {adaptor_name} adaptor."
         adaptor = SegmentationUpsampling(
-            shot_features=shot_features,
-            shot_labels=shot_labels,
-            shot_coordinates=shot_coordinates,
-            shot_names=shot_names,
-            test_features=test_features,
-            test_coordinates=test_coordinates,
-            test_names=test_names,
-            test_image_sizes=test_image_sizes,
             global_patch_size=global_patch_size[0],
             global_patch_spacing=global_patch_spacing[0],
         )
     elif adaptor_name == "linear-upsample-conv3d":
         adaptor = LinearUpsampleConv3D_V1(
-            shot_features=shot_features,
-            shot_coordinates=shot_coordinates,
-            shot_names=shot_names,
-            shot_labels=shot_labels,
-            shot_label_spacing=shot_label_spacing,
-            shot_label_origins=shot_label_origins,
-            shot_label_directions=shot_label_directions,
-            test_features=test_features,
-            test_coordinates=test_coordinates,
-            test_names=test_names,  # try to remove this input
-            test_image_sizes=test_image_sizes,
-            test_image_origins=test_image_origins,
-            test_image_spacings=test_image_spacing,
-            test_image_directions=test_image_directions,
-            test_label_sizes=test_label_sizes,
-            test_label_spacing=test_label_spacing,
-            test_label_origins=test_label_origins,
-            test_label_directions=test_label_directions,
             global_patch_size=global_patch_size,
             global_patch_spacing=global_patch_spacing,
-            shot_image_sizes=shot_image_sizes,
-            shot_image_spacing=shot_image_spacing,
-            shot_image_origins=shot_image_origins,
-            shot_image_directions=shot_image_directions,
-            shot_patch_sizes=shot_patch_sizes,
-            test_patch_sizes=test_patch_sizes,
-            shot_patch_spacings=shot_patch_spacings,
-            test_patch_spacings=test_patch_spacings,
         )
     elif adaptor_name == "linear-upsample-conv3d-v2":
         adaptor = LinearUpsampleConv3D_V2(
-            shot_features=shot_features,
-            shot_coordinates=shot_coordinates,
-            shot_names=shot_names,
-            shot_labels=shot_labels,
-            shot_label_spacing=shot_label_spacing,
-            shot_label_origins=shot_label_origins,
-            shot_label_directions=shot_label_directions,
-            test_features=test_features,
-            test_coordinates=test_coordinates,
-            test_names=test_names,  # try to remove this input
-            test_image_sizes=test_image_sizes,
-            test_image_origins=test_image_origins,
-            test_image_spacings=test_image_spacing,
-            test_image_directions=test_image_directions,
-            test_label_sizes=test_label_sizes,
-            test_label_spacing=test_label_spacing,
-            test_label_origins=test_label_origins,
-            test_label_directions=test_label_directions,
             global_patch_size=global_patch_size,
             global_patch_spacing=None,
-            shot_image_sizes=shot_image_sizes,
-            shot_image_spacing=shot_image_spacing,
-            shot_image_origins=shot_image_origins,
-            shot_image_directions=shot_image_directions,
-            shot_patch_sizes=shot_patch_sizes,
-            test_patch_sizes=test_patch_sizes,
-            shot_patch_spacings=shot_patch_spacings,
-            test_patch_spacings=test_patch_spacings,
         )
     elif adaptor_name == "conv3d-linear-upsample":
         adaptor = LinearUpsampleConv3D_V2(
-            shot_features=shot_features,
-            shot_coordinates=shot_coordinates,
-            shot_names=shot_names,
-            shot_labels=shot_labels,
-            shot_label_spacing=shot_label_spacing,
-            shot_label_origins=shot_label_origins,
-            shot_label_directions=shot_label_directions,
-            test_features=test_features,
-            test_coordinates=test_coordinates,
-            test_names=test_names,  # try to remove this input
-            test_image_sizes=test_image_sizes,
-            test_image_origins=test_image_origins,
-            test_image_spacings=test_image_spacing,
-            test_image_directions=test_image_directions,
-            test_label_sizes=test_label_sizes,
-            test_label_spacing=test_label_spacing,
-            test_label_origins=test_label_origins,
-            test_label_directions=test_label_directions,
             global_patch_size=global_patch_size,
             global_patch_spacing=None,
-            shot_image_sizes=shot_image_sizes,
-            shot_image_spacing=shot_image_spacing,
-            shot_image_origins=shot_image_origins,
-            shot_image_directions=shot_image_directions,
-            shot_patch_sizes=shot_patch_sizes,
-            test_patch_sizes=test_patch_sizes,
-            shot_patch_spacings=shot_patch_spacings,
-            test_patch_spacings=test_patch_spacings,
             decoder_cls=ConvUpsampleSegAdaptor,
         )
 
     elif adaptor_name == "segmentation-upsampling-3d":
         adaptor = SegmentationUpsampling3D(
-            shot_features=shot_features,
-            shot_coordinates=shot_coordinates,
-            shot_names=shot_names,
-            shot_labels=shot_labels,
-            shot_label_spacing=shot_label_spacing,
-            shot_label_origins=shot_label_origins,
-            shot_label_directions=shot_label_directions,
-            test_features=test_features,
-            test_coordinates=test_coordinates,
-            test_names=test_names,  # try to remove this input
-            test_image_sizes=test_image_sizes,
-            test_image_origins=test_image_origins,
-            test_image_spacings=test_image_spacing,
-            test_image_directions=test_image_directions,
-            test_label_sizes=test_label_sizes,
-            test_label_spacing=test_label_spacing,
-            test_label_origins=test_label_origins,
-            test_label_directions=test_label_directions,
             global_patch_size=global_patch_size,
             global_patch_spacing=global_patch_spacing,
-            shot_image_sizes=shot_image_sizes,
-            shot_image_spacing=shot_image_spacing,
-            shot_image_origins=shot_image_origins,
-            shot_image_directions=shot_image_directions,
-            shot_patch_sizes=shot_patch_sizes,
-            test_patch_sizes=test_patch_sizes,
-            shot_patch_spacings=shot_patch_spacings,
-            test_patch_spacings=test_patch_spacings,
         )
 
     elif adaptor_name == "segmentation-upsampling-3d-v2":
         adaptor = SegmentationUpsampling3D_V2(
-            shot_features=shot_features,
-            shot_coordinates=shot_coordinates,
-            shot_names=shot_names,
-            shot_labels=shot_labels,
-            shot_label_spacing=shot_label_spacing,
-            shot_label_origins=shot_label_origins,
-            shot_label_directions=shot_label_directions,
-            test_features=test_features,
-            test_coordinates=test_coordinates,
-            test_names=test_names,  # try to remove this input
-            test_image_sizes=test_image_sizes,
-            test_image_origins=test_image_origins,
-            test_image_spacings=test_image_spacing,
-            test_image_directions=test_image_directions,
-            test_label_sizes=test_label_sizes,
-            test_label_spacing=test_label_spacing,
-            test_label_origins=test_label_origins,
-            test_label_directions=test_label_directions,
             global_patch_size=global_patch_size,
             global_patch_spacing=global_patch_spacing,
-            shot_image_sizes=shot_image_sizes,
-            shot_image_spacing=shot_image_spacing,
-            shot_image_origins=shot_image_origins,
-            shot_image_directions=shot_image_directions,
-            shot_patch_sizes=shot_patch_sizes,
-            test_patch_sizes=test_patch_sizes,
-            shot_patch_spacings=shot_patch_spacings,
-            test_patch_spacings=test_patch_spacings,
         )
 
     elif adaptor_name == "conv-segmentation-3d":
-        adaptor = ConvSegmentation3D(  # All args copied from segmentation-upsampling-3d
-            shot_features=shot_features,
-            shot_coordinates=shot_coordinates,
-            shot_names=shot_names,
-            shot_labels=shot_labels,
-            shot_label_spacing=shot_label_spacing,
-            shot_label_origins=shot_label_origins,
-            shot_label_directions=shot_label_directions,
-            test_features=test_features,
-            test_coordinates=test_coordinates,
-            test_names=test_names,  # try to remove this input
-            test_image_sizes=test_image_sizes,
-            test_image_origins=test_image_origins,
-            test_image_spacings=test_image_spacing,
-            test_image_directions=test_image_directions,
-            test_label_sizes=test_label_sizes,
-            test_label_spacing=test_label_spacing,
-            test_label_origins=test_label_origins,
-            test_label_directions=test_label_directions,
+        adaptor = ConvSegmentation3D(
             global_patch_size=global_patch_size,
             global_patch_spacing=global_patch_spacing,
             feature_grid_resolution=feature_grid_resolution,
-            shot_image_sizes=shot_image_sizes,
-            shot_image_spacing=shot_image_spacing,
-            shot_image_origins=shot_image_origins,
-            shot_image_directions=shot_image_directions,
-            shot_patch_sizes=shot_patch_sizes,
-            test_patch_sizes=test_patch_sizes,
-            shot_patch_spacings=shot_patch_spacings,
-            test_patch_spacings=test_patch_spacings,
         )
 
     elif adaptor_name == "detection-by-linear-upsample-conv3d":
         adaptor = LinearUpsampleConv3D_V2(
-            shot_features=shot_features,
-            shot_coordinates=shot_coordinates,
-            shot_names=shot_names,
-            shot_image_sizes=shot_image_sizes,
-            shot_image_spacing=shot_image_spacing,
-            shot_image_origins=shot_image_origins,
-            shot_image_directions=shot_image_directions,
-            shot_labels=shot_labels,
-            shot_label_spacing=shot_label_spacing,
-            shot_label_origins=shot_label_origins,
-            shot_label_directions=shot_label_directions,
-            test_features=test_features,
-            test_coordinates=test_coordinates,
-            test_names=test_names,
-            test_image_sizes=test_image_sizes,
-            test_image_origins=test_image_origins,
-            test_image_spacings=test_image_spacing,
-            test_image_directions=test_image_directions,
-            test_label_sizes=test_label_sizes,
-            test_label_spacing=test_label_spacing,
-            test_label_origins=test_label_origins,
-            test_label_directions=test_label_directions,
             global_patch_size=global_patch_size,
             global_patch_spacing=None,
-            shot_patch_sizes=shot_patch_sizes,
-            test_patch_sizes=test_patch_sizes,
-            shot_patch_spacings=shot_patch_spacings,
-            test_patch_spacings=test_patch_spacings,
             return_binary=False,
         )
 
     elif adaptor_name == "detection-by-conv3d-linear-upsample":
         adaptor = LinearUpsampleConv3D_V2(
-            shot_features=shot_features,
-            shot_coordinates=shot_coordinates,
-            shot_names=shot_names,
-            shot_image_sizes=shot_image_sizes,
-            shot_image_spacing=shot_image_spacing,
-            shot_image_origins=shot_image_origins,
-            shot_image_directions=shot_image_directions,
-            shot_labels=shot_labels,
-            shot_label_spacing=shot_label_spacing,
-            shot_label_origins=shot_label_origins,
-            shot_label_directions=shot_label_directions,
-            test_features=test_features,
-            test_coordinates=test_coordinates,
-            test_names=test_names,
-            test_image_sizes=test_image_sizes,
-            test_image_origins=test_image_origins,
-            test_image_spacings=test_image_spacing,
-            test_image_directions=test_image_directions,
-            test_label_sizes=test_label_sizes,
-            test_label_spacing=test_label_spacing,
-            test_label_origins=test_label_origins,
-            test_label_directions=test_label_directions,
             global_patch_size=global_patch_size,
             global_patch_spacing=None,
-            shot_patch_sizes=shot_patch_sizes,
-            test_patch_sizes=test_patch_sizes,
-            shot_patch_spacings=shot_patch_spacings,
-            test_patch_spacings=test_patch_spacings,
             return_binary=False,
             decoder_cls=ConvUpsampleSegAdaptor,
         )
 
     elif adaptor_name == "detection-by-segmentation-upsampling-3d":
         adaptor = SegmentationUpsampling3D(
-            shot_features=shot_features,
-            shot_coordinates=shot_coordinates,
-            shot_names=shot_names,
-            shot_image_sizes=shot_image_sizes,
-            shot_image_spacing=shot_image_spacing,
-            shot_image_origins=shot_image_origins,
-            shot_image_directions=shot_image_directions,
-            shot_labels=shot_labels,
-            shot_label_spacing=shot_label_spacing,
-            shot_label_origins=shot_label_origins,
-            shot_label_directions=shot_label_directions,
-            test_features=test_features,
-            test_coordinates=test_coordinates,
-            test_names=test_names,
-            test_image_sizes=test_image_sizes,
-            test_image_origins=test_image_origins,
-            test_image_spacings=test_image_spacing,
-            test_image_directions=test_image_directions,
-            test_label_sizes=test_label_sizes,
-            test_label_spacing=test_label_spacing,
-            test_label_origins=test_label_origins,
-            test_label_directions=test_label_directions,
             global_patch_size=global_patch_size,
             global_patch_spacing=global_patch_spacing,
-            shot_patch_sizes=shot_patch_sizes,
-            test_patch_sizes=test_patch_sizes,
-            shot_patch_spacings=shot_patch_spacings,
-            test_patch_spacings=test_patch_spacings,
             return_binary=False,
         )
 
     elif adaptor_name == "detection-by-segmentation-upsampling-3d-v2":
         adaptor = SegmentationUpsampling3D_V2(
-            shot_features=shot_features,
-            shot_coordinates=shot_coordinates,
-            shot_names=shot_names,
-            shot_image_sizes=shot_image_sizes,
-            shot_image_spacing=shot_image_spacing,
-            shot_image_origins=shot_image_origins,
-            shot_image_directions=shot_image_directions,
-            shot_labels=shot_labels,
-            shot_label_spacing=shot_label_spacing,
-            shot_label_origins=shot_label_origins,
-            shot_label_directions=shot_label_directions,
-            test_features=test_features,
-            test_coordinates=test_coordinates,
-            test_names=test_names,
-            test_image_sizes=test_image_sizes,
-            test_image_origins=test_image_origins,
-            test_image_spacings=test_image_spacing,
-            test_image_directions=test_image_directions,
-            test_label_sizes=test_label_sizes,
-            test_label_spacing=test_label_spacing,
-            test_label_origins=test_label_origins,
-            test_label_directions=test_label_directions,
             global_patch_size=global_patch_size,
             global_patch_spacing=global_patch_spacing,
-            shot_patch_sizes=shot_patch_sizes,
-            test_patch_sizes=test_patch_sizes,
-            shot_patch_spacings=shot_patch_spacings,
-            test_patch_spacings=test_patch_spacings,
             return_binary=False,
         )
 
     elif adaptor_name == "conv-detection-segmentation-3d":
-        adaptor = ConvSegmentation3D(  # All args copied from detection-by-segmentation-upsampling-3d
-            shot_features=shot_features,
-            shot_coordinates=shot_coordinates,
-            shot_names=shot_names,
-            shot_image_sizes=shot_image_sizes,
-            shot_image_spacing=shot_image_spacing,
-            shot_image_origins=shot_image_origins,
-            shot_image_directions=shot_image_directions,
-            shot_labels=shot_labels,
-            shot_label_spacing=shot_label_spacing,
-            shot_label_origins=shot_label_origins,
-            shot_label_directions=shot_label_directions,
-            test_features=test_features,
-            test_coordinates=test_coordinates,
-            test_names=test_names,
-            test_image_sizes=test_image_sizes,
-            test_image_origins=test_image_origins,
-            test_image_spacings=test_image_spacing,
-            test_image_directions=test_image_directions,
-            test_label_sizes=test_label_sizes,
-            test_label_spacing=test_label_spacing,
-            test_label_origins=test_label_origins,
-            test_label_directions=test_label_directions,
+        adaptor = ConvSegmentation3D(
             global_patch_size=global_patch_size,
             global_patch_spacing=global_patch_spacing,
             feature_grid_resolution=feature_grid_resolution,
-            shot_patch_sizes=shot_patch_sizes,
-            test_patch_sizes=test_patch_sizes,
-            shot_patch_spacings=shot_patch_spacings,
-            test_patch_spacings=test_patch_spacings,
             return_binary=False,
         )
 
     else:
         raise ValueError(f"Unknown adaptor: {adaptor_name}")
 
-    adaptor.fit()
-    predictions = adaptor.predict()
-    return predictions
+    return adaptor
 
 
 def convert_numpy_types(obj):
@@ -842,19 +468,15 @@ def evaluate_predictions(
 
 def process_image_representation(data):
     # stack embeddings
-    data["shot_embeddings"] = np.vstack(data["shot_embeddings"])
-    data["case_embeddings"] = np.vstack(data["case_embeddings"])
+    if "embeddings" in data:
+        data["embeddings"] = np.vstack(data["embeddings"])
     # convert labels to numpy arrays
-    data["shot_labels"] = np.array(data["shot_labels"])
-    data["case_labels"] = np.array(data["case_labels"])
-    if data["shot_extra_labels"] and data["shot_extra_labels"][0] is not None:
-        data["shot_extra_labels"] = np.concatenate(data["shot_extra_labels"], axis=0)
+    if "labels" in data:
+        data["labels"] = np.array(data["labels"])
+    if data["extra_labels"] and data["extra_labels"][0] is not None:
+        data["extra_labels"] = np.concatenate(data["extra_labels"], axis=0)
     else:
-        data["shot_extra_labels"] = None
-    if data["case_extra_labels"] and data["case_extra_labels"][0] is not None:
-        data["case_extra_labels"] = np.concatenate(data["case_extra_labels"], axis=0)
-    else:
-        data["case_extra_labels"] = None
+        data["extra_labels"] = None
     return data
 
 
@@ -884,15 +506,14 @@ def process_detection_pathology(
             pts_all.append(case_pts)
         return pts_all
 
-    data["shot_labels"] = extract_points(data["shot_labels"])
-    data["case_labels"] = extract_points(data["case_labels"])
+    data["labels"] = extract_points(data["labels"])
 
-    extra_list = data.get("case_extra_labels")
+    extra_list = data.get("extra_labels")
     if not extra_list or extra_list[0] is None:
-        data["case_extra_labels"] = None
+        data["extra_labels"] = None
         return data
 
-    data["case_extra_labels"] = np.concatenate(extra_list, axis=0)
+    data["extra_labels"] = np.concatenate(extra_list, axis=0)
 
     return data
 
@@ -922,12 +543,11 @@ def process_detection_radiology(data, task_name: str | None = None):
             pts_all.append(case_pts)
         return pts_all
 
-    data["shot_labels"] = extract_points(data["shot_labels"])
-    data["case_labels"] = extract_points(data["case_labels"])
+    data["labels"] = extract_points(data["labels"])
 
-    extra_list = data.get("case_extra_labels")
+    extra_list = data.get("extra_labels")
     if not extra_list or extra_list[0] is None:
-        data["case_extra_labels"] = None
+        data["extra_labels"] = None
         return data
 
     if task_name == "Task07_detecting_lung_nodules_in_thoracic_ct":
@@ -975,15 +595,52 @@ def process_detection_radiology(data, task_name: str | None = None):
             else:
                 raise ValueError(f"Unsupported extra_label type: {type(case_extra)}")
 
-        data["case_extra_labels"] = diameter_records
+        data["extra_labels"] = diameter_records
 
     else:
-        data["case_extra_labels"] = np.concatenate(extra_list, axis=0)
+        data["extra_labels"] = np.concatenate(extra_list, axis=0)
 
     return data
 
 
-def extract_embeddings_and_labels(processed_results, task_name):
+def extract_labels(processed_results, task_name) -> dict[str, Any] | None:
+    """Extract labels for a given task."""
+    data = defaultdict(list)
+    valid_results_found = False
+
+    for result in processed_results:
+
+        task_type = result["task_type"]
+        domain = result["domain"]
+
+        # only process results for this specific task
+        if result["task_name"] != task_name:
+            continue
+
+        valid_results_found = True
+
+        data["labels"].append(result["label"])
+        data["extra_labels"].append(result.get("extra_labels"))
+        data["ids"].append(result["case_id"])
+
+    if not valid_results_found:
+        return None
+
+    if task_type in ["classification", "regression"]:
+        data = process_image_representation(data)
+    elif task_type == "detection":
+        if domain == "pathology":
+            data = process_detection_pathology(data)
+        elif domain in ["CT", "MR"]:
+            if task_name != "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams":
+                data = process_detection_radiology(data, task_name)
+        else:
+            raise ValueError(f"Unknown task domain: {domain}")
+
+    return data
+
+
+def extract_embeddings_and_labels(processed_results, task_name) -> dict[str, Any] | None:
     """Extract embeddings and labels for a given task."""
     task_data = {
         "task_type": None,
@@ -993,39 +650,32 @@ def extract_embeddings_and_labels(processed_results, task_name):
         "global_patch_spacing": None,
         "feature_grid_resolution": None,
         "prediction": [],
-        "shot_embeddings": [],
-        "shot_coordinates": [],
-        "shot_image_spacings": {},
-        "shot_image_origins": {},
-        "shot_image_directions": {},
-        "shot_image_sizes": {},
-        "shot_patch_sizes": {},
-        "shot_patch_spacings": {},
-        "shot_label_sizes": {},
-        "shot_label_spacings": {},
-        "shot_label_origins": {},
-        "shot_label_directions": {},
-        "shot_labels": [],
-        "shot_extra_labels": [],
-        "shot_ids": [],
-        "case_embeddings": [],
-        "cases_coordinates": [],
-        "case_labels": [],
-        "case_extra_labels": [],
-        "case_ids": [],
-        "cases_image_sizes": {},
-        "cases_image_spacings": {},
-        "cases_image_origins": {},
-        "cases_image_directions": {},
-        "cases_patch_sizes": {},
-        "cases_patch_spacings": {},
-        "cases_label_sizes": {},
-        "cases_label_spacings": {},
-        "cases_label_origins": {},
-        "cases_label_directions": {},
+        "embeddings": [],
+        "coordinates": [],
+        "image_spacings": {},
+        "image_origins": {},
+        "image_directions": {},
+        "image_sizes": {},
+        "patch_sizes": {},
+        "patch_spacings": {},
+        "label_sizes": {},
+        "label_spacings": {},
+        "label_origins": {},
+        "label_directions": {},
+        "labels": [],
+        "extra_labels": [],
+        "ids": [],
     }
 
     valid_results_found = False
+
+    # check if all cases have the same patch size and spacing
+    all_patch_sizes = [result["patch_size"] for result in processed_results]
+    all_patch_spacings = [result["patch_spacing"] for result in processed_results]
+
+    # set global values if all are the same, otherwise None
+    task_data["global_patch_size"] = all_patch_sizes[0] if all_patch_sizes and all(ps == all_patch_sizes[0] for ps in all_patch_sizes) else None
+    task_data["global_patch_spacing"] = all_patch_spacings[0] if all_patch_spacings and all(ps == all_patch_spacings[0] for ps in all_patch_spacings) else None
 
     for result in processed_results:
         if result is None:
@@ -1045,50 +695,22 @@ def extract_embeddings_and_labels(processed_results, task_name):
             task_data["domain"] = result["domain"]
             task_data["feature_grid_resolution"] = result["feature_grid_resolution"]
 
-            # Check if all cases have the same patch size and spacing
-            all_patch_sizes = [result["patch_size"] for result in processed_results]
-            all_patch_spacings = [result["patch_spacing"] for result in processed_results]
-
-            # Set global values if all are the same, otherwise None
-            task_data["global_patch_size"] = all_patch_sizes[0] if all_patch_sizes and all(ps == all_patch_sizes[0] for ps in all_patch_sizes) else None
-            task_data["global_patch_spacing"] = all_patch_spacings[0] if all_patch_spacings and all(ps == all_patch_spacings[0] for ps in all_patch_spacings) else None
-
-
-        if result["split"] == "shot":
-            task_data["shot_embeddings"].append(result["embeddings"])
-            task_data["shot_labels"].append(result["label"])
-            task_data["shot_extra_labels"].append(result.get("extra_labels"))
-            task_data["shot_ids"].append(result["case_id"])
-            task_data["shot_coordinates"].append(result["coordinates"])
-            shot_id = result["case_id"]
-            task_data["shot_image_sizes"][shot_id] = result["image_size"]
-            task_data["shot_image_spacings"][shot_id] = result["image_spacing"]
-            task_data["shot_image_origins"][shot_id] = result["image_origin"]
-            task_data["shot_image_directions"][shot_id] = result["image_direction"]
-            task_data["shot_patch_spacings"][shot_id] = result["patch_spacing"]
-            task_data["shot_patch_sizes"][shot_id] = result["patch_size"]
-            task_data["shot_label_spacings"][shot_id] = result["label_spacing"]
-            task_data["shot_label_sizes"][shot_id] = result["label_size"]
-            task_data["shot_label_origins"][shot_id] = result["label_origin"]
-            task_data["shot_label_directions"][shot_id] = result["label_direction"]
-        elif result["split"] == "case":
-            task_data["case_embeddings"].append(result["embeddings"])
-            task_data["case_labels"].append(result["label"])
-            task_data["case_extra_labels"].append(result.get("extra_labels"))
-            task_data["prediction"].append(result.get("prediction"))
-            task_data["case_ids"].append(result["case_id"])
-            task_data["cases_coordinates"].append(result["coordinates"])
-            case_id = result["case_id"]
-            task_data["cases_image_spacings"][case_id] = result["image_spacing"]
-            task_data["cases_image_sizes"][case_id] = result["image_size"]
-            task_data["cases_image_origins"][case_id] = result["image_origin"]
-            task_data["cases_image_directions"][case_id] = result["image_direction"]
-            task_data["cases_patch_sizes"][case_id] = result["patch_size"]
-            task_data["cases_patch_spacings"][case_id] = result["patch_spacing"]
-            task_data["cases_label_spacings"][case_id] = result["label_spacing"]
-            task_data["cases_label_sizes"][case_id] = result["label_size"]
-            task_data["cases_label_origins"][case_id] = result["label_origin"]
-            task_data["cases_label_directions"][case_id] = result["label_direction"]
+        task_data["embeddings"].append(result["embeddings"])
+        task_data["labels"].append(result["label"])
+        task_data["extra_labels"].append(result.get("extra_labels"))
+        task_data["ids"].append(result["case_id"])
+        task_data["coordinates"].append(result["coordinates"])
+        case_id = result["case_id"]
+        task_data["image_sizes"][case_id] = result["image_size"]
+        task_data["image_spacings"][case_id] = result["image_spacing"]
+        task_data["image_origins"][case_id] = result["image_origin"]
+        task_data["image_directions"][case_id] = result["image_direction"]
+        task_data["patch_spacings"][case_id] = result["patch_spacing"]
+        task_data["patch_sizes"][case_id] = result["patch_size"]
+        task_data["label_spacings"][case_id] = result["label_spacing"]
+        task_data["label_sizes"][case_id] = result["label_size"]
+        task_data["label_origins"][case_id] = result["label_origin"]
+        task_data["label_directions"][case_id] = result["label_direction"]
 
     if not valid_results_found:
         return None
@@ -1111,74 +733,7 @@ def extract_embeddings_and_labels(processed_results, task_name):
     return task_data
 
 
-def extract_data(patch_neural_representation):
-    # Extract metadata
-    metadata: dict[str, Any] = patch_neural_representation["meta"]
-    spacing = metadata["patch-spacing"]
-    patch_size = metadata["patch-size"]
-    patch_spacing = metadata["patch-spacing"]
-    feature_grid_resolution = metadata.get("feature-grid-resolution", [1]*len(patch_size))
-    image_size = metadata["image-size"]
-    image_spacing = metadata["image-spacing"]
-    image_origin = metadata["image-origin"]
-    image_direction = metadata["image-direction"]
-
-    # Extract patches
-    patches = patch_neural_representation["patches"]
-
-    # Extract features and coordinates
-    features = np.array([p["features"] for p in patches]).astype(np.float32)
-    coordinates = np.array([p["coordinates"] for p in patches])
-
-    return (
-        features,
-        coordinates,
-        spacing,
-        patch_size,
-        patch_spacing,
-        feature_grid_resolution,
-        image_size,
-        image_spacing,
-        image_origin,
-        image_direction,
-    )
-
-
 def normalize_metric(task_name, metric_value):
     min_value, max_value = METRIC_DICT[task_name]["range"]
     normalized_value = (metric_value - min_value) / (max_value - min_value)
     return normalized_value
-
-
-def sanitize_json_content(obj):
-    if isinstance(obj, dict):
-        return {k: sanitize_json_content(v) for k, v in obj.items()}
-    elif isinstance(obj, (list, tuple, np.ndarray)):
-        return [sanitize_json_content(v) for v in obj]
-    elif isinstance(obj, (str, int, bool, float)):
-        return obj
-    elif isinstance(obj, (np.float16, np.float32, np.float64)):
-        return float(obj)
-    elif isinstance(
-        obj,
-        (
-            np.uint8,
-            np.uint16,
-            np.uint32,
-            np.uint64,
-            np.int8,
-            np.int16,
-            np.int32,
-            np.int64,
-        ),
-    ):
-        return int(obj)
-    else:
-        return obj.__repr__()
-
-
-def write_json_file(*, location, content):
-    # Writes a json file with the sanitized content
-    content = sanitize_json_content(content)
-    with open(location, "w") as f:
-        f.write(json.dumps(content, indent=4))

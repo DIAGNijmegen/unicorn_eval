@@ -19,29 +19,19 @@ import logging
 import multiprocessing
 import random
 from pathlib import Path
-from pprint import pformat
 
 import numpy as np
-import openslide
 import pandas as pd
-import SimpleITK as sitk
 from dragon_eval import DragonEval
 from dragon_eval.evaluation import REGRESSION_EPSILON, TASK_TYPE, EvalType
 
 from unicorn_eval.helpers import get_max_workers
-from unicorn_eval.utils import (
-    adapt_features,
-    evaluate_predictions,
-    extract_data,
-    extract_embeddings_and_labels,
-    normalize_metric,
-    write_json_file,
-)
-
-INPUT_DIRECTORY = Path("/input")
-OUTPUT_DIRECTORY = Path("/output")
-GROUNDTRUTH_DIRECTORY = Path("/opt/ml/input/data/ground_truth")
-
+from unicorn_eval.io import (GROUNDTRUTH_DIRECTORY, INPUT_DIRECTORY,
+                             OUTPUT_DIRECTORY, process, read_inputs,
+                             write_json_file)
+from unicorn_eval.utils import (set_all_seeds, evaluate_predictions,
+                                extract_embeddings_and_labels, extract_labels,
+                                get_adaptor, normalize_metric)
 
 ADAPTOR_SLUGS_DICT = {
     "Task01_classifying_he_prostate_biopsies_into_isup_scores": "adaptor-pathology-classification",
@@ -57,6 +47,15 @@ ADAPTOR_SLUGS_DICT = {
     "Task11_segmenting_three_anatomical_structures_in_lumbar_spine_mri": "adaptor-radiology-segmentation",
 }
 
+DETERMINISTIC_ADAPTORS = [
+    "1-nn",
+    "5-nn",
+    "20-nn",
+    "1-nn-weighted",
+    "5-nn-weighted",
+    "20-nn-weighted",
+]
+
 REQUIRES_PROBABILITIES_DICT = {
     "Task01_classifying_he_prostate_biopsies_into_isup_scores": False,
     "Task02_classifying_lung_nodule_malignancy_in_ct": True,
@@ -69,79 +68,6 @@ REQUIRES_PROBABILITIES_DICT = {
     "Task09_segmenting_rois_in_breast_cancer_wsis": False,
     "Task10_segmenting_lesions_within_vois_in_ct": False,
     "Task11_segmenting_three_anatomical_structures_in_lumbar_spine_mri": False,
-}
-
-INPUT_SLUGS_DICT = {
-    "Task01_classifying_he_prostate_biopsies_into_isup_scores": [
-        "prostate-tissue-biopsy-whole-slide-image"
-    ],
-    "Task02_classifying_lung_nodule_malignancy_in_ct": [
-        "chest-ct-region-of-interest-cropout"
-    ],
-    "Task03_predicting_the_time_to_biochemical_recurrence_in_he_prostatectomies": [
-        "prostatectomy-tissue-whole-slide-image"
-    ],
-    "Task04_predicting_slide_level_tumor_proportion_score_in_ihc_stained_wsi": [
-        "ihc-staining-for-pd-l1"
-    ],
-    "Task05_detecting_signet_ring_cells_in_he_stained_wsi_of_gastric_cancer": [
-        "histopathology-region-of-interest-cropout"
-    ],
-    "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams": [
-        "transverse-t2-prostate-mri",
-    ],
-    "Task07_detecting_lung_nodules_in_thoracic_ct": [
-        "chest-ct",
-    ],
-    "Task08_detecting_mitotic_figures_in_breast_cancer_wsis": [
-        "histopathology-region-of-interest-cropout"
-    ],
-    "Task09_segmenting_rois_in_breast_cancer_wsis": [
-        "histopathology-region-of-interest-cropout"
-    ],
-    "Task10_segmenting_lesions_within_vois_in_ct": ["stacked-3d-ct-volumes-of-lesions"],
-    "Task11_segmenting_three_anatomical_structures_in_lumbar_spine_mri": [
-        "sagittal-spine-mri"
-    ],
-    "Task20_generating_caption_from_wsi": ["he-staining"],
-}
-
-MODEL_OUTPUT_SLUG_DICT = {
-    "Task01_classifying_he_prostate_biopsies_into_isup_scores": "image-neural-representation",
-    "Task02_classifying_lung_nodule_malignancy_in_ct": "image-neural-representation",
-    "Task03_predicting_the_time_to_biochemical_recurrence_in_he_prostatectomies": "image-neural-representation",
-    "Task04_predicting_slide_level_tumor_proportion_score_in_ihc_stained_wsi": "image-neural-representation",
-    "Task05_detecting_signet_ring_cells_in_he_stained_wsi_of_gastric_cancer": "patch-neural-representation",
-    "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams": "patch-neural-representation",
-    "Task07_detecting_lung_nodules_in_thoracic_ct": "patch-neural-representation",
-    "Task08_detecting_mitotic_figures_in_breast_cancer_wsis": "patch-neural-representation",
-    "Task09_segmenting_rois_in_breast_cancer_wsis": "patch-neural-representation",
-    "Task10_segmenting_lesions_within_vois_in_ct": "patch-neural-representation",
-    "Task11_segmenting_three_anatomical_structures_in_lumbar_spine_mri": "patch-neural-representation",
-    "Task20_generating_caption_from_wsi": "nlp-predictions-dataset",
-}
-
-LABEL_SLUG_DICT = {
-    "Task01_classifying_he_prostate_biopsies_into_isup_scores": "isup-grade.json",
-    "Task02_classifying_lung_nodule_malignancy_in_ct": "lung-nodule-malignancy-risk.json",
-    "Task03_predicting_the_time_to_biochemical_recurrence_in_he_prostatectomies": "overall-survival-years.json",
-    "Task04_predicting_slide_level_tumor_proportion_score_in_ihc_stained_wsi": "pd-l1-tps-binned.json",
-    "Task05_detecting_signet_ring_cells_in_he_stained_wsi_of_gastric_cancer": "cell-classification.json",
-    "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams": "images/transverse-cspca-label/{case_id}.mha",
-    "Task07_detecting_lung_nodules_in_thoracic_ct": "nodule-locations.json",
-    "Task08_detecting_mitotic_figures_in_breast_cancer_wsis": "mitotic-figures.json",
-    "Task09_segmenting_rois_in_breast_cancer_wsis": "images/tumor-stroma-and-other/{case_id}.tif",
-    "Task10_segmenting_lesions_within_vois_in_ct": "images/ct-binary-uls/{case_id}.mha",
-    "Task11_segmenting_three_anatomical_structures_in_lumbar_spine_mri": "images/sagittal-spine-mr-segmentation/{case_id}.mha",
-    "Task20_generating_caption_from_wsi": "nlp-predictions-dataset.json",
-}
-
-EXTRA_LABEL_SLUG_DICT = {
-    "Task03_predicting_the_time_to_biochemical_recurrence_in_he_prostatectomies": [
-        "event.json",
-        "cohort.json",
-    ],
-    "Task07_detecting_lung_nodules_in_thoracic_ct": ["diameter.json"],
 }
 
 LANGUAGE_TASK_NAMES = [
@@ -178,223 +104,6 @@ REGRESSION_EPSILON.update(
 )
 
 
-def process(job):
-    """Processes a single algorithm job, looking at the outputs"""
-
-    embeddings = None
-    prediction = None
-    coordinates = None
-    spacing = None
-    patch_size = None
-    patch_spacing = None
-    image_size = None
-    image_spacing = None
-    image_origin = None
-    image_direction = None
-    feature_grid_resolution = None
-
-    report = "Processing:\n"
-    report += pformat(job)
-    report += "\n"
-
-    mapping_path = GROUNDTRUTH_DIRECTORY / "mapping.csv"
-    try:
-        mapping = pd.read_csv(
-            mapping_path, dtype={"case_id": str}
-        )  # ensure case_id is string to enable leading zeros
-    except FileNotFoundError:
-        # if the mapping file is not found, we assume that the evaluation is for a language task
-        # and we do not need the mapping
-        logging.error(f"{mapping_path} not found, cannot group by task.")
-        return {}
-
-    image_name = None
-    for slug_inputs in INPUT_SLUGS_DICT.values():
-        for slug_input in slug_inputs:
-            try:
-                image_name = get_image_name(
-                    values=job["inputs"],
-                    slug=slug_input,
-                )
-            except Exception as e:
-                continue
-
-    if image_name is None:
-        # if no image_name is found, it corresponds to a pure language task
-        # for which we already have written the metrics
-        return None
-
-    case_name = Path(image_name).stem
-
-    # remove suffixes "_adc", "_t2w", and "_hbv" from the case name if present
-    for suffix in ["_adc", "_t2w", "_hbv"]:
-        if case_name.endswith(suffix):
-            case_name = case_name[: -len(suffix)]
-
-    case_info = mapping[mapping.case_id == case_name]
-    if case_info.empty:
-        raise ValueError(f"Case {case_name} not found in mapping.")
-
-    task_name = case_info.task_name.values[0]
-    modality = case_info.modality.values[0]
-
-    if modality == "vision":
-
-        prediction = None
-        slug_embedding = MODEL_OUTPUT_SLUG_DICT[task_name]
-
-        # find the location of the results
-        location_neural_representation = get_file_location(
-            job_pk=job["pk"],
-            values=job["outputs"],
-            slug=slug_embedding,
-        )
-
-        # read the results
-        neural_representations = load_json_file(
-            location=location_neural_representation,
-        )
-
-        features = []
-        if slug_embedding == "image-neural-representation":
-            for neural_representation in neural_representations:
-                feature = neural_representation["features"]
-                feature = np.array(feature).astype(np.float32)
-                features.append(feature)
-            embeddings = np.concatenate(features)
-
-        elif slug_embedding == "patch-neural-representation":
-            # TODO: better handle the case when there are multiple encoded inputs for a case
-            # right now we concatenate the features
-            # and use the first coordinates, spacing, patch_size, image_size, and image_spacing
-            first = True
-            for neural_representation in neural_representations:
-                (
-                    feature,
-                    curr_coordinates,
-                    curr_spacing,
-                    curr_patch_size,
-                    curr_patch_spacing,
-                    curr_feature_grid_resolution,
-                    curr_image_size,
-                    curr_image_spacing,
-                    curr_image_origin,
-                    curr_image_direction,
-                ) = extract_data(neural_representation)
-                features.append(feature)
-                if first:
-                    coordinates = curr_coordinates
-                    spacing = curr_spacing
-                    patch_size = curr_patch_size
-                    patch_spacing = curr_patch_spacing
-                    feature_grid_resolution = curr_feature_grid_resolution
-                    image_size = curr_image_size
-                    image_spacing = curr_image_spacing
-                    image_origin = curr_image_origin
-                    image_direction = curr_image_direction
-                    first = False
-                else:
-                    assert np.all(
-                        coordinates == curr_coordinates
-                    ), "Coordinates do not match between images of the same case"
-                    assert np.all(
-                        spacing == curr_spacing
-                    ), "Spacing does not match between images of the same case"
-                    assert np.all(
-                        patch_size == curr_patch_size
-                    ), "Patch size does not match between images of the same case"
-                    assert np.all(
-                        patch_spacing == curr_patch_spacing
-                    ), "Patch spacing does not match between images of the same case"
-                    assert np.all(
-                        image_size == curr_image_size
-                    ), "Image size does not match between images of the same case"
-                    assert np.all(
-                        image_spacing == curr_image_spacing
-                    ), "Image spacing does not match between images of the same case"
-                    assert np.all(
-                        image_origin == curr_image_origin
-                    ), "Image origin does not match between images of the same case"
-                    assert np.all(
-                        image_direction == curr_image_direction
-                    ), "Image direction does not match between images of the same case"
-            embeddings = np.concatenate(features)
-
-    elif modality == "vision-language":
-
-        model_output_slug = MODEL_OUTPUT_SLUG_DICT[task_name]
-
-        # find the location of the results
-        location_prediction = get_file_location(
-            job_pk=job["pk"],
-            values=job["outputs"],
-            slug=model_output_slug,
-        )
-
-        # read the results
-        prediction = load_json_file(
-            location=location_prediction,
-        )[0]
-
-    case_specific_ground_truth_dir = GROUNDTRUTH_DIRECTORY / task_name / case_name
-
-    slug_label = LABEL_SLUG_DICT[task_name]
-    label_path = case_specific_ground_truth_dir / slug_label
-
-    label_size, label_origin, label_spacing, label_direction = None, None, None, None
-    if label_path.suffix == ".json":
-        label = load_json_file(location=label_path)
-    elif label_path.suffix == ".tif":
-        label_path = Path(str(label_path).replace("{case_id}", case_name))
-        label = load_tif_file(location=label_path)
-    elif label_path.suffix == ".mha":
-        label_path = Path(str(label_path).replace("{case_id}", case_name))
-        label, label_size, label_origin, label_spacing, label_direction = load_mha_file(
-            path=label_path,
-        )
-    else:
-        raise ValueError(f"Unsupported file format: {label_path.suffix}")
-
-    extra_labels = None
-    extra_slug_labels = EXTRA_LABEL_SLUG_DICT.get(task_name, [])
-    use_extra_labels = len(extra_slug_labels) > 0
-    if use_extra_labels:
-        extra_labels = {}
-        for extra_slug_label in extra_slug_labels:
-            slug_name = Path(extra_slug_label).stem
-            extra_label_path = case_specific_ground_truth_dir / extra_slug_label
-            if extra_label_path.exists():
-                extra_labels[slug_name] = load_json_file(location=extra_label_path)
-            else:
-                logging.warning(f"extra label file not found: {extra_label_path}")
-                extra_labels[slug_name] = None
-
-        # convert extra_labels dictionary to a structured numpy array
-        dtype = [(key, type(value)) for key, value in extra_labels.items()]
-        extra_labels = np.array([tuple(extra_labels.values())], dtype=dtype)
-
-    case_info_dict = case_info.to_dict(orient="records")[0]
-    case_info_dict["embeddings"] = embeddings
-    case_info_dict["coordinates"] = coordinates
-    case_info_dict["spacing"] = spacing
-    case_info_dict["image_spacing"] = image_spacing
-    case_info_dict["image_size"] = image_size
-    case_info_dict["image_origin"] = image_origin
-    case_info_dict["image_direction"] = image_direction
-    case_info_dict["patch_size"] = patch_size
-    case_info_dict["patch_spacing"] = patch_spacing
-    case_info_dict["feature_grid_resolution"] = feature_grid_resolution
-    case_info_dict["prediction"] = prediction
-    case_info_dict["label"] = label
-    case_info_dict["extra_labels"] = extra_labels
-    case_info_dict["label_spacing"] = label_spacing
-    case_info_dict["label_size"] = label_size
-    case_info_dict["label_origin"] = label_origin
-    case_info_dict["label_direction"] = label_direction
-
-    return case_info_dict
-
-
 def print_directory_contents(path: Path | str):
     path = Path(path)
     for child in path.iterdir():
@@ -413,99 +122,6 @@ def read_adaptors():
             with open(adaptor_path) as f:
                 adaptors[task_name] = json.loads(f.read())
     return adaptors
-
-
-def read_predictions(input_dir: Path, case_names: list[str]):
-    # the prediction file tells us the location of the users' predictions
-    with open(input_dir / "predictions.json") as f:
-        predictions = json.loads(f.read())
-
-    filtered_predictions = []
-    for prediction in predictions:
-        case_name = None
-        for slug_inputs in INPUT_SLUGS_DICT.values():
-            for slug_input in slug_inputs:
-                try:
-                    image_name = get_image_name(
-                        values=prediction["inputs"], slug=slug_input
-                    )
-                    case_name = Path(image_name).stem
-                    # remove suffixes "_adc", "_t2w", and "_hbv" from the case name if present
-                    for suffix in ["_adc", "_t2w", "_hbv", "_tissue"]:
-                        if case_name.endswith(suffix):
-                            case_name = case_name[: -len(suffix)]
-                    break
-                except Exception:
-                    continue
-            if case_name:
-                break
-
-        if case_name is None:
-            # skip if we can't determine case name (language task)
-            continue
-        if case_name in case_names:
-            filtered_predictions.append(prediction)
-
-    # free up memory
-    del predictions
-    gc.collect()
-
-    return filtered_predictions
-
-
-def get_image_name(*, values, slug):
-    # this tells us the user-provided name of the input or output image
-    for value in values:
-        if value["interface"]["slug"] == slug:
-            return value["image"]["name"]
-
-    raise RuntimeError(f"Image with interface {slug} not found!")
-
-
-def get_interface_relative_path(*, values, slug):
-    # gets the location of the interface relative to the input or output
-    for value in values:
-        if value["interface"]["slug"] == slug:
-            return value["interface"]["relative_path"]
-
-    raise RuntimeError(f"Value with interface {slug} not found!")
-
-
-def get_file_location(*, job_pk, values, slug):
-    # where a job's output file will be located in the evaluation container
-    relative_path = get_interface_relative_path(values=values, slug=slug)
-    return INPUT_DIRECTORY / job_pk / "output" / relative_path
-
-
-def load_json_file(*, location):
-    # reads a json file
-    with open(location) as f:
-        return json.loads(f.read())
-
-
-def load_tif_file(*, location):
-    slide = openslide.OpenSlide(location)
-    logging.info(f"Image dimensions: {slide.dimensions}")
-    level_0 = slide.read_region((0, 0), 0, slide.dimensions)
-    #   save_tif(level_0, location.stem)
-    level_0_np = np.array(level_0)
-    class_labels = level_0_np[:, :, 0]  # shape: (H, W)
-    return class_labels
-
-
-def load_mha_file(*, path: Path | str):
-    class_labels = sitk.ReadImage(str(path))
-
-    if class_labels is None:
-        raise ValueError("Failed to load class labels from MHA file.")
-
-    return (
-        sitk.GetArrayFromImage(class_labels),
-        list(class_labels.GetSize()),
-        list(class_labels.GetOrigin()),
-        list(class_labels.GetSpacing()),
-        list(class_labels.GetDirection()),
-    )
 
 
 def write_combined_metrics(
@@ -737,171 +353,206 @@ def process_task_in_subprocess(
 ):
     logging.info(f"Processing task in subprocess: {task_name}")
 
-    # identify task cases to filter predictions
-    task_case_names = mapping[mapping["task_name"] == task_name]["case_id"].tolist()
-    task_predictions = read_predictions(
-        input_dir=INPUT_DIRECTORY, case_names=task_case_names
-    )
-
-    # process the task's predictions in parallel
+    modality = mapping[(mapping.task_name == task_name)]["modality"].values[0]
     max_workers = get_max_workers()
-    pool = multiprocessing.Pool(processes=max_workers)
-    processed_results = pool.map(process, task_predictions)
-    pool.close()
-    pool.join()
 
-    task_results = extract_embeddings_and_labels(processed_results, task_name)
-    del task_predictions
-    del processed_results
-    gc.collect()
+    if modality == "vision":
 
-    if task_results is None:
-        logging.info(f"No results found for task {task_name}, skipping.")
-        logging.info("=+=" * 10)
+        # ensure we have an adaptor for this task
+        if task_name not in adaptors:
+            raise Exception(f"No adaptor found for task {task_name}")
 
-    else:
+        adaptor_name = adaptors[task_name]
+        return_probabilities = REQUIRES_PROBABILITIES_DICT[task_name]
 
-        modality = task_results["modality"]
-        case_labels = task_results["case_labels"]
-        case_ids = task_results["case_ids"]
-        task_type = task_results["task_type"]
+        num_run = 5
+        if adaptor_name in DETERMINISTIC_ADAPTORS:
+            num_run = 1
+        first_metric, first_additional_metric = True, True
+        metrics = {}
+        running_metrics = {"metrics": {}, "additional_metrics": {}}
 
-        if modality == "vision":
+        for seed in range(num_run):
 
-            # ensure we have an adaptor for this task
-            if task_name not in adaptors:
-                raise Exception(f"No adaptor found for task {task_name}")
+            logging.info(f"Run {seed+1}/{num_run} for task {task_name} using {adaptor_name}")
+            set_all_seeds(seed)
 
-            adaptor_name = adaptors[task_name]
-            return_probabilities = REQUIRES_PROBABILITIES_DICT[task_name]
-
-            global_patch_size = task_results["global_patch_size"]
-            global_patch_spacing = task_results["global_patch_spacing"]
-            feature_grid_resolution = task_results["feature_grid_resolution"]
-
-            shot_embeddings = task_results["shot_embeddings"]
-            shot_labels = task_results["shot_labels"]
-            shot_extra_labels = task_results["shot_extra_labels"]
-            shot_ids = task_results["shot_ids"]
-            shot_image_sizes = task_results["shot_image_sizes"]
-            shot_image_spacings = task_results["shot_image_spacings"]
-            shot_image_origins = task_results["shot_image_origins"]
-            shot_image_directions = task_results["shot_image_directions"]
-            shot_patch_sizes = task_results["shot_patch_sizes"]
-            shot_patch_spacings = task_results["shot_patch_spacings"]
-            shot_label_spacings = task_results["shot_label_spacings"]
-            shot_label_origins = task_results["shot_label_origins"]
-            shot_label_directions = task_results["shot_label_directions"]
-
-            case_embeddings = task_results["case_embeddings"]
-            case_extra_labels = task_results["case_extra_labels"]
-            case_image_sizes = task_results["cases_image_sizes"]
-            case_image_spacings = task_results["cases_image_spacings"]
-            case_image_origins = task_results["cases_image_origins"]
-            case_image_directions = task_results["cases_image_directions"]
-            case_patch_sizes = task_results["cases_patch_sizes"]
-            case_patch_spacings = task_results["cases_patch_spacings"]
-            case_label_sizes = task_results["cases_label_sizes"]
-            case_label_spacings = task_results["cases_label_spacings"]
-            case_label_origins = task_results["cases_label_origins"]
-            case_label_directions = task_results["cases_label_directions"]
-
-            if task_type in ["classification", "regression"]:
-                save_predictions = True
-                if len(shot_embeddings.shape) > 2:
-                    shot_embeddings = shot_embeddings.squeeze(1)
-                if len(case_embeddings.shape) > 2:
-                    case_embeddings = case_embeddings.squeeze(1)
-
-            predictions = adapt_features(
-                adaptor_name=adaptor_name,
-                task_type=task_type,
-                shot_features=shot_embeddings,
-                shot_names=shot_ids,
-                shot_labels=shot_labels,
-                test_features=case_embeddings,
-                shot_coordinates=task_results["shot_coordinates"],
-                test_coordinates=task_results["cases_coordinates"],
-                test_names=case_ids,
-                global_patch_size=global_patch_size,
-                global_patch_spacing=global_patch_spacing,
-                shot_patch_sizes=shot_patch_sizes,
-                test_patch_sizes=case_patch_sizes,
-                shot_patch_spacings=shot_patch_spacings,
-                test_patch_spacings=case_patch_spacings,
-                feature_grid_resolution=feature_grid_resolution,
-                test_image_sizes=case_image_sizes,
-                shot_extra_labels=shot_extra_labels,
-                test_image_spacing=case_image_spacings,
-                test_image_origins=case_image_origins,
-                test_image_directions=case_image_directions,
-                test_label_spacing=case_label_spacings,
-                test_label_origins=case_label_origins,
-                test_label_directions=case_label_directions,
-                test_label_sizes=case_label_sizes,
-                shot_image_sizes=shot_image_sizes,
-                shot_image_spacing=shot_image_spacings,
-                shot_image_origins=shot_image_origins,
-                shot_image_directions=shot_image_directions,
-                shot_label_spacing=shot_label_spacings,
-                shot_label_origins=shot_label_origins,
-                shot_label_directions=shot_label_directions,
-                return_probabilities=return_probabilities,
+            # only load few shots for the given task
+            task_shots = mapping[(mapping.task_name == task_name) & (mapping.split == "shot")]["case_id"].tolist()
+            shot_inputs = read_inputs(
+                input_dir=INPUT_DIRECTORY, case_names=task_shots
             )
-            del (
-                shot_embeddings,
-                case_embeddings,
-                shot_labels,
-                shot_extra_labels,
-                shot_ids,
-                shot_image_sizes,
-                shot_image_spacings,
-                shot_image_origins,
-                shot_image_directions,
-                shot_patch_sizes,
-                shot_patch_spacings,
-                shot_label_spacings,
-                shot_label_origins,
-                shot_label_directions,
-                case_image_sizes,
-                case_image_spacings,
-                case_image_origins,
-                case_image_directions,
-                case_patch_sizes,
-                case_patch_spacings,
-                case_label_sizes,
-                case_label_spacings,
-                case_label_origins,
-                case_label_directions,
-            )
+
+            pool = multiprocessing.Pool(processes=max_workers)
+            shots = pool.map(process, shot_inputs)
+            pool.close()
+            pool.join()
+
+            shot_informations = extract_embeddings_and_labels(shots, task_name)
+            del shot_inputs
+            del shots
             gc.collect()
 
-        elif modality == "vision-language":
-            predictions = [pred["text"] for pred in task_results["prediction"]]
-            case_labels = [
-                label["text"] for case in task_results["case_labels"] for label in case
-            ]
-            case_extra_labels = None
+            if shot_informations is None:
+                logging.info(f"No shots found for task {task_name}, skipping.")
+                logging.info("=+=" * 10)
+                return 0
 
-        else:
-            raise ValueError(f"Unsupported modality: {modality}")
+            else:
+
+                global_patch_size = shot_informations["global_patch_size"]
+                global_patch_spacing = shot_informations["global_patch_spacing"]
+                feature_grid_resolution = shot_informations["feature_grid_resolution"]
+
+                shot_embeddings = shot_informations["embeddings"]
+                shot_coordinates = shot_informations["coordinates"]
+                shot_labels = shot_informations["labels"]
+                shot_extra_labels = shot_informations["extra_labels"]
+                shot_ids = shot_informations["ids"]
+                shot_image_sizes = shot_informations["image_sizes"]
+                shot_image_spacings = shot_informations["image_spacings"]
+                shot_image_origins = shot_informations["image_origins"]
+                shot_image_directions = shot_informations["image_directions"]
+                shot_patch_sizes = shot_informations["patch_sizes"]
+                shot_patch_spacings = shot_informations["patch_spacings"]
+                shot_label_spacings = shot_informations["label_spacings"]
+                shot_label_origins = shot_informations["label_origins"]
+                shot_label_directions = shot_informations["label_directions"]
+
+                task_type = shot_informations["task_type"]
+                if task_type in ["classification", "regression"]:
+                    save_predictions = True
+                    if len(shot_embeddings.shape) > 2:
+                        shot_embeddings = shot_embeddings.squeeze(1)
+
+                num_shots = len(shot_ids)
+
+                adaptor = get_adaptor(
+                    adaptor_name=adaptor_name,
+                    task_type=task_type,
+                    num_shots=num_shots,
+                    feature_grid_resolution=feature_grid_resolution,
+                    global_patch_size=global_patch_size,
+                    global_patch_spacing=global_patch_spacing,
+                    return_probabilities=return_probabilities,
+                    seed=seed,
+                )
+
+                adaptor.fit(
+                    shot_features=shot_embeddings,
+                    shot_labels=shot_labels,
+                    shot_ids=shot_ids,
+                    shot_coordinates=shot_coordinates,
+                    shot_patch_sizes=shot_patch_sizes,
+                    shot_patch_spacings=shot_patch_spacings,
+                    shot_extra_labels=shot_extra_labels,
+                    shot_image_sizes=shot_image_sizes,
+                    shot_image_spacings=shot_image_spacings,
+                    shot_image_origins=shot_image_origins,
+                    shot_image_directions=shot_image_directions,
+                    shot_label_spacings=shot_label_spacings,
+                    shot_label_origins=shot_label_origins,
+                    shot_label_directions=shot_label_directions,
+                )
+
+                del (
+                    shot_embeddings,
+                    shot_labels,
+                    shot_extra_labels,
+                    shot_ids,
+                    shot_image_sizes,
+                    shot_image_spacings,
+                    shot_image_origins,
+                    shot_image_directions,
+                    shot_patch_sizes,
+                    shot_patch_spacings,
+                    shot_label_spacings,
+                    shot_label_origins,
+                    shot_label_directions,
+                    shot_informations,
+                )
+                gc.collect()
+
+                case_inputs = read_inputs(
+                    input_dir=INPUT_DIRECTORY, case_names=task_shots
+                )
+                pool = multiprocessing.Pool(processes=max_workers)
+                cases = pool.map(process, case_inputs)
+                pool.close()
+                pool.join()
+
+                case_information = extract_labels(cases, task_name)
+                if case_information is None:
+                    raise ValueError(f"No cases found for task {task_name}")
+                case_labels = case_information["labels"]
+
+                predictions = adaptor.predict(case_information["ids"])
+
+                run_metrics = evaluate_predictions(
+                    task_name=task_name,
+                    case_ids=case_information["ids"],
+                    test_predictions=predictions,
+                    test_labels=case_labels,
+                    test_extra_labels=case_information.get("extra_labels"),
+                    save_predictions=save_predictions,
+                )
+
+                # store metrics
+                for metric_name, metric_value in run_metrics["metrics"].items():
+                    if first_metric:
+                        first_metric = False
+                        running_metrics["metrics"][metric_name] = metric_value
+                    else:
+                        running_metrics["metrics"][metric_name] += metric_value
+                for metric_name, metric_value in run_metrics["additional_metrics"].items():
+                    if first_additional_metric:
+                        first_additional_metric = False
+                        running_metrics["additional_metrics"][metric_name] = metric_value
+                    else:
+                        running_metrics["additional_metrics"][metric_name] += metric_value
+
+        # average metrics
+        metrics = {
+            "metrics": {k: v / num_run for k, v in running_metrics["metrics"].items()},
+            "additional_metrics": {k: v / num_run for k, v in running_metrics["additional_metrics"].items()}
+        }
+
+    elif modality == "vision-language":
+
+        case_inputs = read_inputs(
+            input_dir=INPUT_DIRECTORY, case_names=task_shots
+        )
+        pool = multiprocessing.Pool(processes=max_workers)
+        cases = pool.map(process, case_inputs)
+        pool.close()
+        pool.join()
+
+        case_information = extract_embeddings_and_labels(cases, task_name)
+        if case_information is None:
+            raise ValueError(f"No cases found for task {task_name}")
+
+        predictions = [pred["text"] for pred in case_information["prediction"]]
+        case_labels = [
+            label["text"] for case in case_information["case_labels"] for label in case
+        ]
 
         metrics = evaluate_predictions(
             task_name=task_name,
-            case_ids=case_ids,
+            case_ids=case_information["ids"],
             test_predictions=predictions,
             test_labels=case_labels,
-            test_extra_labels=case_extra_labels,
+            test_extra_labels=case_information.get("extra_labels"),
             save_predictions=save_predictions,
         )
 
-        # save metrics
-        write_json_file(location=metrics_path, content=metrics)
+    else:
+        raise ValueError(f"Unsupported modality: {modality}")
 
-        del task_results, predictions, case_labels, case_ids
-        if "case_extra_labels" in locals():
-            del case_extra_labels
-        gc.collect()
+    # save metrics
+    write_json_file(location=metrics_path, content=metrics)
+
+    del case_information, predictions, case_labels
+    gc.collect()
 
 
 def main():
@@ -935,12 +586,14 @@ def main():
             )
             p.start()
             p.join()
-            if metrics_path.exists():
-                with open(metrics_path, "r") as f:
-                    metrics = json.load(f)
-                    task_metrics[task_name] = metrics
-                print(f"Completed processing task: {task_name}")
-                print("=+=" * 10)
+            if not metrics_path.exists():
+                raise FileNotFoundError(f"Metrics file not found for task {task_name}")
+
+            with open(metrics_path, "r") as f:
+                metrics = json.load(f)
+                task_metrics[task_name] = metrics
+            print(f"Completed processing task: {task_name}")
+            print("=+=" * 10)
 
         logging.info(f"Writing metrics for {len(task_metrics)} tasks...")
         write_combined_metrics(metric_dict=task_metrics, save_predictions=False)
@@ -952,7 +605,6 @@ def main():
         write_combined_metrics(metric_dict=task_metrics, save_predictions=False)
         logging.info("Metrics written successfully.")
         return 0
-
 
 if __name__ == "__main__":
     raise SystemExit(main())

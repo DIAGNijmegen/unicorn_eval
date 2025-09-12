@@ -99,10 +99,10 @@ def world_to_voxel(coord, origin, spacing, inv_direction):
 def create_grid(decoded_patches):
     grids = {}
 
-    for idx, patches in tqdm(decoded_patches.items(), desc="Creating grids"):
+    for idx, patches in decoded_patches.items():
         stitched = stitch_patches_fast(patches)
         grids[idx] = stitched
-        
+
         # Clear patches from memory immediately after processing
         decoded_patches[idx].clear()
         del patches
@@ -129,7 +129,7 @@ def inference3d(
     with torch.no_grad():
         grouped_predictions = defaultdict(lambda: defaultdict(list))
 
-        for batch in tqdm(data_loader, desc="Inference"):
+        for batch in data_loader:
             inputs = batch["patch"].to(device)  # shape: [B, ...]
             coords = batch["coordinates"]  # list of 3 tensors
             image_idxs = batch["case_number"]
@@ -230,12 +230,14 @@ def inference3d(
                 sitk.sitkNearestNeighbor,
                 gt_origin,
                 gt_spacing,
-                gt_direction
+                gt_direction,
             )
 
             aligned_preds[case_id] = sitk.GetArrayFromImage(pred_on_gt)
             if mask_postprocessor is not None:
-                aligned_preds[case_id] = mask_postprocessor(aligned_preds[case_id], pred_on_gt)
+                aligned_preds[case_id] = mask_postprocessor(
+                    aligned_preds[case_id], pred_on_gt
+                )
 
             # Clear individual grid to save memory during iteration
             del pred_msk
