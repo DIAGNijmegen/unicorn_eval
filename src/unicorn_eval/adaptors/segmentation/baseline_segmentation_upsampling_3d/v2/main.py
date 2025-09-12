@@ -90,8 +90,8 @@ class SegmentationUpsampling3D_V2(PatchLevelTaskAdaptor):
         balance_bg=True,
     ):
 
-        self.patch_size = global_patch_size  # TODO: remove?
-        self.patch_spacing = global_patch_spacing  # TODO: remove?
+        self.patch_size = global_patch_size
+        self.patch_spacing = global_patch_spacing
         self.decoder = None
         self.return_binary = return_binary
         self.balance_bg = balance_bg
