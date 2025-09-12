@@ -345,6 +345,7 @@ def process_task_in_subprocess(
     logging.info(f"Processing task in subprocess: {task_name}")
 
     modality = mapping[(mapping.task_name == task_name)]["modality"].values[0]
+    max_workers = get_max_workers()
 
     if modality == "vision":
 
@@ -354,7 +355,6 @@ def process_task_in_subprocess(
             input_dir=INPUT_DIRECTORY, case_names=task_shots
         )
 
-        max_workers = get_max_workers()
         pool = multiprocessing.Pool(processes=max_workers)
         shots = pool.map(process, shot_inputs)
         pool.close()
