@@ -458,12 +458,12 @@ def process_task_in_subprocess(
             pool.close()
             pool.join()
 
-            case_informations = extract_labels(cases, task_name)
-            if case_informations is None:
+            case_information = extract_labels(cases, task_name)
+            if case_information is None:
                 raise ValueError(f"No cases found for task {task_name}")
-            case_ids, case_labels, case_extra_labels = case_informations["ids"], case_informations["labels"], case_informations["extra_labels"]
+            case_labels = case_information["labels"]
 
-            predictions = adaptor.predict(case_ids)
+            predictions = adaptor.predict(case_information["ids"])
 
     elif modality == "vision-language":
 
@@ -475,35 +475,31 @@ def process_task_in_subprocess(
         pool.close()
         pool.join()
 
-        case_informations = extract_embeddings_and_labels(cases, task_name)
-        if case_informations is None:
+        case_information = extract_embeddings_and_labels(cases, task_name)
+        if case_information is None:
             raise ValueError(f"No cases found for task {task_name}")
-        case_ids = case_informations["ids"]
 
-        predictions = [pred["text"] for pred in case_informations["prediction"]]
+        predictions = [pred["text"] for pred in case_information["prediction"]]
         case_labels = [
-            label["text"] for case in case_informations["case_labels"] for label in case
+            label["text"] for case in case_information["case_labels"] for label in case
         ]
-        case_extra_labels = None
 
     else:
         raise ValueError(f"Unsupported modality: {modality}")
 
     metrics = evaluate_predictions(
         task_name=task_name,
-        case_ids=case_ids,
+        case_ids=case_information["ids"],
         test_predictions=predictions,
         test_labels=case_labels,
-        test_extra_labels=case_extra_labels,
+        test_extra_labels=case_information.get("extra_labels"),
         save_predictions=save_predictions,
     )
 
     # save metrics
     write_json_file(location=metrics_path, content=metrics)
 
-    del case_informations, predictions, case_labels, case_ids
-    if "case_extra_labels" in locals():
-        del case_extra_labels
+    del case_information, predictions, case_labels
     gc.collect()
 
 
