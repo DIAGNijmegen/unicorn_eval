@@ -256,19 +256,21 @@ class LogisticRegression(CaseLevelTaskAdaptor):
 
     def __init__(
         self,
-        max_iterations=1000,
-        C=1.0,
-        solver="lbfgs",
-        return_probabilities=False,
+        max_iterations: int = 1000,
+        C: float = 1.0,
+        solver: str = "lbfgs",
+        return_probabilities: bool = False,
+        seed: int = 0,
     ):
         self.max_iterations = max_iterations
         self.C = C
         self.solver = solver
         self.return_probabilities = return_probabilities
+        self.seed = seed
 
     def fit(self, shot_features, shot_labels, **kwargs):
         self.model = sklearn.linear_model.LogisticRegression(
-            C=self.C, max_iter=self.max_iterations, solver=self.solver, random_state=0
+            C=self.C, max_iter=self.max_iterations, solver=self.solver, random_state=self.seed
         )
         self.model.fit(shot_features, shot_labels)
 

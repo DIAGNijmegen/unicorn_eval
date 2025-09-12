@@ -12,6 +12,9 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
+import os
+import random
+import torch
 import logging
 from collections import defaultdict
 from functools import partial
@@ -143,6 +146,15 @@ METRIC_DICT = {
 }
 
 
+def set_all_seeds(seed: int):
+    os.environ["PYTHONHASHSEED"] = str(seed)
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.benchmark = False
+
+
 def get_adaptor(
     *,
     adaptor_name: str,
@@ -152,6 +164,7 @@ def get_adaptor(
     global_patch_spacing: list[float] | float | None = None,
     feature_grid_resolution: list[int] | None = None,
     return_probabilities: bool = False,
+    seed: int = 0,
 ) -> Adaptor:
 
     if "-nn" in adaptor_name:
@@ -181,6 +194,7 @@ def get_adaptor(
             C=1.0,
             solver="lbfgs",
             return_probabilities=return_probabilities,
+            seed=seed,
         )
 
     elif "linear-probing" in adaptor_name:
