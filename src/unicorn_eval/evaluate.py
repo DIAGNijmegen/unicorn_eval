@@ -376,6 +376,7 @@ def process_task_in_subprocess(
         running_metrics = {"metrics": {}, "additional_metrics": {}}
         for seed in range(num_run):
 
+            logging.info(f"Run {seed+1}/{num_run} for task {task_name} using adaptor {adaptor_name}")
             set_all_seeds(seed)
 
             # only load few shots for the given task
