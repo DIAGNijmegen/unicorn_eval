@@ -13,10 +13,33 @@
 #  limitations under the License.
 
 from abc import ABC, abstractmethod
+
 import numpy as np
 
 
-class CaseLevelTaskAdaptor(ABC):
+class Adaptor(ABC):
+    """
+    Abstract base class for all adaptors.
+    This class provides a blueprint for implementing adaptors that can handle both case-level and patch-level tasks.
+    """
+
+    @abstractmethod
+    def fit(self, *args, **kwargs) -> None:
+        """
+        Abstract method to fit the model using the few-shot data.
+        The implementation should use the provided arguments to fit the model.
+        """
+
+    @abstractmethod
+    def predict(self, test_ids: list[str]) -> np.ndarray:
+        """
+        Abstract method to make predictions using the test data.
+        Returns:
+            np.ndarray: Predictions for the test set.
+        """
+
+
+class CaseLevelTaskAdaptor(Adaptor):
     """
     Abstract base class for case-level tasks such as classification or regression.
     This class provides a blueprint for implementing adaptors that operate on a case level,
@@ -30,32 +53,29 @@ class CaseLevelTaskAdaptor(ABC):
         This constructor can be used to store hyperparameters (such as number of epochs or learning rate, if relevant) for later use.
         If there are no hyperparameters, this method can remain empty.
         """
-        pass
 
     @abstractmethod
     def fit(
         self,
         shot_features: np.ndarray,
         shot_labels: np.ndarray,
-        shot_extra_labels: np.ndarray = None,
+        shot_extra_labels: np.ndarray | None = None,
     ) -> None:
         """
         Abstract method to fit the model using the few-shot data.
         The implementation should use `shot_features`, `shot_labels` (and potentially `shot_extra_labels`) to fit the model.
         """
-        pass
 
     @abstractmethod
-    def predict(self) -> np.ndarray:
+    def predict(self, test_ids: list[str]) -> np.ndarray:
         """
         Abstract method to make predictions using the test data.
         Returns:
             np.ndarray: Predictions for the test set based on `test_features`.
         """
-        pass
 
 
-class PatchLevelTaskAdaptor(ABC):
+class PatchLevelTaskAdaptor(Adaptor):
     """
     Abstract base class for dense prediction tasks such as detection or segmentation.
     This class provides a blueprint for implementing adaptors that operate on a patch level,
@@ -85,19 +105,17 @@ class PatchLevelTaskAdaptor(ABC):
         shot_features: np.ndarray,
         shot_coordinates: np.ndarray,
         shot_labels: np.ndarray,
-        shot_extra_labels: np.ndarray = None,
+        shot_extra_labels: np.ndarray | None = None,
     ) -> None:
         """
         Abstract method to fit the model using the few-shot data.
         The implementation should use `shot_features`, `shot_coordinates`, `shot_labels` (and potentially `shot_extra_labels`) to fit the model.
         """
-        pass
 
     @abstractmethod
-    def predict(self) -> np.ndarray:
+    def predict(self, test_ids: list[str]) -> np.ndarray:
         """
         Abstract method to make predictions using the test data.
         Returns:
             np.ndarray: Predictions for the test set based on `test_features` and `test_coordinates`.
         """
-        pass

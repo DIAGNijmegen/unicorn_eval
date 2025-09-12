@@ -29,9 +29,6 @@ from unicorn_eval.helpers import get_max_workers
 from unicorn_eval.io import (GROUNDTRUTH_DIRECTORY, INPUT_DIRECTORY,
                              OUTPUT_DIRECTORY, process, read_inputs,
                              write_json_file)
-from unicorn_eval.memory_profiler import (finalize_memory_profiler,
-                                          init_memory_profiler, log_memory,
-                                          start_continuous_logging)
 from unicorn_eval.utils import (evaluate_predictions,
                                 extract_embeddings_and_labels, extract_labels,
                                 get_adaptor, normalize_metric)
@@ -462,6 +459,8 @@ def process_task_in_subprocess(
             pool.join()
 
             case_informations = extract_labels(cases, task_name)
+            if case_informations is None:
+                raise ValueError(f"No cases found for task {task_name}")
             case_ids, case_labels, case_extra_labels = case_informations["ids"], case_informations["labels"], case_informations["extra_labels"]
 
             predictions = adaptor.predict(case_ids)
@@ -477,6 +476,8 @@ def process_task_in_subprocess(
         pool.join()
 
         case_informations = extract_embeddings_and_labels(cases, task_name)
+        if case_informations is None:
+            raise ValueError(f"No cases found for task {task_name}")
         case_ids = case_informations["ids"]
 
         predictions = [pred["text"] for pred in case_informations["prediction"]]
@@ -507,9 +508,6 @@ def process_task_in_subprocess(
 
 
 def main():
-    init_memory_profiler(output_dir=OUTPUT_DIRECTORY)
-    start_continuous_logging()
-
     logging.info("Input folder contents:")
     print_directory_contents(INPUT_DIRECTORY)
     logging.info("=+=" * 10)
@@ -533,7 +531,6 @@ def main():
 
         for task_name in all_tasks:
             print(f"Processing task: {task_name} (in subprocess)")
-            log_memory(f"Starting task {task_name}")
             metrics_path = OUTPUT_DIRECTORY / f"{task_name}.json"
             p = multiprocessing.Process(
                 target=process_task_in_subprocess,
@@ -548,7 +545,6 @@ def main():
                 metrics = json.load(f)
                 task_metrics[task_name] = metrics
             print(f"Completed processing task: {task_name}")
-            log_memory(f"Completed task {task_name}")
             print("=+=" * 10)
 
         logging.info(f"Writing metrics for {len(task_metrics)} tasks...")
@@ -561,9 +557,6 @@ def main():
         write_combined_metrics(metric_dict=task_metrics, save_predictions=False)
         logging.info("Metrics written successfully.")
         return 0
-
-    finally:
-        finalize_memory_profiler()
 
 if __name__ == "__main__":
     raise SystemExit(main())

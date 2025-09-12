@@ -13,8 +13,9 @@
 #  limitations under the License.
 
 import logging
-from functools import partial
 from collections import defaultdict
+from functools import partial
+from typing import Any
 
 import numpy as np
 from sklearn.metrics import cohen_kappa_score, roc_auc_score
@@ -26,6 +27,7 @@ from unicorn_eval.adaptors import (KNN, ConvDetector, DensityMap, KNNRegressor,
                                    MultiLayerPerceptronRegressor,
                                    PatchNoduleRegressor, WeightedKNN,
                                    WeightedKNNRegressor)
+from unicorn_eval.adaptors.base import Adaptor
 from unicorn_eval.adaptors.segmentation.aimhi_linear_upsample_conv3d.v1 import \
     LinearUpsampleConv3D_V1
 from unicorn_eval.adaptors.segmentation.aimhi_linear_upsample_conv3d.v2 import (
@@ -44,7 +46,6 @@ from unicorn_eval.metrics.spider import compute_spider_score
 from unicorn_eval.metrics.uls import compute_uls_score
 from unicorn_eval.metrics.vision_language import \
     compute_average_language_metric
-
 
 METRIC_DICT = {
     "Task01_classifying_he_prostate_biopsies_into_isup_scores": {
@@ -151,7 +152,7 @@ def get_adaptor(
     global_patch_spacing: list[float] | float | None = None,
     feature_grid_resolution: list[int] | None = None,
     return_probabilities: bool = False,
-) -> np.ndarray:
+) -> Adaptor:
 
     if "-nn" in adaptor_name:
         k = int(adaptor_name.split("-")[0])
@@ -588,7 +589,7 @@ def process_detection_radiology(data, task_name: str | None = None):
     return data
 
 
-def extract_labels(processed_results, task_name):
+def extract_labels(processed_results, task_name) -> dict[str, Any] | None:
     """Extract labels for a given task."""
     data = defaultdict(list)
     valid_results_found = False
@@ -625,7 +626,7 @@ def extract_labels(processed_results, task_name):
     return data
 
 
-def extract_embeddings_and_labels(processed_results, task_name):
+def extract_embeddings_and_labels(processed_results, task_name) -> dict[str, Any] | None:
     """Extract embeddings and labels for a given task."""
     task_data = {
         "task_type": None,
