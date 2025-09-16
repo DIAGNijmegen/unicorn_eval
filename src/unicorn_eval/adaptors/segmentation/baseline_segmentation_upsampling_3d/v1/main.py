@@ -99,7 +99,7 @@ class SegmentationUpsampling(PatchLevelTaskAdaptor):
             )
             predictions.extend(predicted_masks)
 
-        return np.array(predictions)
+        return predictions
 
 
 class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
