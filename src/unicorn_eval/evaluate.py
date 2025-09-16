@@ -473,8 +473,9 @@ def process_task_in_subprocess(
                 )
                 gc.collect()
 
+                task_cases = mapping[(mapping.task_name == task_name) & (mapping.split == "case")]["case_id"].tolist()
                 case_inputs = read_inputs(
-                    input_dir=INPUT_DIRECTORY, case_names=task_shots
+                    input_dir=INPUT_DIRECTORY, case_names=task_cases
                 )
                 pool = multiprocessing.Pool(processes=max_workers)
                 cases = pool.map(process, case_inputs)
