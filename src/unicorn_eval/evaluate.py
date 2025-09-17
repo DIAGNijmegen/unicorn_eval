@@ -483,6 +483,10 @@ def process_task_in_subprocess(
                 pool.join()
 
                 case_information = extract_labels(cases, task_name)
+                del case_inputs
+                del cases
+                gc.collect()
+
                 if case_information is None:
                     raise ValueError(f"No cases found for task {task_name}")
                 case_labels = case_information["labels"]
@@ -497,6 +501,9 @@ def process_task_in_subprocess(
                     test_extra_labels=case_information.get("extra_labels"),
                     save_predictions=save_predictions,
                 )
+
+                del case_information, case_labels, predictions
+                gc.collect()
 
                 # store metrics
                 for metric_name, metric_value in run_metrics["metrics"].items():
@@ -546,14 +553,14 @@ def process_task_in_subprocess(
             save_predictions=save_predictions,
         )
 
+        del case_information, predictions, case_labels
+        gc.collect()
+
     else:
         raise ValueError(f"Unsupported modality: {modality}")
 
     # save metrics
     write_json_file(location=metrics_path, content=metrics)
-
-    del case_information, predictions, case_labels
-    gc.collect()
 
 
 def main():
