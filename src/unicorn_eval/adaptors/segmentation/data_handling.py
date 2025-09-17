@@ -225,7 +225,13 @@ def extract_patch_labels(
             ((x_start, x_end), (y_start, y_end), (z_start, z_end)).
         - features (list[float]): List of features extracted from the patch
     """
-    label = sitk.GetImageFromArray(label)
+    try:
+        label = sitk.GetImageFromArray(label)
+    except Exception as e:
+        if isinstance(label, str):
+            label = sitk.ReadImage(label)
+        else:
+            raise ValueError(f"Label must be a numpy array or a valid file path string. {e}")
     label.SetOrigin(label_origin)
     label.SetSpacing(label_spacing)
     label.SetDirection(label_direction)
