@@ -173,7 +173,7 @@ def load_mha_file(*, path: Path | str):
         raise ValueError("Failed to load class labels from MHA file.")
 
     return (
-        sitk.GetArrayFromImage(class_labels),
+        path,
         list(class_labels.GetSize()),
         list(class_labels.GetOrigin()),
         list(class_labels.GetSpacing()),
