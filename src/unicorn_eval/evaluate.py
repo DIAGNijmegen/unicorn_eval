@@ -450,7 +450,7 @@ def process_task_in_subprocess(
         adaptor_name = adaptors[task_name]
         return_probabilities = REQUIRES_PROBABILITIES_DICT[task_name]
 
-        num_run = 1
+        num_run = 5
         if adaptor_name in DETERMINISTIC_ADAPTORS:
             num_run = 1
         first_metric, first_additional_metric = True, True
