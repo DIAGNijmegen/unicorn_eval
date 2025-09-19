@@ -576,22 +576,27 @@ def main():
         save_predictions = False
 
         for task_name in all_tasks:
-            print(f"Processing task: {task_name} (in subprocess)")
-            metrics_path = OUTPUT_DIRECTORY / f"{task_name}.json"
-            p = multiprocessing.Process(
-                target=process_task_in_subprocess,
-                args=(task_name, mapping, adaptors, save_predictions, metrics_path),
-            )
-            p.start()
-            p.join()
-            if not metrics_path.exists():
-                raise FileNotFoundError(f"Metrics file not found for task {task_name}")
+            try:
+                print(f"Processing task: {task_name} (in subprocess)")
+                metrics_path = OUTPUT_DIRECTORY / f"{task_name}.json"
+                p = multiprocessing.Process(
+                    target=process_task_in_subprocess,
+                    args=(task_name, mapping, adaptors, save_predictions, metrics_path),
+                )
+                p.start()
+                p.join()
+                if not metrics_path.exists():
+                    raise FileNotFoundError(f"Metrics file not found for task {task_name}")
 
-            with open(metrics_path, "r") as f:
-                metrics = json.load(f)
-                task_metrics[task_name] = metrics
-            print(f"Completed processing task: {task_name}")
-            print("=+=" * 10)
+                with open(metrics_path, "r") as f:
+                    metrics = json.load(f)
+                    task_metrics[task_name] = metrics
+                print(f"Completed processing task: {task_name}")
+                print("=+=" * 10)
+            except Exception as e:
+                logging.info(f"Error processing task {task_name}: {e}")
+                logging.info(f"Continuing with next task...")
+                continue
 
         logging.info(f"Writing metrics for {len(task_metrics)} tasks...")
         write_combined_metrics(metric_dict=task_metrics, save_predictions=False)
