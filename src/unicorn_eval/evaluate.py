@@ -439,6 +439,7 @@ def process_task_in_subprocess(
     logging.info(f"Processing task in subprocess: {task_name}")
 
     modality = mapping[(mapping.task_name == task_name)]["modality"].values[0]
+    max_workers = get_max_workers()
 
     if modality == "vision":
 
@@ -449,7 +450,7 @@ def process_task_in_subprocess(
         adaptor_name = adaptors[task_name]
         return_probabilities = REQUIRES_PROBABILITIES_DICT[task_name]
 
-        num_run = 5
+        num_run = 1
         if adaptor_name in DETERMINISTIC_ADAPTORS:
             num_run = 1
         first_metric, first_additional_metric = True, True
@@ -469,7 +470,11 @@ def process_task_in_subprocess(
             ]["case_id"].tolist()
             shot_inputs = read_inputs(input_dir=INPUT_DIRECTORY, case_names=task_shots)
 
-            shots = [process(shot_input) for shot_input in shot_inputs]
+            pool = multiprocessing.Pool(processes=max_workers)
+            shots = pool.map(process, shot_inputs)
+            pool.close()
+            pool.join()
+            # shots = [process(shot_input) for shot_input in shot_inputs]
             del shot_inputs
             gc.collect()
             shot_informations = extract_embeddings_and_labels(shots, task_name)
@@ -563,7 +568,11 @@ def process_task_in_subprocess(
                 case_inputs = read_inputs(
                     input_dir=INPUT_DIRECTORY, case_names=task_cases
                 )
-                cases = [process(case_input) for case_input in case_inputs]
+                pool = multiprocessing.Pool(processes=max_workers)
+                cases = pool.map(process, case_inputs)
+                pool.close()
+                pool.join()
+                # cases = [process(case_input) for case_input in case_inputs]
                 del case_inputs
                 gc.collect()
                 case_information = extract_labels(cases, task_name)
@@ -671,22 +680,27 @@ def main():
         save_predictions = False
 
         for task_name in all_tasks:
-            print(f"Processing task: {task_name} (in subprocess)")
-            metrics_path = OUTPUT_DIRECTORY / f"{task_name}.json"
-            p = multiprocessing.Process(
-                target=process_task_in_subprocess,
-                args=(task_name, mapping, adaptors, save_predictions, metrics_path),
-            )
-            p.start()
-            p.join()
-            if not metrics_path.exists():
-                raise FileNotFoundError(f"Metrics file not found for task {task_name}")
+            try:
+                print(f"Processing task: {task_name} (in subprocess)")
+                metrics_path = OUTPUT_DIRECTORY / f"{task_name}.json"
+                p = multiprocessing.Process(
+                    target=process_task_in_subprocess,
+                    args=(task_name, mapping, adaptors, save_predictions, metrics_path),
+                )
+                p.start()
+                p.join()
+                if not metrics_path.exists():
+                    raise FileNotFoundError(f"Metrics file not found for task {task_name}")
 
-            with open(metrics_path, "r") as f:
-                metrics = json.load(f)
-                task_metrics[task_name] = metrics
-            print(f"Completed processing task: {task_name}")
-            print("=+=" * 10)
+                with open(metrics_path, "r") as f:
+                    metrics = json.load(f)
+                    task_metrics[task_name] = metrics
+                print(f"Completed processing task: {task_name}")
+                print("=+=" * 10)
+            except Exception as e:
+                logging.info(f"Error processing task {task_name}: {e}")
+                logging.info(f"Continuing with next task...")
+                continue
 
         logging.info(f"Writing metrics for {len(task_metrics)} tasks...")
         write_combined_metrics(metric_dict=task_metrics, save_predictions=False)
