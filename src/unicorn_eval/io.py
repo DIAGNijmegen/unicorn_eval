@@ -289,7 +289,6 @@ def process(job):
             case_name = case_name[: -len(suffix)]
 
     case_info = mapping[mapping.case_id == case_name]
-    is_few_shot = case_info.split.values[0] == "shot"
     if case_info.empty:
         raise ValueError(f"Case {case_name} not found in mapping.")
 
@@ -406,7 +405,6 @@ def process(job):
         label_path = Path(str(label_path).replace("{case_id}", case_name))
         label, label_size, label_origin, label_spacing, label_direction = load_mha_file(
             path=label_path,
-            return_as_path=not is_few_shot,
         )
     else:
         raise ValueError(f"Unsupported file format: {label_path.suffix}")

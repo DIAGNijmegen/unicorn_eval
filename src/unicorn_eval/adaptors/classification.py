@@ -88,7 +88,7 @@ class KNN(CaseLevelTaskAdaptor):
         self.model = None
 
     def fit(self, shot_features, shot_labels, **kwargs):
-        self.mean_feature = shot_features.mean(dim=0, keepdims=True)
+        self.mean_feature = shot_features.mean(axis=0, keepdims=True)
         processed_shot_features = preprocess_features(
             shot_features,
             center=self.center_features,
@@ -169,7 +169,7 @@ class WeightedKNN(CaseLevelTaskAdaptor):
         self.num_classes = None
 
     def fit(self, shot_features, shot_labels, **kwargs):
-        self.mean_feature = shot_features.mean(dim=0, keepdims=True)
+        self.mean_feature = shot_features.mean(axis=0, keepdims=True)
         self.shot_features = preprocess_features(
             shot_features,
             center=self.center_features,

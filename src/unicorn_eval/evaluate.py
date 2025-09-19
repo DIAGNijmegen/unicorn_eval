@@ -470,11 +470,7 @@ def process_task_in_subprocess(
             ]["case_id"].tolist()
             shot_inputs = read_inputs(input_dir=INPUT_DIRECTORY, case_names=task_shots)
 
-            pool = multiprocessing.Pool(processes=max_workers)
-            shots = pool.map(process, shot_inputs)
-            pool.close()
-            pool.join()
-            # shots = [process(shot_input) for shot_input in shot_inputs]
+            shots = [process(shot_input) for shot_input in shot_inputs]
             del shot_inputs
             gc.collect()
             shot_informations = extract_embeddings_and_labels(shots, task_name)
@@ -568,11 +564,7 @@ def process_task_in_subprocess(
                 case_inputs = read_inputs(
                     input_dir=INPUT_DIRECTORY, case_names=task_cases
                 )
-                pool = multiprocessing.Pool(processes=max_workers)
-                cases = pool.map(process, case_inputs)
-                pool.close()
-                pool.join()
-                # cases = [process(case_input) for case_input in case_inputs]
+                cases = [process(case_input) for case_input in case_inputs]
                 del case_inputs
                 gc.collect()
                 case_information = extract_labels(cases, task_name)
