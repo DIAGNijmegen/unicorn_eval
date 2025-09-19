@@ -18,6 +18,8 @@ import json
 import logging
 import multiprocessing
 import random
+import re
+import shutil
 from pathlib import Path
 
 import numpy as np
@@ -26,12 +28,26 @@ from dragon_eval import DragonEval
 from dragon_eval.evaluation import REGRESSION_EPSILON, TASK_TYPE, EvalType
 
 from unicorn_eval.helpers import get_max_workers
-from unicorn_eval.io import (GROUNDTRUTH_DIRECTORY, INPUT_DIRECTORY,
-                             OUTPUT_DIRECTORY, process, read_inputs,
-                             write_json_file)
-from unicorn_eval.utils import (set_all_seeds, evaluate_predictions,
-                                extract_embeddings_and_labels, extract_labels,
-                                get_adaptor, normalize_metric)
+from unicorn_eval.io import (
+    GROUNDTRUTH_DIRECTORY,
+    INPUT_DIRECTORY,
+    OUTPUT_DIRECTORY,
+    process,
+    read_inputs,
+    write_json_file,
+)
+from unicorn_eval.utils import (
+    evaluate_predictions,
+    extract_embeddings_and_labels,
+    extract_labels,
+    get_adaptor,
+    normalize_metric,
+    set_all_seeds,
+)
+
+# Matches BMP PUA (U+E000–U+F8FF) and the supplementary PUA ranges (planes 15 & 16)
+PUA_REGEX = re.compile(r"[\uE000-\uF8FF\U000F0000-\U000FFFFD\U00100000-\U0010FFFD]")
+
 
 ADAPTOR_SLUGS_DICT = {
     "Task01_classifying_he_prostate_biopsies_into_isup_scores": "adaptor-pathology-classification",
@@ -301,6 +317,40 @@ def prepare_predictions_language(input_dir: Path, output_dir: Path, gt_dir: Path
             )
 
 
+def _strip_pua(s: str, stats: dict) -> str:
+    if not s:
+        return s
+    hits = PUA_REGEX.findall(s)
+    if hits:
+        stats["total_removed"] += len(hits)
+        # save a few examples of what we saw (as code points)
+        if len(stats["examples"]) < 10:
+            stats["examples"].extend(
+                [f"U+{ord(ch):04X}" for ch in hits[: 10 - len(stats["examples"])]]
+            )
+    return PUA_REGEX.sub("", s)
+
+
+def _clean_obj(obj, stats: dict):
+    """Recursively clean strings inside dicts/lists/tuples; leave other types untouched."""
+    if isinstance(obj, str):
+        return _strip_pua(obj, stats)
+    elif isinstance(obj, list):
+        return [_clean_obj(x, stats) for x in obj]
+    elif isinstance(obj, tuple):
+        return tuple(_clean_obj(x, stats) for x in obj)
+    elif isinstance(obj, dict):
+        # Clean both keys and values (keys are rarely non-ASCII, but just in case)
+        new_dict = {}
+        for k, v in obj.items():
+            new_k = _clean_obj(k, stats) if isinstance(k, str) else k
+            new_v = _clean_obj(v, stats)
+            new_dict[new_k] = new_v
+        return new_dict
+    else:
+        return obj
+
+
 def evaluate_language_predictions():
     input_dir = (
         INPUT_DIRECTORY
@@ -330,6 +380,41 @@ def evaluate_language_predictions():
     ]
 
     if task_names:
+        # Remove restricted unicode characters from input of task 19
+        if "Task19_anonymizing_report" in task_names:
+            input_path = (
+                workdir
+                / "Task19_anonymizing_report-fold0"
+                / "nlp-predictions-dataset.json"
+            )
+            if input_path.exists():
+                with open(input_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+
+                # Clean the loaded JSON
+                stats = {"total_removed": 0, "examples": []}
+                cleaned = _clean_obj(data, stats)
+
+                # Only write if anything changed
+                if stats["total_removed"] > 0:
+                    # Make a backup before overwriting
+                    backup_path = input_path.with_suffix(input_path.suffix + ".bak")
+                    if not backup_path.exists():
+                        shutil.copy2(input_path, backup_path)
+
+                    # Write cleaned JSON (preserve UTF-8 as-is)
+                    with open(input_path, "w", encoding="utf-8") as f:
+                        json.dump(cleaned, f, ensure_ascii=False, indent=2)
+
+                    print(
+                        f"[PUA scrub] Removed {stats['total_removed']} private-use characters "
+                        f"from '{input_path.name}'. Examples: {', '.join(stats['examples']) or 'n/a'}"
+                    )
+                else:
+                    print(
+                        f"[PUA scrub] No private-use characters found in '{input_path.name}'."
+                    )
+
         # evaluate
         DragonEval(
             ground_truth_path=GROUNDTRUTH_DIRECTORY,
@@ -373,14 +458,16 @@ def process_task_in_subprocess(
 
         for seed in range(num_run):
 
-            logging.info(f"Run {seed+1}/{num_run} for task {task_name} using {adaptor_name}")
+            logging.info(
+                f"Run {seed+1}/{num_run} for task {task_name} using {adaptor_name}"
+            )
             set_all_seeds(seed)
 
             # only load few shots for the given task
-            task_shots = mapping[(mapping.task_name == task_name) & (mapping.split == "shot")]["case_id"].tolist()
-            shot_inputs = read_inputs(
-                input_dir=INPUT_DIRECTORY, case_names=task_shots
-            )
+            task_shots = mapping[
+                (mapping.task_name == task_name) & (mapping.split == "shot")
+            ]["case_id"].tolist()
+            shot_inputs = read_inputs(input_dir=INPUT_DIRECTORY, case_names=task_shots)
 
             shots = [process(shot_input) for shot_input in shot_inputs]
             del shot_inputs
@@ -470,7 +557,9 @@ def process_task_in_subprocess(
                 )
                 gc.collect()
 
-                task_cases = mapping[(mapping.task_name == task_name) & (mapping.split == "case")]["case_id"].tolist()
+                task_cases = mapping[
+                    (mapping.task_name == task_name) & (mapping.split == "case")
+                ]["case_id"].tolist()
                 case_inputs = read_inputs(
                     input_dir=INPUT_DIRECTORY, case_names=task_cases
                 )
@@ -506,24 +595,30 @@ def process_task_in_subprocess(
                         running_metrics["metrics"][metric_name] = metric_value
                     else:
                         running_metrics["metrics"][metric_name] += metric_value
-                for metric_name, metric_value in run_metrics["additional_metrics"].items():
+                for metric_name, metric_value in run_metrics[
+                    "additional_metrics"
+                ].items():
                     if first_additional_metric:
                         first_additional_metric = False
-                        running_metrics["additional_metrics"][metric_name] = metric_value
+                        running_metrics["additional_metrics"][
+                            metric_name
+                        ] = metric_value
                     else:
-                        running_metrics["additional_metrics"][metric_name] += metric_value
+                        running_metrics["additional_metrics"][
+                            metric_name
+                        ] += metric_value
 
         # average metrics
         metrics = {
             "metrics": {k: v / num_run for k, v in running_metrics["metrics"].items()},
-            "additional_metrics": {k: v / num_run for k, v in running_metrics["additional_metrics"].items()}
+            "additional_metrics": {
+                k: v / num_run for k, v in running_metrics["additional_metrics"].items()
+            },
         }
 
     elif modality == "vision-language":
 
-        case_inputs = read_inputs(
-            input_dir=INPUT_DIRECTORY, case_names=task_shots
-        )
+        case_inputs = read_inputs(input_dir=INPUT_DIRECTORY, case_names=task_shots)
         cases = process(case_inputs)
         case_information = extract_embeddings_and_labels(cases, task_name)
         if case_information is None:
@@ -603,6 +698,7 @@ def main():
         write_combined_metrics(metric_dict=task_metrics, save_predictions=False)
         logging.info("Metrics written successfully.")
         return 0
+
 
 if __name__ == "__main__":
     raise SystemExit(main())
