@@ -2,7 +2,7 @@ import logging
 from collections import OrderedDict, defaultdict
 from pathlib import Path
 from typing import Iterable
-
+import SimpleITK as sitk
 import numpy as np
 import pandas
 
@@ -31,7 +31,8 @@ class Spider:
 
     def score_case(self, gt, pred):
         if isinstance(gt, (Path, str)):
-            gt = np.load(gt)
+            gt_img = sitk.ReadImage(gt)
+            gt = sitk.GetArrayFromImage(gt_img)
         if isinstance(pred, (Path, str)):
             pred = np.load(pred)
 
