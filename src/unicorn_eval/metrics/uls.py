@@ -7,7 +7,7 @@ import SimpleITK as sitk
 from scipy.ndimage import binary_erosion, label
 from scipy.spatial.distance import pdist, squareform
 from skimage.measure import regionprops
-
+import SimpleITK as sitk
 
 def calculate_angle_between_lines(point1, point2, point3, point4):
     # Convert points to vectors
@@ -139,7 +139,8 @@ def compute_uls_score(gts, preds):
     for i, gt in enumerate(gts):
         pred = preds[i]
         if isinstance(gt, (Path, str)):
-            gt = np.load(gt)
+            gt_img = sitk.ReadImage(gt)
+            gt = sitk.GetArrayFromImage(gt_img)
         if isinstance(pred, (Path, str)):
             pred = np.load(pred)
 
