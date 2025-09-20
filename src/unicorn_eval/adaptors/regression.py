@@ -365,8 +365,7 @@ class LinearProbingRegressor(CaseLevelTaskAdaptor):
                     prediction = -risk_scores
                     predictions.append(prediction.cpu().numpy())
                 else:
-                    _, prediction = torch.max(logits, 0)
-                    predictions.append(prediction.cpu().numpy())
+                    predictions.append(logits.cpu().numpy())
 
         return np.array(predictions).squeeze()
 
@@ -530,7 +529,6 @@ class MultiLayerPerceptronRegressor(CaseLevelTaskAdaptor):
                     prediction = -risk_scores
                     predictions.append(prediction.cpu().numpy())
                 else:
-                    _, prediction = torch.max(logits, 0)
-                    predictions.append(prediction.cpu().numpy())
+                    predictions.append(logits.cpu().numpy())
 
         return np.array(predictions).squeeze()
