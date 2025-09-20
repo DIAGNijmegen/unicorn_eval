@@ -690,8 +690,8 @@ def main():
                 print(f"Completed processing task: {task_name}")
                 print("=+=" * 10)
             except Exception as e:
-                logging.info(f"Error processing task {task_name}: {e}")
-                logging.info(f"Continuing with next task...")
+                print(f"Error processing task {task_name}: {e}")
+                print("Continuing with next task...")
                 continue
 
         logging.info(f"Writing metrics for {len(task_metrics)} tasks...")
