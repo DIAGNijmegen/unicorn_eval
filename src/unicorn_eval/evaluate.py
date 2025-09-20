@@ -619,7 +619,10 @@ def process_task_in_subprocess(
 
     elif modality == "vision-language":
 
-        case_inputs = read_inputs(input_dir=INPUT_DIRECTORY, case_names=task_shots)
+        task_cases = mapping[
+            (mapping.task_name == task_name) & (mapping.split == "case")
+        ]["case_id"].tolist()
+        case_inputs = read_inputs(input_dir=INPUT_DIRECTORY, case_names=task_cases)
         cases = process(case_inputs)
         case_information = extract_embeddings_and_labels(cases, task_name)
         if case_information is None:
