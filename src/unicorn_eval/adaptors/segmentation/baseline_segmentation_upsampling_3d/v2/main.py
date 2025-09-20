@@ -155,7 +155,7 @@ class SegmentationUpsampling3D_V2(PatchLevelTaskAdaptor):
             train_data, batch_size=10, balance_bg=self.balance_bg
         )
 
-        max_class = max_class_label_from_labels(shot_labels)
+        max_class = max_class_label_from_labels(patch_labels)
         self.num_classes = max_class + 1
 
         latent_dim = len(shot_features[0][0])
