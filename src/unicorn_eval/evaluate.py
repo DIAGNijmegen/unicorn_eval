@@ -41,6 +41,7 @@ from unicorn_eval.utils import (
     evaluate_predictions,
     set_lowest_possible_metric,
     extract_embeddings_and_labels,
+    extract_embeddings_labels_and_predictions,
     extract_labels,
     get_adaptor,
     normalize_metric,
@@ -634,7 +635,7 @@ def process_task_in_subprocess(
         pool.close()
         pool.join()
 
-        case_information = extract_embeddings_and_labels(cases, task_name)
+        case_information = extract_embeddings_labels_and_predictions(cases, task_name)
         if case_information is None:
             raise ValueError(f"No cases found for task {task_name}")
 
