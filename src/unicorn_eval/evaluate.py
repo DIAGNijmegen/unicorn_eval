@@ -640,7 +640,7 @@ def process_task_in_subprocess(
 
         predictions = [pred["text"] for pred in case_information["prediction"]]
         case_labels = [
-            label["text"] for case in case_information["case_labels"] for label in case
+            label["text"] for case in case_information["labels"] for label in case
         ]
 
         metrics = evaluate_predictions(
