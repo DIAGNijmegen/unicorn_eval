@@ -55,93 +55,113 @@ METRIC_DICT = {
         "name": "cohen-kappa-quadratic",
         "fn": partial(cohen_kappa_score, weights="quadratic"),
         "range": (0, 1),
+        "lowest": -1,
     },
     "Task02_classifying_lung_nodule_malignancy_in_ct": {
         "name": "auc",
         "fn": roc_auc_score,
         "range": (0.5, 1),
+        "lowest": 0,
     },
     "Task03_predicting_the_time_to_biochemical_recurrence_in_he_prostatectomies": {
         "name": "c-index",
         "fn": concordance_index_censored,
         "range": (0.5, 1),
+        "lowest": 0,
     },
     "Task04_predicting_slide_level_tumor_proportion_score_in_ihc_stained_wsi": {
         "name": "cohen-kappa-quadratic",
         "fn": partial(cohen_kappa_score, weights="quadratic"),
         "range": (0, 1),
+        "lowest": -1,
     },
     "Task05_detecting_signet_ring_cells_in_he_stained_wsi_of_gastric_cancer": {
         "name": "f1",
         "fn": compute_f1,
         "range": (0, 1),
+        "lowest": 0,
     },
     "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams": {
         "name": "picai",
         "fn": compute_picai_score,
         "range": (0.25, 1),
+        "lowest": 0,
     },
     "Task07_detecting_lung_nodules_in_thoracic_ct": {
         "name": "sensitivity",
         "fn": compute_cpm,
         "range": (0, 1),
+        "lowest": 0,
     },
     "Task08_detecting_mitotic_figures_in_breast_cancer_wsis": {
         "name": "f1",
         "fn": compute_f1,
         "range": (0, 1),
+        "lowest": 0,
     },
     "Task09_segmenting_rois_in_breast_cancer_wsis": {
         "name": "dice",
         "fn": compute_dice_score,
         "range": (0.2548, 1),
+        "lowest": 0,
     },
     "Task10_segmenting_lesions_within_vois_in_ct": {
         "name": "uls_score",
         "fn": compute_uls_score,
         "range": (0, 1),
+        "lowest": 0,
     },
     "Task11_segmenting_three_anatomical_structures_in_lumbar_spine_mri": {
         "name": "spider_score",
         "fn": compute_spider_score,
         "range": (0, 1),
+        "lowest": 0,
     },
     "Task12_predicting_histopathology_sample_origin": {
         "name": "unweighted-kappa",
         "range": (0, 1),
+        "lowest": -1,
     },
     "Task13_classifying_pulmonary_nodule_presence": {
         "name": "auc",
         "range": (0.5, 1),
+        "lowest": 0,
     },
     "Task14_classifying_kidney_abnormality": {
         "name": "auc",
         "range": (0.5, 1),
+        "lowest": 0,
     },
     "Task15_hip_kellgren_lawrence_score": {
         "name": "unweighted-kappa",
         "range": (0, 1),
+        "lowest": -1,
     },
     "Task16_classifying_colon_histopathology_diagnosis": {
         "name": "macro-auc",
         "range": (0.5, 1),
+        "lowest": 0,
     },
     "Task17_predicting_lesion_size_measurements": {
         "name": "rsmape",
         "range": (0.7580, 1),
+        "lowest": 0,
     },
     "Task18_predicting_prostate_volume_psa_and_psa_density": {
         "name": "rsmape",
         "range": (0.7668, 1),
+        "lowest": 0,
     },
     "Task19_anonymizing_report": {
         "name": "redaction_score",
         "range": (0, 1),
+        "lowest": 0,
     },
     "Task20_generating_caption_from_wsi": {
         "name": "average_language_metric",
         "fn": compute_average_language_metric,
         "range": (0, 1),
+        "lowest": 0,
     },
 }
 
@@ -459,6 +479,22 @@ def evaluate_predictions(
         additional_metric_dict.update(language_metric_dict)
     else:
         raise ValueError(f"Unsupported task: {task_name}")
+
+    metrics["metrics"] = metric_dict
+    metrics["additional_metrics"] = additional_metric_dict
+
+    return metrics
+
+
+def set_lowest_possible_metric(task_name):
+
+    metrics = {}
+    metric_dict = {}
+    additional_metric_dict = {}
+
+    metric_name = METRIC_DICT[task_name]["name"]
+    metric_value = METRIC_DICT[task_name]["lowest"]
+    metric_dict[metric_name] = metric_value
 
     metrics["metrics"] = metric_dict
     metrics["additional_metrics"] = additional_metric_dict
