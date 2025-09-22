@@ -685,24 +685,24 @@ def main():
         save_predictions = False
 
         for task_name in all_tasks:
-                print(f"Processing task: {task_name} (in subprocess)")
-                metrics_path = OUTPUT_DIRECTORY / f"{task_name}.json"
-                p = multiprocessing.Process(
-                    target=process_task_in_subprocess,
-                    args=(task_name, mapping, adaptors, save_predictions, metrics_path),
-                )
-                p.start()
-                p.join()
-                if not metrics_path.exists():
-                    print(f"Error processing task {task_name}, continuing...")
-                    metrics = set_lowest_possible_metric(task_name)
-                    write_json_file(location=metrics_path, content=metrics)
-                else:
-                    print(f"Completed processing task: {task_name}")
-                with open(metrics_path, "r") as f:
-                    metrics = json.load(f)
-                    task_metrics[task_name] = metrics
-                print("=+=" * 10)
+            print(f"Processing task: {task_name} (in subprocess)")
+            metrics_path = OUTPUT_DIRECTORY / f"{task_name}.json"
+            p = multiprocessing.Process(
+                target=process_task_in_subprocess,
+                args=(task_name, mapping, adaptors, save_predictions, metrics_path),
+            )
+            p.start()
+            p.join()
+            if not metrics_path.exists():
+                print(f"Error processing task {task_name}, continuing...")
+                metrics = set_lowest_possible_metric(task_name)
+                write_json_file(location=metrics_path, content=metrics)
+            else:
+                print(f"Completed processing task: {task_name}")
+            with open(metrics_path, "r") as f:
+                metrics = json.load(f)
+                task_metrics[task_name] = metrics
+            print("=+=" * 10)
 
         # set lowest possible metric for skipped tasks
         for task_name in METRIC_DICT.keys():
