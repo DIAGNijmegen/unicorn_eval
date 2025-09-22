@@ -37,7 +37,9 @@ from unicorn_eval.io import (
     write_json_file,
 )
 from unicorn_eval.utils import (
+    METRIC_DICT,
     evaluate_predictions,
+    set_lowest_possible_metric,
     extract_embeddings_and_labels,
     extract_labels,
     get_adaptor,
@@ -683,27 +685,29 @@ def main():
         save_predictions = False
 
         for task_name in all_tasks:
-            try:
-                print(f"Processing task: {task_name} (in subprocess)")
-                metrics_path = OUTPUT_DIRECTORY / f"{task_name}.json"
-                p = multiprocessing.Process(
-                    target=process_task_in_subprocess,
-                    args=(task_name, mapping, adaptors, save_predictions, metrics_path),
-                )
-                p.start()
-                p.join()
-                if not metrics_path.exists():
-                    raise FileNotFoundError(f"Metrics file not found for task {task_name}")
-
-                with open(metrics_path, "r") as f:
-                    metrics = json.load(f)
-                    task_metrics[task_name] = metrics
+            print(f"Processing task: {task_name} (in subprocess)")
+            metrics_path = OUTPUT_DIRECTORY / f"{task_name}.json"
+            p = multiprocessing.Process(
+                target=process_task_in_subprocess,
+                args=(task_name, mapping, adaptors, save_predictions, metrics_path),
+            )
+            p.start()
+            p.join()
+            if not metrics_path.exists():
+                print(f"Error processing task {task_name}, continuing...")
+                metrics = set_lowest_possible_metric(task_name)
+                write_json_file(location=metrics_path, content=metrics)
+            else:
                 print(f"Completed processing task: {task_name}")
-                print("=+=" * 10)
-            except Exception as e:
-                print(f"Error processing task {task_name}: {e}")
-                print("Continuing with next task...")
-                continue
+            with open(metrics_path, "r") as f:
+                metrics = json.load(f)
+                task_metrics[task_name] = metrics
+            print("=+=" * 10)
+
+        # set lowest possible metric for skipped tasks
+        for task_name in METRIC_DICT.keys():
+            if task_name not in task_metrics:
+                task_metrics[task_name] = set_lowest_possible_metric(task_name)
 
         logging.info(f"Writing metrics for {len(task_metrics)} tasks...")
         write_combined_metrics(metric_dict=task_metrics, save_predictions=False)
