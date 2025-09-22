@@ -769,6 +769,100 @@ def extract_embeddings_and_labels(processed_results, task_name) -> dict[str, Any
     return task_data
 
 
+def extract_embeddings_labels_and_predictions(processed_results, task_name) -> dict[str, Any] | None:
+    """Extract embeddings and labels for a given task."""
+    task_data = {
+        "task_type": None,
+        "modality": None,
+        "domain": None,
+        "global_patch_size": None,
+        "global_patch_spacing": None,
+        "feature_grid_resolution": None,
+        "prediction": [],
+        "embeddings": [],
+        "coordinates": [],
+        "image_spacings": {},
+        "image_origins": {},
+        "image_directions": {},
+        "image_sizes": {},
+        "patch_sizes": {},
+        "patch_spacings": {},
+        "label_sizes": {},
+        "label_spacings": {},
+        "label_origins": {},
+        "label_directions": {},
+        "labels": [],
+        "extra_labels": [],
+        "ids": [],
+    }
+
+    valid_results_found = False
+
+    # check if all cases have the same patch size and spacing
+    all_patch_sizes = [result["patch_size"] for result in processed_results]
+    all_patch_spacings = [result["patch_spacing"] for result in processed_results]
+
+    # set global values if all are the same, otherwise None
+    task_data["global_patch_size"] = all_patch_sizes[0] if all_patch_sizes and all(ps == all_patch_sizes[0] for ps in all_patch_sizes) else None
+    task_data["global_patch_spacing"] = all_patch_spacings[0] if all_patch_spacings and all(ps == all_patch_spacings[0] for ps in all_patch_spacings) else None
+
+    for result in processed_results:
+        if result is None:
+            # skip language tasks
+            continue
+
+        # only process results for this specific task
+        if result["task_name"] != task_name:
+            continue
+
+        valid_results_found = True
+
+        # initialize task data with first valid result
+        if task_data["task_type"] is None:
+            task_data["task_type"] = result["task_type"]
+            task_data["modality"] = result["modality"]
+            task_data["domain"] = result["domain"]
+            task_data["feature_grid_resolution"] = result["feature_grid_resolution"]
+
+        task_data["embeddings"].append(result["embeddings"])
+        task_data["labels"].append(result["label"])
+        task_data["extra_labels"].append(result.get("extra_labels"))
+        task_data["prediction"].append(result.get("prediction"))
+        task_data["ids"].append(result["case_id"])
+        task_data["coordinates"].append(result["coordinates"])
+        case_id = result["case_id"]
+        task_data["image_sizes"][case_id] = result["image_size"]
+        task_data["image_spacings"][case_id] = result["image_spacing"]
+        task_data["image_origins"][case_id] = result["image_origin"]
+        task_data["image_directions"][case_id] = result["image_direction"]
+        task_data["patch_spacings"][case_id] = result["patch_spacing"]
+        task_data["patch_sizes"][case_id] = result["patch_size"]
+        task_data["label_spacings"][case_id] = result["label_spacing"]
+        task_data["label_sizes"][case_id] = result["label_size"]
+        task_data["label_origins"][case_id] = result["label_origin"]
+        task_data["label_directions"][case_id] = result["label_direction"]
+
+    if not valid_results_found:
+        return None
+
+    # post-process the task data
+    task_type = task_data["task_type"]
+    task_domain = task_data["domain"]
+
+    if task_type in ["classification", "regression"]:
+        task_data = process_image_representation(task_data)
+    elif task_type == "detection":
+        if task_domain == "pathology":
+            task_data = process_detection_pathology(task_data)
+        elif task_domain in ["CT", "MR"]:
+            if task_name != "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams":
+                task_data = process_detection_radiology(task_data, task_name)
+        else:
+            raise ValueError(f"Unknown task domain: {task_domain}")
+
+    return task_data
+
+
 def normalize_metric(task_name, metric_value):
     min_value, max_value = METRIC_DICT[task_name]["range"]
     normalized_value = (metric_value - min_value) / (max_value - min_value)
