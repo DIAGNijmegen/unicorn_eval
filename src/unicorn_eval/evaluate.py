@@ -147,7 +147,7 @@ def read_adaptors():
 def write_combined_metrics(
     *, metric_dict: dict[str, dict], save_predictions: bool = True
 ) -> None:
-    metrics = {"metrics": {}, "normalized_metrics": {}}
+    metrics = {"metrics": {}, "std": {}, "normalized_metrics": {}, "additional_std": {}}
     predictions = {"predictions": []}
 
     for task_name, task_metrics in metric_dict.items():
