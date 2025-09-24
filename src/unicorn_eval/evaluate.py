@@ -20,8 +20,8 @@ import multiprocessing
 import random
 import re
 import shutil
+import argparse
 from pathlib import Path
-from collections import defaultdict
 
 import numpy as np
 import pandas as pd
@@ -40,13 +40,13 @@ from unicorn_eval.io import (
 from unicorn_eval.utils import (
     METRIC_DICT,
     evaluate_predictions,
-    set_lowest_possible_metric,
     extract_embeddings_and_labels,
     extract_embeddings_labels_and_predictions,
     extract_labels,
     get_adaptor,
     normalize_metric,
     set_all_seeds,
+    set_lowest_possible_metric,
 )
 
 # Matches BMP PUA (U+E000–U+F8FF) and the supplementary PUA ranges (planes 15 & 16)
@@ -675,7 +675,18 @@ def process_task_in_subprocess(
     write_json_file(location=metrics_path, content=metrics)
 
 
-def main(task_names: list[str] | None = None):
+def main():
+
+    parser = argparse.ArgumentParser(description="Unicorn Eval runner")
+    parser.add_argument(
+        "--tasks",
+        nargs="+",
+        type=str,
+        help="List of task names to evaluate",
+    )
+    args = parser.parse_args()
+    task_names = args.tasks
+
     logging.info("Input folder contents:")
     print_directory_contents(INPUT_DIRECTORY)
     logging.info("=+=" * 10)
