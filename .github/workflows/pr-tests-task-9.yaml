@@ -1,4 +1,4 @@
-name: PR tests for adapting vision tasks
+name: PR test for adapting Task09
 
 on:
   pull_request:
@@ -59,4 +59,4 @@ jobs:
           docker run --rm \
             -v "$GITHUB_WORKSPACE/tests/vision/input:/input" \
             -v "$GITHUB_WORKSPACE/tests/vision/ground_truth:/opt/ml/input/data/ground_truth" \
-            unicorn-eval:${{ github.sha }}
+            unicorn-eval:${{ github.sha }} --tasks Task09_segmenting_rois_in_breast_cancer_wsis

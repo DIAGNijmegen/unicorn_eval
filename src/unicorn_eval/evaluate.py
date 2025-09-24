@@ -20,6 +20,7 @@ import multiprocessing
 import random
 import re
 import shutil
+import argparse
 from pathlib import Path
 
 import numpy as np
@@ -39,13 +40,13 @@ from unicorn_eval.io import (
 from unicorn_eval.utils import (
     METRIC_DICT,
     evaluate_predictions,
-    set_lowest_possible_metric,
     extract_embeddings_and_labels,
     extract_embeddings_labels_and_predictions,
     extract_labels,
     get_adaptor,
     normalize_metric,
     set_all_seeds,
+    set_lowest_possible_metric,
 )
 
 # Matches BMP PUA (U+E000–U+F8FF) and the supplementary PUA ranges (planes 15 & 16)
@@ -146,22 +147,33 @@ def read_adaptors():
 def write_combined_metrics(
     *, metric_dict: dict[str, dict], save_predictions: bool = True
 ) -> None:
-    metrics = {"metrics": {}, "normalized_metrics": {}}
+    metrics = {"metrics": {}, "std": {}, "normalized_metrics": {}, "additional_std": {}}
     predictions = {"predictions": []}
 
     for task_name, task_metrics in metric_dict.items():
+
+        task_identifier = task_name.split("_")[0]
+
         for metric_name, metric_value in task_metrics["metrics"].items():
-            task_identifier = task_name.split("_")[0]
             metrics["metrics"][f"{task_identifier}_{metric_name}"] = metric_value
             metrics["normalized_metrics"][f"{task_identifier}_{metric_name}"] = (
                 normalize_metric(task_name, metric_value)
             )
 
+        for metric_name, std_value in task_metrics.get(
+            "std", {}
+        ).items():
+            metrics["std"][f"{task_identifier}_{metric_name}"] = std_value
+
         for metric_name, metric_value in task_metrics.get(
             "additional_metrics", {}
         ).items():
-            task_identifier = task_name.split("_")[0]
             metrics["metrics"][f"{task_identifier}_{metric_name}"] = metric_value
+
+        for metric_name, std_value in task_metrics.get(
+            "additional_std", {}
+        ).items():
+            metrics["std"][f"{task_identifier}_{metric_name}"] = std_value
 
         if save_predictions:
             case_prediction = [
@@ -598,9 +610,9 @@ def process_task_in_subprocess(
                 for metric_name, metric_value in run_metrics["metrics"].items():
                     if first_metric:
                         first_metric = False
-                        running_metrics["metrics"][metric_name] = metric_value
+                        running_metrics["metrics"][metric_name] = [metric_value]
                     else:
-                        running_metrics["metrics"][metric_name] += metric_value
+                        running_metrics["metrics"][metric_name].append(metric_value)
                 for metric_name, metric_value in run_metrics[
                     "additional_metrics"
                 ].items():
@@ -608,18 +620,18 @@ def process_task_in_subprocess(
                         first_additional_metric = False
                         running_metrics["additional_metrics"][
                             metric_name
-                        ] = metric_value
+                        ] = [metric_value]
                     else:
                         running_metrics["additional_metrics"][
                             metric_name
-                        ] += metric_value
+                        ].append(metric_value)
 
         # average metrics
         metrics = {
-            "metrics": {k: v / num_run for k, v in running_metrics["metrics"].items()},
-            "additional_metrics": {
-                k: v / num_run for k, v in running_metrics["additional_metrics"].items()
-            },
+            "metrics": {k: np.mean(v) for k, v in running_metrics["metrics"].items()},
+            "std": {k: np.std(v) for k, v in running_metrics["metrics"].items()},
+            "additional_metrics": {k: np.mean(v) for k, v in running_metrics["additional_metrics"].items()},
+            "additional_std": {k: np.std(v) for k, v in running_metrics["additional_metrics"].items()},
         }
 
     elif modality == "vision-language":
@@ -664,6 +676,17 @@ def process_task_in_subprocess(
 
 
 def main():
+
+    parser = argparse.ArgumentParser(description="Unicorn Eval runner")
+    parser.add_argument(
+        "--tasks",
+        nargs="+",
+        type=str,
+        help="List of task names to evaluate",
+    )
+    args = parser.parse_args()
+    task_names = args.tasks
+
     logging.info("Input folder contents:")
     print_directory_contents(INPUT_DIRECTORY)
     logging.info("=+=" * 10)
@@ -682,7 +705,13 @@ def main():
     mapping_path = GROUNDTRUTH_DIRECTORY / "mapping.csv"
     try:
         mapping = pd.read_csv(mapping_path, dtype={"case_id": str})
-        all_tasks = mapping["task_name"].unique()
+        if task_names is not None:
+            all_tasks = task_names
+            assert all(
+                task in mapping["task_name"].unique() for task in all_tasks
+            ), "One or more specified task names are not present in the mapping.csv file."
+        else:
+            all_tasks = mapping["task_name"].unique()
         save_predictions = False
 
         for task_name in all_tasks:

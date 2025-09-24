@@ -1,0 +1,62 @@
+name: PR test for adapting Task10
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    workflow_dispatch:  # allows manual run from GitHub ui
+
+jobs:
+  docker-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60 # should complete in 1h
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Verify required folders exist
+        run: |
+          set -euo pipefail
+          test -d tests/vision/input
+          test -d tests/vision/ground_truth
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Free disk space on runner
+        run: |
+          set -euxo pipefail
+          df -h
+
+          # Remove preinstalled SDKs and tool caches
+          sudo rm -rf /usr/local/lib/android || true
+          sudo rm -rf /usr/share/dotnet || true
+          sudo rm -rf /opt/ghc || true
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY" || true
+
+          docker system prune -af || true
+          sudo apt-get clean
+
+          df -h
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.lightweight
+          push: false
+          load: true
+          tags: unicorn-eval:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run container entrypoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE/tests/vision/input:/input" \
+            -v "$GITHUB_WORKSPACE/tests/vision/ground_truth:/opt/ml/input/data/ground_truth" \
+            unicorn-eval:${{ github.sha }} --tasks Task10_segmenting_lesions_within_vois_in_ct
