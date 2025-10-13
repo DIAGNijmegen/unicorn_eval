@@ -49,7 +49,7 @@ def assign_mask_to_patch(mask_data, x_patch, y_patch, patch_size, padding_value=
         constant_values=padding_value,
     )
 
-    patch = padded_mask[y_patch : y_patch + patch_size, x_patch : x_patch + patch_size]
+    patch = padded_mask[y_patch : y_patch + patch_size, x_patch : x_patch + patch_size].copy()
     assert patch.shape == (
         patch_size,
         patch_size,
