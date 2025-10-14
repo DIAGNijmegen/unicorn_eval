@@ -734,7 +734,7 @@ def main():
                     )
                 except Exception as e:
                     # capture the exception and traceback, then put it in the queue
-                    error_queue.put((task_name, str(e), traceback.format_exc()))
+                    error_queue.put((task_name, traceback.format_exc()))
 
             # start the subprocess
             p = multiprocessing.Process(target=wrapped_process_task)
@@ -743,8 +743,8 @@ def main():
 
             # check if there was an error in the subprocess
             if not error_queue.empty():
-                task_name, error_message, error_traceback = error_queue.get()
-                print(f"⚠️ Error processing task {task_name}: {error_message}")
+                task_name, error_traceback = error_queue.get()
+                print(f"⚠️ Error processing task {task_name}")
                 print(f"🛠️ Traceback:\n{error_traceback}")
                 metrics = set_lowest_possible_metric(task_name)
                 write_json_file(location=metrics_path, content=metrics)
