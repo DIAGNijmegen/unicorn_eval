@@ -12,8 +12,10 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from unicorn_eval.adaptors.segmentation.baseline_segmentation_upsampling_3d.v1 import (
+from unicorn_eval.adaptors.segmentation.baseline_segmentation_upsampling import (
     SegmentationUpsampling,
+)
+from unicorn_eval.adaptors.segmentation.baseline_segmentation_upsampling_3d.v1 import (
     SegmentationUpsampling3D,
 )
 from unicorn_eval.adaptors.segmentation.data_handling import (

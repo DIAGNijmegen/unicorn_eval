@@ -19,87 +19,15 @@ from pathlib import Path
 
 import numpy as np
 import torch
-from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from unicorn_eval.adaptors.base import PatchLevelTaskAdaptor
 from unicorn_eval.adaptors.segmentation.data_handling import (
-    SegmentationDataset, construct_data_with_labels,
-    construct_segmentation_labels, custom_collate, extract_patch_labels,
-    load_patch_data)
-from unicorn_eval.adaptors.segmentation.decoders import (Decoder3D,
-                                                         SegmentationDecoder)
-from unicorn_eval.adaptors.segmentation.inference import inference, inference3d
-from unicorn_eval.adaptors.segmentation.training import (train_decoder,
-                                                         train_decoder3d)
+    construct_data_with_labels, extract_patch_labels, load_patch_data)
+from unicorn_eval.adaptors.segmentation.decoders import Decoder3D
+from unicorn_eval.adaptors.segmentation.inference import inference3d
+from unicorn_eval.adaptors.segmentation.training import train_decoder3d
 from unicorn_eval.io import INPUT_DIRECTORY, process, read_inputs
-
-
-class SegmentationUpsampling(PatchLevelTaskAdaptor):
-    def __init__(
-        self,
-        global_patch_size,
-        global_patch_spacing,
-        num_epochs=20,
-        learning_rate=1e-5,
-    ):
-        self.patch_size = global_patch_size
-        self.patch_spacing = global_patch_spacing
-        self.num_epochs = num_epochs
-        self.learning_rate = learning_rate
-        self.decoder = None
-
-    def fit(self, shot_features, shot_labels, shot_coordinates, shot_ids, **kwargs):
-        input_dim = shot_features[0].shape[1]
-        num_classes = max([np.max(label) for label in shot_labels]) + 1
-
-        shot_data = construct_segmentation_labels(
-            shot_coordinates,
-            shot_features,
-            shot_ids,
-            labels=shot_labels,
-            patch_size=self.patch_size,
-        )
-        dataset = SegmentationDataset(preprocessed_data=shot_data)
-        dataloader = DataLoader(
-            dataset, batch_size=32, shuffle=True, collate_fn=custom_collate
-        )
-
-        self.decoder = SegmentationDecoder(
-            input_dim=input_dim, patch_size=self.patch_size, num_classes=num_classes
-        ).to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
-        self.decoder = train_decoder(
-            self.decoder, dataloader, num_epochs=self.num_epochs, lr=self.learning_rate
-        )
-
-    def predict(self, test_cases) -> list:
-        predictions = []
-        for case_name in test_cases:
-            test_input = process(
-                read_inputs(input_dir=INPUT_DIRECTORY, case_names=[case_name])[0]
-            )
-            test_data = construct_segmentation_labels(
-                [test_input["coordinates"]],
-                [test_input["embeddings"]],
-                [case_name],
-                patch_size=self.patch_size,
-                is_train=False,
-            )
-
-            test_dataset = SegmentationDataset(preprocessed_data=test_data)
-            test_dataloader = DataLoader(
-                test_dataset, batch_size=1, shuffle=False, collate_fn=custom_collate
-            )
-
-            predicted_masks = inference(
-                self.decoder,
-                test_dataloader,
-                patch_size=self.patch_size,
-                test_image_sizes={case_name: test_input["image_size"]},
-            )
-            predictions.extend(predicted_masks)
-
-        return predictions
 
 
 class SegmentationUpsampling3D(PatchLevelTaskAdaptor):
