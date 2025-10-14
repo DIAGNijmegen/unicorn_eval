@@ -22,6 +22,7 @@ import re
 import shutil
 import argparse
 from pathlib import Path
+import traceback
 
 import numpy as np
 import pandas as pd
@@ -489,7 +490,6 @@ def process_task_in_subprocess(
             shots = pool.map(process, shot_inputs)
             pool.close()
             pool.join()
-            # shots = [process(shot_input) for shot_input in shot_inputs]
 
             del shot_inputs
             gc.collect()
@@ -589,7 +589,6 @@ def process_task_in_subprocess(
                 cases = pool.map(process, case_inputs)
                 pool.close()
                 pool.join()
-                # cases = [process(case_input) for case_input in case_inputs]
 
                 del case_inputs
                 gc.collect()
@@ -725,18 +724,39 @@ def main():
         for task_name in all_tasks:
             print(f"Processing task: {task_name} (in subprocess)")
             metrics_path = OUTPUT_DIRECTORY / f"{task_name}.json"
-            p = multiprocessing.Process(
-                target=process_task_in_subprocess,
-                args=(task_name, mapping, adaptors, save_predictions, metrics_path),
-            )
+
+            # create a queue to capture errors from the subprocess
+            error_queue = multiprocessing.Queue()
+            def wrapped_process_task():
+                try:
+                    process_task_in_subprocess(
+                        task_name, mapping, adaptors, save_predictions, metrics_path
+                    )
+                except Exception as e:
+                    # capture the exception and traceback, then put it in the queue
+                    error_queue.put((task_name, str(e), traceback.format_exc()))
+
+            # start the subprocess
+            p = multiprocessing.Process(target=wrapped_process_task)
             p.start()
             p.join()
-            if not metrics_path.exists():
-                print(f"Error processing task {task_name}, continuing...")
+
+            # check if there was an error in the subprocess
+            if not error_queue.empty():
+                task_name, error_message, error_traceback = error_queue.get()
+                print(f"⚠️ Error processing task {task_name}: {error_message}")
+                print(f"🛠️ Traceback:\n{error_traceback}")
+                metrics = set_lowest_possible_metric(task_name)
+                write_json_file(location=metrics_path, content=metrics)
+                print(f"🚨 Setting lowest possible metric for task {task_name} due to error.")
+            elif not metrics_path.exists():
+                print(f"❌ Metrics file not found for task {task_name}.")
+                print(f"🚨 Setting lowest possible metric for task {task_name}.")
                 metrics = set_lowest_possible_metric(task_name)
                 write_json_file(location=metrics_path, content=metrics)
             else:
-                print(f"Completed processing task: {task_name}")
+                print(f"✅ Successfully completed processing task: {task_name}")
+
             with open(metrics_path, "r") as f:
                 metrics = json.load(f)
                 task_metrics[task_name] = metrics
