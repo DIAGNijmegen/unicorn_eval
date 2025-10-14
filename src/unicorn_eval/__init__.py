@@ -13,3 +13,12 @@
 #  limitations under the License.
 
 __version__ = "3.0.0"
+
+print(
+    "\n"
+    "🦄 UNICORN Evaluation Toolkit\n"
+    "This is the official evaluation package for the UNICORN challenge.\n"
+    "Challenge: https://unicorn.grand-challenge.org\n"
+    "Repository: https://github.com/DIAGNijmegen/unicorn_eval\n"
+    "We welcome new adaptors for vision tasks — see contribution guidelines on the repository.\n"
+)

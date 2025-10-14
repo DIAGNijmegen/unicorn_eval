@@ -1,11 +1,14 @@
+import os
 import itertools
 import pickle
 from pathlib import Path
 from typing import Iterable
+from contextlib import redirect_stdout, redirect_stderr
 
 import numpy as np
 import SimpleITK as sitk
-from picai_prep.preprocessing import crop_or_pad, resample_img
+with open(os.devnull, "w") as f, redirect_stdout(f), redirect_stderr(f):
+    from picai_prep.preprocessing import crop_or_pad, resample_img
 
 from unicorn_eval.adaptors.reconstruct_prediction import stitch_patches_fast
 from unicorn_eval.adaptors.segmentation.data_handling import (
