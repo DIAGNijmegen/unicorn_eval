@@ -1,5 +1,9 @@
-from picai_eval import evaluate
-from report_guided_annotation import extract_lesion_candidates
+import os
+from contextlib import redirect_stdout, redirect_stderr
+
+with open(os.devnull, "w") as f, redirect_stdout(f), redirect_stderr(f):
+    from picai_eval import evaluate
+    from report_guided_annotation import extract_lesion_candidates
 
 
 def compute_picai_score(gts, preds):

@@ -1,8 +1,10 @@
+import os
 from typing import Iterable
+from contextlib import redirect_stdout, redirect_stderr
 
 import SimpleITK as sitk
-from picai_prep.preprocessing import resample_img
-
+with open(os.devnull, "w") as f, redirect_stdout(f), redirect_stderr(f):
+    from picai_prep.preprocessing import resample_img
 
 def safe_region_of_interest(
     image: sitk.Image,
