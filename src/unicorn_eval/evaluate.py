@@ -450,11 +450,13 @@ def evaluate_language_predictions():
 
 
 def process_task_in_subprocess(
-    task_name, mapping, adaptors, save_predictions, metrics_path
+    task_name, mapping, adaptors, save_predictions, metrics_path, num_workers=None
 ):
     logging.info(f"Processing task in subprocess: {task_name}")
 
     max_workers = get_max_workers()
+    if num_workers is not None:
+        max_workers = min(max_workers, num_workers)
     modality = mapping[(mapping.task_name == task_name)]["modality"].values[0]
 
     if modality == "vision":
@@ -722,6 +724,9 @@ def main():
         save_predictions = False
 
         for task_name in all_tasks:
+            num_workers = None
+            if task_name == "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams":
+                num_workers = 1  # limit to 1 worker for this task due to memory issues
             print(f"Processing task: {task_name} (in subprocess)")
             metrics_path = OUTPUT_DIRECTORY / f"{task_name}.json"
 
@@ -730,7 +735,7 @@ def main():
             def wrapped_process_task():
                 try:
                     process_task_in_subprocess(
-                        task_name, mapping, adaptors, save_predictions, metrics_path
+                        task_name, mapping, adaptors, save_predictions, metrics_path, num_workers
                     )
                 except Exception as e:
                     # capture the exception and traceback, then put it in the queue

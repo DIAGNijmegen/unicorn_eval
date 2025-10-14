@@ -12,10 +12,18 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from unicorn_eval.adaptors.segmentation.baseline_segmentation_upsampling_3d.v1 import (
-    SegmentationUpsampling,
-    SegmentationUpsampling3D,
-)
+from unicorn_eval.adaptors.segmentation.baseline_segmentation_upsampling import \
+    SegmentationUpsampling
+from unicorn_eval.adaptors.segmentation.aimhi_linear_upsample_conv3d.v1 import \
+    LinearUpsampleConv3D_V1
+from unicorn_eval.adaptors.segmentation.aimhi_linear_upsample_conv3d.v2 import (
+    ConvUpsampleSegAdaptor, LinearUpsampleConv3D_V2)
+from unicorn_eval.adaptors.segmentation.baseline_segmentation_upsampling_3d.v1 import \
+    SegmentationUpsampling3D
+from unicorn_eval.adaptors.segmentation.baseline_segmentation_upsampling_3d.v2.main import \
+    SegmentationUpsampling3D_V2
+from unicorn_eval.adaptors.segmentation.mevis_conv_segmentation_3d.v1.main import (
+    ConvDecoder3D, ConvSegmentation3D)
 from unicorn_eval.adaptors.segmentation.data_handling import (
     SegmentationDataset,
     assign_mask_to_patch,
@@ -40,16 +48,16 @@ from unicorn_eval.adaptors.segmentation.inference import (
     inference3d,
     world_to_voxel,
 )
-from unicorn_eval.adaptors.segmentation.mevis_conv_segmentation_3d.v1.main import (
-    ConvDecoder3D,
-    ConvSegmentation3D,
-)
 from unicorn_eval.adaptors.segmentation.training import train_decoder, train_decoder3d
 
 __all__ = [
     # Adaptors
     "SegmentationUpsampling",
     "SegmentationUpsampling3D",
+    "SegmentationUpsampling3D_V2",
+    "LinearUpsampleConv3D_V1",
+    "LinearUpsampleConv3D_V2",
+    "ConvUpsampleSegAdaptor",
     "ConvSegmentation3D",
     # Data handling
     "assign_mask_to_patch",
