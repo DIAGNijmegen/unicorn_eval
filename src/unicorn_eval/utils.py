@@ -31,16 +31,15 @@ from unicorn_eval.adaptors import (KNN, ConvDetector, DensityMap, KNNRegressor,
                                    PatchNoduleRegressor, WeightedKNN,
                                    WeightedKNNRegressor)
 from unicorn_eval.adaptors.base import Adaptor
-from unicorn_eval.adaptors.segmentation.aimhi_linear_upsample_conv3d.v1 import \
-    LinearUpsampleConv3D_V1
-from unicorn_eval.adaptors.segmentation.aimhi_linear_upsample_conv3d.v2 import (
-    ConvUpsampleSegAdaptor, LinearUpsampleConv3D_V2)
-from unicorn_eval.adaptors.segmentation.baseline_segmentation_upsampling_3d.v1 import (
-    SegmentationUpsampling, SegmentationUpsampling3D)
-from unicorn_eval.adaptors.segmentation.baseline_segmentation_upsampling_3d.v2.main import \
-    SegmentationUpsampling3D_V2
-from unicorn_eval.adaptors.segmentation.mevis_conv_segmentation_3d.v1.main import \
+from unicorn_eval.adaptors.segmentation import (
+    LinearUpsampleConv3D_V1,
+    LinearUpsampleConv3D_V2,
+    ConvUpsampleSegAdaptor,
+    SegmentationUpsampling,
+    SegmentationUpsampling3D,
+    SegmentationUpsampling3D_V2,
     ConvSegmentation3D
+)
 from unicorn_eval.metrics.dice import compute_dice_score
 from unicorn_eval.metrics.f1_score import compute_f1
 from unicorn_eval.metrics.picai_score import compute_picai_score
