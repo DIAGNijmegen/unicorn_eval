@@ -450,13 +450,11 @@ def evaluate_language_predictions():
 
 
 def process_task_in_subprocess(
-    task_name, mapping, adaptors, save_predictions, metrics_path, num_workers=None
+    task_name, mapping, adaptors, save_predictions, metrics_path, use_multiprocessing=True
 ):
     logging.info(f"Processing task in subprocess: {task_name}")
 
     max_workers = get_max_workers()
-    if num_workers is not None:
-        max_workers = min(max_workers, num_workers)
     modality = mapping[(mapping.task_name == task_name)]["modality"].values[0]
 
     if modality == "vision":
@@ -488,10 +486,13 @@ def process_task_in_subprocess(
             ]["case_id"].tolist()
             shot_inputs = read_inputs(input_dir=INPUT_DIRECTORY, case_names=task_shots)
 
-            pool = multiprocessing.Pool(processes=max_workers)
-            shots = pool.map(process, shot_inputs)
-            pool.close()
-            pool.join()
+            if use_multiprocessing:
+                pool = multiprocessing.Pool(processes=max_workers)
+                shots = pool.map(process, shot_inputs)
+                pool.close()
+                pool.join()
+            else:
+                shots = [process(shot) for shot in shot_inputs]
 
             del shot_inputs
             gc.collect()
@@ -587,10 +588,13 @@ def process_task_in_subprocess(
                     input_dir=INPUT_DIRECTORY, case_names=task_cases
                 )
 
-                pool = multiprocessing.Pool(processes=max_workers)
-                cases = pool.map(process, case_inputs)
-                pool.close()
-                pool.join()
+                if use_multiprocessing:
+                    pool = multiprocessing.Pool(processes=max_workers)
+                    cases = pool.map(process, case_inputs)
+                    pool.close()
+                    pool.join()
+                else:
+                    cases = [process(case) for case in case_inputs]
 
                 del case_inputs
                 gc.collect()
@@ -651,10 +655,13 @@ def process_task_in_subprocess(
         ]["case_id"].tolist()
         case_inputs = read_inputs(input_dir=INPUT_DIRECTORY, case_names=task_cases)
 
-        pool = multiprocessing.Pool(processes=max_workers)
-        cases = pool.map(process, case_inputs)
-        pool.close()
-        pool.join()
+        if use_multiprocessing:
+            pool = multiprocessing.Pool(processes=max_workers)
+            cases = pool.map(process, case_inputs)
+            pool.close()
+            pool.join()
+        else:
+            cases = [process(case) for case in case_inputs]
 
         case_information = extract_embeddings_labels_and_predictions(cases, task_name)
         if case_information is None:
@@ -724,9 +731,9 @@ def main():
         save_predictions = False
 
         for task_name in all_tasks:
-            num_workers = None
+            use_multiprocessing = True
             if task_name == "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams":
-                num_workers = 1  # limit to 1 worker for this task due to memory issues
+                use_multiprocessing = False  # disable multiprocessing for this task due to memory issues
             print(f"Processing task: {task_name} (in subprocess)")
             metrics_path = OUTPUT_DIRECTORY / f"{task_name}.json"
 
@@ -735,7 +742,7 @@ def main():
             def wrapped_process_task():
                 try:
                     process_task_in_subprocess(
-                        task_name, mapping, adaptors, save_predictions, metrics_path, num_workers
+                        task_name, mapping, adaptors, save_predictions, metrics_path, use_multiprocessing
                     )
                 except Exception as e:
                     # capture the exception and traceback, then put it in the queue
