@@ -732,8 +732,9 @@ def main():
 
         for task_name in all_tasks:
             use_multiprocessing = True
-            if task_name == "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams":
-                use_multiprocessing = False  # disable multiprocessing for this task due to memory issues
+            task_type = mapping[(mapping.task_name == task_name)]["task_type"].values[0]
+            if task_type in ["detection", "segmentation"]:
+                use_multiprocessing = False  # disable multiprocessing for dense tasks due to memory issues
             print(f"Processing task: {task_name} (in subprocess)")
             metrics_path = OUTPUT_DIRECTORY / f"{task_name}.json"
 
