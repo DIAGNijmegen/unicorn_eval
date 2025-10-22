@@ -786,6 +786,11 @@ def main():
         return 0
 
     except FileNotFoundError:
+        # set lowest possible metric for skipped tasks
+        for task_name in METRIC_DICT.keys():
+            if task_name not in task_metrics:
+                task_metrics[task_name] = set_lowest_possible_metric(task_name)
+
         logging.info(f"Writing metrics for {len(task_metrics)} tasks...")
         write_combined_metrics(metric_dict=task_metrics, save_predictions=False)
         logging.info("Metrics written successfully.")
