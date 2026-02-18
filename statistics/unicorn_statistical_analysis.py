@@ -7,13 +7,11 @@ Normalized scores were computed during the evaluation step and stored per task a
 """
 
 import itertools
-from dataclasses import dataclass
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Optional
 import warnings
 
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 
 
 def holm_bonferroni_adjust(pvals: List[float]) -> List[float]:
@@ -209,49 +207,6 @@ def analyze_four_teams(
     return out
 
 
-def load_results(file_path: str) -> pd.DataFrame:
-    """
-    Load results from an Excel file with one sheet per task.
-
-    Each sheet must contain columns:
-        - team
-        - normalized score
-
-    Returns a DataFrame with columns:
-        team | task | score_norm
-    """
-
-    xls = pd.ExcelFile(file_path)  # <-- important
-
-    all_data = []
-
-    for sheet_name in xls.sheet_names:
-
-        # Skip non-task sheets
-        if sheet_name.lower() in ["overview", "worst-score"]:
-            continue
-
-        df_sheet = pd.read_excel(xls, sheet_name=sheet_name)
-
-        # Keep only needed columns
-        df_sheet = df_sheet[["team", "normalized score"]].copy()
-
-        # Rename
-        df_sheet = df_sheet.rename(columns={"normalized score": "score_norm"})
-
-        # Add task name
-        df_sheet["task"] = sheet_name
-
-        all_data.append(df_sheet)
-
-    if not all_data:
-        raise ValueError("No task sheets found in Excel file.")
-
-    df = pd.concat(all_data, ignore_index=True)
-
-    return df
-
-
 # ============================================================================
 # EXAMPLE USAGE WITH REAL DATA FORMAT
 # ============================================================================
@@ -261,7 +216,8 @@ if __name__ == "__main__":
     print("UNICORN CHALLENGE STATISTICAL ANALYSIS - ENHANCED VERSION")
     print("=" * 80)
     print()
-    ##Normalized task scores per team (sorted by tasks) - for reference only, not used in analysis
+
+    ##Normalized task scores per team (sorted by tasks) - for transparency these are hardcoded here
     mevis_scores = [
         0.679,
         0.714,
@@ -386,8 +342,7 @@ if __name__ == "__main__":
   
     # Save results
     results.to_csv(
-        "/Volumes/temporary/judith/code/unicorn_eval/statistics/results/unicorn_results.csv",
+        "./statistics/results/unicorn_results.csv",
         index=False,
     )
-
     print("ANALYSIS COMPLETED: Output saved to unicorn_results.csv")
