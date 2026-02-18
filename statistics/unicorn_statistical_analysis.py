@@ -2,7 +2,7 @@
 UNICORN Challenge Statistical Analysis 
 ==========================================================
 
-Core methodology is preserved (Paired permutation test + Holm-Bonferroni across 4 teams that submitted to all 20 tasks (ALL Leaderboard).
+Core methodology is preserved (paired permutation test + Holm-Bonferroni) across 4 teams that submitted to all 20 tasks (ALL leaderboard).
 Normalized scores were computed during the evaluation step and stored per task across 5 adaptor runs; the statistical analysis script uses these normalized task-level scores as input.
 """
 
