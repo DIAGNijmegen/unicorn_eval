@@ -7,8 +7,7 @@ Normalized scores were computed during the evaluation step and stored per task a
 """
 
 import itertools
-from dataclasses import dataclass
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Optional
 import warnings
 
 import numpy as np
