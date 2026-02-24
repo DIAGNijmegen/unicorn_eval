@@ -162,6 +162,54 @@ METRIC_DICT = {
         "range": (0, 1),
         "lowest": 0,
     },
+    "Hidden01_breast_cancer_classification_from_HE_whole_slide_image": {
+        "name": "auc",
+        "fn": roc_auc_score,
+        "range": (0.5, 1),
+        "lowest": 0,
+    },
+    "Hidden02_oral_cancer_classification_from_HE_whole_slide_image": {
+        "name": "auc",
+        "fn": roc_auc_score,
+        "range": (0.5, 1),
+        "lowest": 0,
+    },
+    "Hidden03_bladder_cancer_classification_from_HE_whole_slide_image": {
+        "name": "auc",
+        "fn": roc_auc_score,
+        "range": (0.5, 1),
+        "lowest": 0,
+    },
+    "Hidden04_kidney_cancer_classification_from_HE_whole_slide_image": {
+        "name": "auc",
+        "fn": roc_auc_score,
+        "range": (0.5, 1),
+        "lowest": 0,
+    },
+    "Hidden05_thyroid_cancer_classification_from_HE_whole_slide_image": {
+        "name": "auc",
+        "fn": roc_auc_score,
+        "range": (0.5, 1),
+        "lowest": 0,
+    },
+    "Hidden06_prostate_cancer_classification_from_HE_whole_slide_image": {
+        "name": "auc",
+        "fn": roc_auc_score,
+        "range": (0.5, 1),
+        "lowest": 0,
+    },
+    "Hidden07_colorectal_cancer_classification_from_HE_whole_slide_image": {
+        "name": "auc",
+        "fn": roc_auc_score,
+        "range": (0.5, 1),
+        "lowest": 0,
+    },
+    "Hidden08_ibd_classification_from_HE_whole_slide_image": {
+        "name": "auc",
+        "fn": roc_auc_score,
+        "range": (0.5, 1),
+        "lowest": 0,
+    },
 }
 
 

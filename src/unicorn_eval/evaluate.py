@@ -66,6 +66,14 @@ ADAPTOR_SLUGS_DICT = {
     "Task09_segmenting_rois_in_breast_cancer_wsis": "adaptor-pathology-segmentation",
     "Task10_segmenting_lesions_within_vois_in_ct": "adaptor-radiology-segmentation",
     "Task11_segmenting_three_anatomical_structures_in_lumbar_spine_mri": "adaptor-radiology-segmentation",
+    "Hidden01_breast_cancer_classification_from_HE_whole_slide_image": "adaptor-pathology-classification",
+    "Hidden02_oral_cancer_classification_from_HE_whole_slide_image": "adaptor-pathology-classification",
+    "Hidden03_bladder_cancer_classification_from_HE_whole_slide_image": "adaptor-pathology-classification",
+    "Hidden04_kidney_cancer_classification_from_HE_whole_slide_image": "adaptor-pathology-classification",
+    "Hidden05_thyroid_cancer_classification_from_HE_whole_slide_image": "adaptor-pathology-classification",
+    "Hidden06_prostate_cancer_classification_from_HE_whole_slide_image": "adaptor-pathology-classification",
+    "Hidden07_colorectal_cancer_classification_from_HE_whole_slide_image": "adaptor-pathology-classification",
+    "Hidden08_ibd_classification_from_HE_whole_slide_image": "adaptor-pathology-classification",
 }
 
 DETERMINISTIC_ADAPTORS = [
@@ -89,6 +97,14 @@ REQUIRES_PROBABILITIES_DICT = {
     "Task09_segmenting_rois_in_breast_cancer_wsis": False,
     "Task10_segmenting_lesions_within_vois_in_ct": False,
     "Task11_segmenting_three_anatomical_structures_in_lumbar_spine_mri": False,
+    "Hidden01_breast_cancer_classification_from_HE_whole_slide_image": False,
+    "Hidden02_oral_cancer_classification_from_HE_whole_slide_image": False,
+    "Hidden03_bladder_cancer_classification_from_HE_whole_slide_image": False,
+    "Hidden04_kidney_cancer_classification_from_HE_whole_slide_image": False,
+    "Hidden05_thyroid_cancer_classification_from_HE_whole_slide_image": False,
+    "Hidden06_prostate_cancer_classification_from_HE_whole_slide_image": False,
+    "Hidden07_colorectal_cancer_classification_from_HE_whole_slide_image": False,
+    "Hidden08_ibd_classification_from_HE_whole_slide_image": False,
 }
 
 LANGUAGE_TASK_NAMES = [
