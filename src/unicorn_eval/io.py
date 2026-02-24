@@ -60,6 +60,30 @@ INPUT_SLUGS_DICT = {
         "sagittal-spine-mri"
     ],
     "Task20_generating_caption_from_wsi": ["he-staining"],
+    "Hidden01_breast_cancer_classification_from_HE_whole_slide_image": [
+        "whole-slide-image"
+    ],
+    "Hidden02_oral_cancer_classification_from_HE_whole_slide_image": [
+        "whole-slide-image"
+    ],
+    "Hidden03_bladder_cancer_classification_from_HE_whole_slide_image": [
+        "whole-slide-image"
+    ],
+    "Hidden04_kidney_cancer_classification_from_HE_whole_slide_image": [
+        "whole-slide-image"
+    ],
+    "Hidden05_thyroid_cancer_classification_from_HE_whole_slide_image": [
+        "whole-slide-image"
+    ],
+    "Hidden06_prostate_cancer_classification_from_HE_whole_slide_image": [
+        "whole-slide-image"
+    ],
+    "Hidden07_colorectal_cancer_classification_from_HE_whole_slide_image": [
+        "whole-slide-image"
+    ],
+    "Hidden08_ibd_classification_from_HE_whole_slide_image": [
+        "whole-slide-image"
+    ],
 }
 
 MODEL_OUTPUT_SLUG_DICT = {
@@ -75,6 +99,14 @@ MODEL_OUTPUT_SLUG_DICT = {
     "Task10_segmenting_lesions_within_vois_in_ct": "patch-neural-representation",
     "Task11_segmenting_three_anatomical_structures_in_lumbar_spine_mri": "patch-neural-representation",
     "Task20_generating_caption_from_wsi": "nlp-predictions-dataset",
+    "Hidden01_breast_cancer_classification_from_HE_whole_slide_image": "image-neural-representation",
+    "Hidden02_oral_cancer_classification_from_HE_whole_slide_image": "image-neural-representation",
+    "Hidden03_bladder_cancer_classification_from_HE_whole_slide_image": "image-neural-representation",
+    "Hidden04_kidney_cancer_classification_from_HE_whole_slide_image": "image-neural-representation",
+    "Hidden05_thyroid_cancer_classification_from_HE_whole_slide_image": "image-neural-representation",
+    "Hidden06_prostate_cancer_classification_from_HE_whole_slide_image": "image-neural-representation",
+    "Hidden07_colorectal_cancer_classification_from_HE_whole_slide_image": "image-neural-representation",
+    "Hidden08_ibd_classification_from_HE_whole_slide_image": "image-neural-representation",
 }
 
 LABEL_SLUG_DICT = {
@@ -90,6 +122,14 @@ LABEL_SLUG_DICT = {
     "Task10_segmenting_lesions_within_vois_in_ct": "images/ct-binary-uls/{case_id}.mha",
     "Task11_segmenting_three_anatomical_structures_in_lumbar_spine_mri": "images/sagittal-spine-mr-segmentation/{case_id}.mha",
     "Task20_generating_caption_from_wsi": "nlp-predictions-dataset.json",
+    "Hidden01_breast_cancer_classification_from_HE_whole_slide_image": "cancer-score.json",
+    "Hidden02_oral_cancer_classification_from_HE_whole_slide_image": "cancer-score.json",
+    "Hidden03_bladder_cancer_classification_from_HE_whole_slide_image": "cancer-score.json",
+    "Hidden04_kidney_cancer_classification_from_HE_whole_slide_image": "cancer-score.json",
+    "Hidden05_thyroid_cancer_classification_from_HE_whole_slide_image": "cancer-score.json",
+    "Hidden06_prostate_cancer_classification_from_HE_whole_slide_image": "cancer-score.json",
+    "Hidden07_colorectal_cancer_classification_from_HE_whole_slide_image": "cancer-score.json",
+    "Hidden08_ibd_classification_from_HE_whole_slide_image": "ibd-activity-score.json",
 }
 
 EXTRA_LABEL_SLUG_DICT = {
