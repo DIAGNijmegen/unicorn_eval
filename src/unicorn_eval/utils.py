@@ -460,10 +460,8 @@ def evaluate_predictions(
     metric_fn = METRIC_DICT[task_name]["fn"]
     metric_dict = {}
     additional_metric_dict = {}
-    if task_name == "Task01_classifying_he_prostate_biopsies_into_isup_scores":
-        metric_value = metric_fn(test_labels, test_predictions)
-        metric_dict[metric_name] = metric_value
-    elif task_name == "Task02_classifying_lung_nodule_malignancy_in_ct":
+
+    if task_name == "Task02_classifying_lung_nodule_malignancy_in_ct":
         malignancy_risk = test_predictions[:, 1]
         metric_value = metric_fn(test_labels, malignancy_risk)
         metric_dict[metric_name] = metric_value
@@ -485,21 +483,9 @@ def evaluate_predictions(
         metric_dict[metric_name] = metric_value
     elif (
         task_name
-        == "Task04_predicting_slide_level_tumor_proportion_score_in_ihc_stained_wsi"
-    ):
-        metric_value = metric_fn(test_labels, test_predictions)
-        metric_dict[metric_name] = metric_value
-    elif (
-        task_name
         == "Task05_detecting_signet_ring_cells_in_he_stained_wsi_of_gastric_cancer"
     ):
         metric_value = metric_fn(test_labels, test_predictions, 20) # Data at 0.5um/px, 10um distance
-        metric_dict[metric_name] = metric_value
-    elif (
-        task_name
-        == "Task06_detecting_clinically_significant_prostate_cancer_in_mri_exams"
-    ):
-        metric_value = metric_fn(test_labels, test_predictions)
         metric_dict[metric_name] = metric_value
     elif task_name == "Task07_detecting_lung_nodules_in_thoracic_ct":
         metric_value = metric_fn(
@@ -508,12 +494,6 @@ def evaluate_predictions(
         metric_dict[metric_name] = metric_value
     elif task_name == "Task08_detecting_mitotic_figures_in_breast_cancer_wsis":
         metric_value = metric_fn(test_labels, test_predictions, 30) # Data at 0.25um/px, 7.5um distance
-        metric_dict[metric_name] = metric_value
-    elif task_name == "Task09_segmenting_rois_in_breast_cancer_wsis":
-        metric_value = metric_fn(test_labels, test_predictions)
-        metric_dict[metric_name] = metric_value
-    elif task_name == "Task10_segmenting_lesions_within_vois_in_ct":
-        metric_value = metric_fn(test_labels, test_predictions)
         metric_dict[metric_name] = metric_value
     elif (
         task_name == "Task11_segmenting_three_anatomical_structures_in_lumbar_spine_mri"
@@ -525,7 +505,8 @@ def evaluate_predictions(
         metric_dict[metric_name] = language_metric_dict.pop(metric_name)
         additional_metric_dict.update(language_metric_dict)
     else:
-        raise ValueError(f"Unsupported task: {task_name}")
+        metric_value = metric_fn(test_labels, test_predictions)
+        metric_dict[metric_name] = metric_value
 
     metrics["metrics"] = metric_dict
     metrics["additional_metrics"] = additional_metric_dict
