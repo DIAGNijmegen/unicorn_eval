@@ -74,6 +74,8 @@ ADAPTOR_SLUGS_DICT = {
     "Hidden06_prostate_cancer_classification_from_HE_whole_slide_image": "adaptor-pathology-classification",
     "Hidden07_colorectal_cancer_classification_from_HE_whole_slide_image": "adaptor-pathology-classification",
     "Hidden08_ibd_classification_from_HE_whole_slide_image": "adaptor-pathology-classification",
+    "Hidden09_classifying_lesion_location_in_whole-body_ct": "adaptor-radiology-classification",
+    "Hidden10_classifying_PDAC_and_non-PDAC_in_pancreatic_ct": "adaptor-radiology-classification",
 }
 
 DETERMINISTIC_ADAPTORS = [
@@ -97,14 +99,16 @@ REQUIRES_PROBABILITIES_DICT = {
     "Task09_segmenting_rois_in_breast_cancer_wsis": False,
     "Task10_segmenting_lesions_within_vois_in_ct": False,
     "Task11_segmenting_three_anatomical_structures_in_lumbar_spine_mri": False,
-    "Hidden01_breast_cancer_classification_from_HE_whole_slide_image": False,
-    "Hidden02_oral_cancer_classification_from_HE_whole_slide_image": False,
-    "Hidden03_bladder_cancer_classification_from_HE_whole_slide_image": False,
-    "Hidden04_kidney_cancer_classification_from_HE_whole_slide_image": False,
-    "Hidden05_thyroid_cancer_classification_from_HE_whole_slide_image": False,
-    "Hidden06_prostate_cancer_classification_from_HE_whole_slide_image": False,
-    "Hidden07_colorectal_cancer_classification_from_HE_whole_slide_image": False,
-    "Hidden08_ibd_classification_from_HE_whole_slide_image": False,
+    "Hidden01_breast_cancer_classification_from_HE_whole_slide_image": True,
+    "Hidden02_oral_cancer_classification_from_HE_whole_slide_image": True,
+    "Hidden03_bladder_cancer_classification_from_HE_whole_slide_image": True,
+    "Hidden04_kidney_cancer_classification_from_HE_whole_slide_image": True,
+    "Hidden05_thyroid_cancer_classification_from_HE_whole_slide_image": True,
+    "Hidden06_prostate_cancer_classification_from_HE_whole_slide_image": True,
+    "Hidden07_colorectal_cancer_classification_from_HE_whole_slide_image": True,
+    "Hidden08_ibd_classification_from_HE_whole_slide_image": True,
+    "Hidden09_classifying_lesion_location_in_whole-body_ct": False,
+    "Hidden10_classifying_PDAC_and_non-PDAC_in_pancreatic_ct": True,
 }
 
 LANGUAGE_TASK_NAMES = [

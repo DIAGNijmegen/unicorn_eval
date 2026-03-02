@@ -21,7 +21,7 @@ from functools import partial
 from typing import Any
 
 import numpy as np
-from sklearn.metrics import cohen_kappa_score, roc_auc_score
+from sklearn.metrics import cohen_kappa_score, roc_auc_score, f1_score
 from sksurv.metrics import concordance_index_censored
 
 from unicorn_eval.adaptors import (KNN, ConvDetector, DensityMap, KNNRegressor,
@@ -205,6 +205,18 @@ METRIC_DICT = {
         "lowest": 0,
     },
     "Hidden08_ibd_classification_from_HE_whole_slide_image": {
+        "name": "auc",
+        "fn": roc_auc_score,
+        "range": (0.5, 1),
+        "lowest": 0,
+    },
+    "Hidden09_classifying_lesion_location_in_whole-body_ct": {
+        "name": "f1_score",
+        "fn": partial(f1_score, average="macro"),
+        "range": (0.040501165501165504, 1), # macro F1 score of a majority class baseline, which predicts all lesions to be in the most common location category
+        "lowest": 0,
+    },
+    "Hidden10_classifying_PDAC_and_non-PDAC_in_pancreatic_ct": {
         "name": "auc",
         "fn": roc_auc_score,
         "range": (0.5, 1),
