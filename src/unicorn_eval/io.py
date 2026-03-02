@@ -84,6 +84,12 @@ INPUT_SLUGS_DICT = {
     "Hidden08_ibd_classification_from_HE_whole_slide_image": [
         "whole-slide-image"
     ],
+    "Hidden09_classifying_lesion_location_in_whole-body_ct": [
+        "stacked-3d-ct-volumes-of-lesions"
+    ],
+    "Hidden10_classifying_PDAC_and_non-PDAC_in_pancreatic_ct": [
+        "venous-phase-ct-scan"
+    ],
 }
 
 MODEL_OUTPUT_SLUG_DICT = {
@@ -107,6 +113,8 @@ MODEL_OUTPUT_SLUG_DICT = {
     "Hidden06_prostate_cancer_classification_from_HE_whole_slide_image": "image-neural-representation",
     "Hidden07_colorectal_cancer_classification_from_HE_whole_slide_image": "image-neural-representation",
     "Hidden08_ibd_classification_from_HE_whole_slide_image": "image-neural-representation",
+    "Hidden09_classifying_lesion_location_in_whole-body_ct": "image-neural-representation",
+    "Hidden10_classifying_PDAC_and_non-PDAC_in_pancreatic_ct": "image-neural-representation",
 }
 
 LABEL_SLUG_DICT = {
@@ -130,6 +138,8 @@ LABEL_SLUG_DICT = {
     "Hidden06_prostate_cancer_classification_from_HE_whole_slide_image": "cancer-score.json",
     "Hidden07_colorectal_cancer_classification_from_HE_whole_slide_image": "cancer-score.json",
     "Hidden08_ibd_classification_from_HE_whole_slide_image": "ibd-activity-score.json",
+    "Hidden09_classifying_lesion_location_in_whole-body_ct": "lesion-location-code.json",
+    "Hidden10_classifying_PDAC_and_non-PDAC_in_pancreatic_ct": "pdac-likelihood.json",
 }
 
 EXTRA_LABEL_SLUG_DICT = {
