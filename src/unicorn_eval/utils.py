@@ -473,11 +473,7 @@ def evaluate_predictions(
     metric_dict = {}
     additional_metric_dict = {}
 
-    if task_name == "Task02_classifying_lung_nodule_malignancy_in_ct":
-        malignancy_risk = test_predictions[:, 1]
-        metric_value = metric_fn(test_labels, malignancy_risk)
-        metric_dict[metric_name] = metric_value
-    elif (
+    if (
         task_name
         == "Task03_predicting_the_time_to_biochemical_recurrence_in_he_prostatectomies"
     ):
