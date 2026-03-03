@@ -627,6 +627,9 @@ def process_task_in_subprocess(
                 case_labels = case_information["labels"]
 
                 predictions = adaptor.predict(case_information["ids"])
+                if adaptor.num_classes == 2 and task_type == "classification" and return_probabilities:
+                    # if binary classification with probabilities, convert to single probability for the positive class
+                    predictions = predictions[:, 1]
 
                 run_metrics = evaluate_predictions(
                     task_name=task_name,
