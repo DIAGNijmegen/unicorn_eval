@@ -213,7 +213,7 @@ METRIC_DICT = {
     "Hidden09_classifying_lesion_location_in_whole-body_ct": {
         "name": "f1_score",
         "fn": partial(f1_score, average="macro"),
-        "range": (0.040501165501165504, 1), # macro F1 score of a majority class baseline, which predicts all lesions to be in the most common location category
+        "range": (0.04001151410477836, 1), # macro F1 score of a majority class baseline, which predicts all lesions to be in the most common location category
         "lowest": 0,
     },
     "Hidden10_classifying_PDAC_and_non-PDAC_in_pancreatic_ct": {
