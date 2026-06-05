@@ -87,7 +87,7 @@ class KNNRegressor(CaseLevelTaskAdaptor):
 
     def fit(self, shot_features, shot_labels, **kwargs):
         self.mean_feature = shot_features.mean(axis=0, keepdims=True)
-        shot_features, _ = preprocess_features(
+        shot_features = preprocess_features(
             shot_features,
             center=self.center_features,
             mean=self.mean_feature,
