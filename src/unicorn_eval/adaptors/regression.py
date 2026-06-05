@@ -297,7 +297,7 @@ class LinearProbingRegressor(CaseLevelTaskAdaptor):
             shot_labels = torch.tensor(shot_labels, dtype=torch.long).to(self.device)
             censoring = torch.tensor(censoring, dtype=torch.long).to(self.device)
         else:
-            shot_labels = torch.tensor(shot_labels, dtype=torch.float32).to(self.device)
+            shot_labels = torch.tensor(shot_labels, dtype=torch.float32).to(self.device).unsqueeze(1)
 
         self.model = LinearClassifier(input_dim, self.num_classes).to(self.device)
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
@@ -459,7 +459,7 @@ class MultiLayerPerceptronRegressor(CaseLevelTaskAdaptor):
             shot_labels = torch.tensor(shot_labels, dtype=torch.long).to(self.device)
             censoring = torch.tensor(censoring, dtype=torch.long).to(self.device)
         else:
-            shot_labels = torch.tensor(shot_labels, dtype=torch.float32).to(self.device)
+            shot_labels = torch.tensor(shot_labels, dtype=torch.float32).to(self.device).unsqueeze(1)
 
         self.model = MLPClassifier(
             input_dim, self.hidden_dim, self.num_classes, self.num_layers
