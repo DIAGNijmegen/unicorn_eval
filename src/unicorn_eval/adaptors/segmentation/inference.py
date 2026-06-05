@@ -67,26 +67,30 @@ def inference(decoder, dataloader, patch_size, test_image_sizes=None):
         if case not in predicted_masks:
             case_image_size = test_image_sizes.get(case, None)
             if case_image_size is not None:
-                predicted_masks[case] = np.zeros(case_image_size, dtype=np.float32)
+                width, height = case_image_size
+                predicted_masks[case] = np.zeros((height, width), dtype=np.float32)
             else:
                 raise ValueError(f"Image size not found for case {case}")
 
-        max_x = min(x + patch_size, predicted_masks[case].shape[0])
-        max_y = min(y + patch_size, predicted_masks[case].shape[1])
-        slice_width = max_x - x
-        slice_height = max_y - y
+        height, width = predicted_masks[case].shape
+        x0 = int(x)
+        y0 = int(y)
+        x1 = min(x0 + patch_size, width)
+        y1 = min(y0 + patch_size, height)
+        slice_width = x1 - x0
+        slice_height = y1 - y0
 
         if slice_height > 0 and slice_width > 0:
-            pred_masks_resized = pred_masks[:slice_width, :slice_height]
+            pred_masks_resized = pred_masks[:slice_height, :slice_width]
             predicted_masks[case][
-                x : x + slice_width, y : y + slice_height
+                y0:y1, x0:x1
             ] = pred_masks_resized
         else:
             logging.warning(
                 f"Skipping assignment for case {case} at ({x}, {y}) due to invalid slice size"
             )
 
-    return [v.T for v in predicted_masks.values()]
+    return list(predicted_masks.values())
 
 
 def world_to_voxel(coord, origin, spacing, inv_direction):
