@@ -322,7 +322,7 @@ class LinearProbingRegressor(CaseLevelTaskAdaptor):
             logits = self.model(shot_features)
             if self.survival:
                 hazards = torch.sigmoid(logits)  # [B, nbins]
-                survival = torch.cumprod(1 - hazards, dim=0)  # [B, nbins]
+                survival = torch.cumprod(1 - hazards, dim=-1)  # [B, nbins]
                 loss = self.criterion(hazards, survival, shot_labels, censoring)
             else:
                 loss = self.criterion(logits, shot_labels)
@@ -360,8 +360,8 @@ class LinearProbingRegressor(CaseLevelTaskAdaptor):
                 logits = self.model(test_features)
                 if self.survival:
                     hazards = torch.sigmoid(logits)
-                    survival = torch.cumprod(1 - hazards, dim=0)
-                    risk_scores = -torch.sum(survival, dim=0)
+                    survival = torch.cumprod(1 - hazards, dim=-1)
+                    risk_scores = -torch.sum(survival, dim=-1)
                     prediction = -risk_scores
                     predictions.append(prediction.cpu().numpy())
                 else:
@@ -486,7 +486,7 @@ class MultiLayerPerceptronRegressor(CaseLevelTaskAdaptor):
             logits = self.model(shot_features)
             if self.survival:
                 hazards = torch.sigmoid(logits)  # [B, nbins]
-                survival = torch.cumprod(1 - hazards, dim=0)  # [B, nbins]
+                survival = torch.cumprod(1 - hazards, dim=-1)  # [B, nbins]
                 loss = self.criterion(hazards, survival, shot_labels, censoring)
             else:
                 loss = self.criterion(logits, shot_labels)
@@ -524,8 +524,8 @@ class MultiLayerPerceptronRegressor(CaseLevelTaskAdaptor):
                 logits = self.model(test_features)
                 if self.survival:
                     hazards = torch.sigmoid(logits)
-                    survival = torch.cumprod(1 - hazards, dim=0)
-                    risk_scores = -torch.sum(survival, dim=0)
+                    survival = torch.cumprod(1 - hazards, dim=-1)
+                    risk_scores = -torch.sum(survival, dim=-1)
                     prediction = -risk_scores
                     predictions.append(prediction.cpu().numpy())
                 else:
