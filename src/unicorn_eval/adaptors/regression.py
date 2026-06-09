@@ -87,7 +87,7 @@ class KNNRegressor(CaseLevelTaskAdaptor):
 
     def fit(self, shot_features, shot_labels, **kwargs):
         self.mean_feature = shot_features.mean(axis=0, keepdims=True)
-        shot_features, _ = preprocess_features(
+        shot_features = preprocess_features(
             shot_features,
             center=self.center_features,
             mean=self.mean_feature,
@@ -297,7 +297,7 @@ class LinearProbingRegressor(CaseLevelTaskAdaptor):
             shot_labels = torch.tensor(shot_labels, dtype=torch.long).to(self.device)
             censoring = torch.tensor(censoring, dtype=torch.long).to(self.device)
         else:
-            shot_labels = torch.tensor(shot_labels, dtype=torch.float32).to(self.device)
+            shot_labels = torch.tensor(shot_labels, dtype=torch.float32).to(self.device).unsqueeze(1)
 
         self.model = LinearClassifier(input_dim, self.num_classes).to(self.device)
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
@@ -322,7 +322,7 @@ class LinearProbingRegressor(CaseLevelTaskAdaptor):
             logits = self.model(shot_features)
             if self.survival:
                 hazards = torch.sigmoid(logits)  # [B, nbins]
-                survival = torch.cumprod(1 - hazards, dim=0)  # [B, nbins]
+                survival = torch.cumprod(1 - hazards, dim=-1)  # [B, nbins]
                 loss = self.criterion(hazards, survival, shot_labels, censoring)
             else:
                 loss = self.criterion(logits, shot_labels)
@@ -360,8 +360,8 @@ class LinearProbingRegressor(CaseLevelTaskAdaptor):
                 logits = self.model(test_features)
                 if self.survival:
                     hazards = torch.sigmoid(logits)
-                    survival = torch.cumprod(1 - hazards, dim=0)
-                    risk_scores = -torch.sum(survival, dim=0)
+                    survival = torch.cumprod(1 - hazards, dim=-1)
+                    risk_scores = -torch.sum(survival, dim=-1)
                     prediction = -risk_scores
                     predictions.append(prediction.cpu().numpy())
                 else:
@@ -459,7 +459,7 @@ class MultiLayerPerceptronRegressor(CaseLevelTaskAdaptor):
             shot_labels = torch.tensor(shot_labels, dtype=torch.long).to(self.device)
             censoring = torch.tensor(censoring, dtype=torch.long).to(self.device)
         else:
-            shot_labels = torch.tensor(shot_labels, dtype=torch.float32).to(self.device)
+            shot_labels = torch.tensor(shot_labels, dtype=torch.float32).to(self.device).unsqueeze(1)
 
         self.model = MLPClassifier(
             input_dim, self.hidden_dim, self.num_classes, self.num_layers
@@ -486,7 +486,7 @@ class MultiLayerPerceptronRegressor(CaseLevelTaskAdaptor):
             logits = self.model(shot_features)
             if self.survival:
                 hazards = torch.sigmoid(logits)  # [B, nbins]
-                survival = torch.cumprod(1 - hazards, dim=0)  # [B, nbins]
+                survival = torch.cumprod(1 - hazards, dim=-1)  # [B, nbins]
                 loss = self.criterion(hazards, survival, shot_labels, censoring)
             else:
                 loss = self.criterion(logits, shot_labels)
@@ -524,8 +524,8 @@ class MultiLayerPerceptronRegressor(CaseLevelTaskAdaptor):
                 logits = self.model(test_features)
                 if self.survival:
                     hazards = torch.sigmoid(logits)
-                    survival = torch.cumprod(1 - hazards, dim=0)
-                    risk_scores = -torch.sum(survival, dim=0)
+                    survival = torch.cumprod(1 - hazards, dim=-1)
+                    risk_scores = -torch.sum(survival, dim=-1)
                     prediction = -risk_scores
                     predictions.append(prediction.cpu().numpy())
                 else:
